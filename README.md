@@ -29,10 +29,14 @@ Writing this later.
 
 # Working with SQLite async nonsense
 Old:
-```var info = data.info;
-actOnInfo(info);```
+```
+var info = data.info;
+actOnInfo(info);
+```
 New:
-```sql.getInfo(channel, info => {
+```
+sql.getInfo(channel, info => {
     actOnInfo(info);
-});```
+});
+```
 It's more of a hassle, but the program is much more powerful and flexible now.
