@@ -2,7 +2,13 @@
 A Discord Bot where you power up and have DBZ fights with each other.
 
 # How to Use
-Writing this later.
+Expanding this later:
+- Download code.
+- Update auth.json with your username.
+- Maybe invite bot to server?
+- `node bot.js`
+- Run `!init` before doing anything else.
+- If you want a fresh start, delete `data.sqlite`.
 
 # Database spec
 Writing this later.
