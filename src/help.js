@@ -5,7 +5,7 @@ const Discord = require("discord.js");
 // TODO: Update rank help for Glory mechanics
 module.exports = {
     showHelp(topic) {
-        var output = new Discord.RichEmbed();
+        let output = new Discord.RichEmbed();
         output.setTitle('Help!')
             .setColor(0x00AE86);
 
