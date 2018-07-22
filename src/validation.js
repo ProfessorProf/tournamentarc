@@ -45,7 +45,7 @@ module.exports = {
 				// - Target must exist if specified
 				// - Player and Target must be different people
 				// - Player and Target must both be alive
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					let defeated = player.status.find(s => s.type == 0);
 					if(defeated) {
@@ -75,9 +75,9 @@ module.exports = {
 				// - Target must be alive
 				// - Player must be Nemesis
 				// - Nemesis attack cooldown must be off
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNemesis(errors, player);
+					this.validateNemesis(errors, player);
 					if(nemesis) {
 						if(nemesis.attackTime > now) {
 							let timeString = tools.getTimeString(nemesis.attackTime - now);
@@ -102,9 +102,9 @@ module.exports = {
 				// !destroy validation rules:
 				// - Player must be Nemesis
 				// - Nemesis destroy cooldown must be off
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(!player) {
-					module.exports.validateNemesis(errors, player);
+					this.validateNemesis(errors, player);
 					if(nemesis) {
 						if(nemesis.attackTime > now) {
 							let timeString = tools.getTimeString(nemesis.attackTime - now);
@@ -121,16 +121,17 @@ module.exports = {
 				// - Must be alive
 				// - Must have lost a fight since they last stopped training
 				// - Must not be training
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
+					this.validateNotNemesis(errors, player);
 					let defeated = player.status.find(s => s.type == 0);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot train for another ' + timeString + '.');
-					}
-					if(!player.status.find(s => s.type == 5)) {
-						errors.push('**' + player.name + '** must lose a fight before they can begin training.');
+					} else {
+						if(!player.status.find(s => s.type == 5)) {
+							errors.push('**' + player.name + '** must lose a fight before they can begin training.');
+						}
 					}
 					if(player.status.find(s => s.type == 2)) {
 						errors.push('**' + player.name + '** is already training.');
@@ -156,11 +157,11 @@ module.exports = {
 				// - Must be at least one plant in the garden
 				// - Must be carrying fewer than 3 of the plant in question
 				// TODO: Only react to discovered plants
-				module.exports.validatePlayerRegistered(errors, player);
-				if(player) module.exports.validateNotNemesis(errors, player);
+				this.validatePlayerRegistered(errors, player);
+				if(player) this.validateNotNemesis(errors, player);
 				if(targetName) {
-					let plantType = module.exports.getPlantType(targetName);
-					let plantCount = garden.plants.filter(p => p && p.type == plantType && p.growTime < now).length;
+					let plantType = this.getPlantType(targetName);
+					let plantCount = garden.plants.filter(p => p && p.type == plantType && p.startTime + p.growTime * hour < now).length;
 					if(plantType == -1) {
 						errors.push("You've never heard of that plant.");
 					} else if(plantCount == 0) {
@@ -181,11 +182,11 @@ module.exports = {
 				// - For healing plants, target must be dead
 				// - For other plants, target must be alive
 				// - Player and Target must be different people
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
+					this.validateNotNemesis(errors, player);
 					if(args.length > 1) {
-						let plantType = module.exports.getPlantType(targetName);
+						let plantType = this.getPlantType(targetName);
 						if(plantType == -1) {
 							errors.push("You've never heard of that plant.");
 						}
@@ -226,10 +227,10 @@ module.exports = {
 				// - Must not have done any gardening/searching in past hour
 				// - Must be room in the garden for a new plant
 				// - TODO: Must be a known plant
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
-					module.exports.validateGardenTime(errors, player);
+					this.validateNotNemesis(errors, player);
+					this.validateGardenTime(errors, player);
 					let plantCount = garden.plants.filter(p => p).length;
 					if(plantCount == 3) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
@@ -239,20 +240,20 @@ module.exports = {
 			case 'expand':
 				// !plant validation rules:
 				// - Must not have done any gardening/searching in past hour
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
-					module.exports.validateGardenTime(errors, player);
+					this.validateNotNemesis(errors, player);
+					this.validateGardenTime(errors, player);
 				}
 			case 'water':
 				// !plant validation rules:
 				// - Must not have done any gardening/searching in past hour
 				// - Must be at least one waterable plant
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
-					module.exports.validateGardenTime(errors, player);
-					let plantCount = garden.plants.filter(p => p && p.growTime > now).length;
+					this.validateNotNemesis(errors, player);
+					//this.validateGardenTime(errors, player);
+					let plantCount = garden.plants.filter(p => p && p.startTime + p.growTime * hour > now).length;
 					if(plantCount == 0) {
 						errors.push("There aren't any plants that need watering right now.");
 					}
@@ -262,10 +263,10 @@ module.exports = {
 				// !plant validation rules:
 				// - Must not have done any gardening/searching in past hour
 				// - Must not be over the limit
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
-					module.exports.validateGardenTime(errors, player);
+					this.validateNotNemesis(errors, player);
+					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known).length;
 					if(garden.researchLevel >= knownPlants) {
 						errors.push("You can't research further right now - try `!expand` to work on the garden instead.");
@@ -274,10 +275,10 @@ module.exports = {
 			case 'search':
 				// !search validation rules:
 				// - Must not have done any gardening/searching in past hour
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
-					module.exports.validateActionTime(errors, player);
+					this.validateNotNemesis(errors, player);
+					this.validateActionTime(errors, player);
 				}
 				break;
 			case 'fuse':
@@ -287,9 +288,9 @@ module.exports = {
 				// - Both must be alive
 				// - Both must be Rank B+
 				// - Both must not be fusions
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
+					this.validateNotNemesis(errors, player);
 					if(args.length > 2) {
 						errors.push('Fusion Name must not contain spaces.');
 					}
@@ -333,7 +334,7 @@ module.exports = {
 				// - Player must be at least Rank S
 				// - There must not be a Nemesis
 				// - 24 hours must have passed since the previous Nemesis died
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					if(nemesis.cooldown > now) {
 						let timeString = tools.getTimeString(nemesis.cooldown - now);
@@ -361,9 +362,9 @@ module.exports = {
 			case 'scan':
 				// !scan validation
 				// - Must specify a valid target
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					module.exports.validateNotNemesis(errors, player);
+					this.validateNotNemesis(errors, player);
 					if(target) {
 						if(player.name == target.name) {
 							errors.push('You cannot scan yourself!');
@@ -378,7 +379,7 @@ module.exports = {
 				// - Must not have wished before
 				// - Must have all seven orbs
 				// - Nemesis can only wish for ruin
-				module.exports.validatePlayerRegistered(errors, player);
+				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					if(args.length == 0) {
 						errors.push('Enter `!help wish` for more information.');
@@ -444,14 +445,14 @@ module.exports = {
 		let now = new Date().getTime();
 		if(player.actionTime > now) {
 			let timeString = tools.getTimeString(player.actionTime - now);
-			errors.push(`**${player.name}** cannot act for another ${timeString}.'`);
+			errors.push(`**${player.name}** cannot act for another ${timeString}.`);
 		}
 	},
 	validateGardenTime(errors, player) {
 		let now = new Date().getTime();
 		if(player.gardenTime > now) {
 			let timeString = tools.getTimeString(player.gardenTime - now);
-			errors.push(`**${player.name}** cannot garden for another ${timeString}.'`);
+			errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
 		}
 	},
 	getPlantType(plantName) {

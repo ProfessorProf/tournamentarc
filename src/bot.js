@@ -8,7 +8,6 @@ const sql = require ('./sql.js');
 const help = require('./help.js');
 
 const hour = (60 * 60 * 1000);
-let globalData = {};
 
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.username}!`);
@@ -39,6 +38,12 @@ async function handleMessage(message) {
 	args = args.splice(1);
 
 	let channel = message.channel.id;
+
+	if(cmd == 'as' && name == auth.admin) {
+		name = args[0];
+		args = args.splice(1);
+		cmd = args[0].toLowerCase();
+	}
 
 	if(cmd == 'init' ) {
 		await sql.initializeGame()
@@ -84,25 +89,23 @@ async function handleMessage(message) {
 			message.channel.send(`**${name}** has begun training.`);
 			break;
 		case 'scan':
-			// Incomplete
-			message.channel.send('Scanning...');
-			message.channel.send('```\n' + tools.scoutPlayer(data, target) + '```');
+			message.channel.send({embed: await tools.scoutPlayer(channel, targetName)});
 			break;
 		case 'reset':
-			// Incomplete
-			resetData();
-			message.channel.send('Onwards, to a new universe...! Wins carry over, but all Power Levels and player status has been reverted.');
+			await tools.resetData(channel);
+			message.channel.send('Onwards, to a new universe...! Some Glory is preserved, but all Power Levels and player status has been reverted.');
 			break;
 		case 'garden':
-			// Incomplete
-			message.channel.send('```\n' + tools.displayGarden(data) + '```');
+			message.channel.send({embed: await tools.displayGarden(channel)});
+			break;
+		case 'plant':
+			message.channel.send(await tools.plant(channel, name, targetName));
+			break;
+		case 'water':
+			message.channel.send(await tools.water(channel, name));
 			break;
 		case 'pick':
-			// Incomplete
-			if(!player.flowers) player.flowers = 0;
-			data.flowers--;
-			player.flowers++;
-			message.channel.send('**' + name + '** is now carrying ' + player.flowers + (player.flowers > 1 ? ' flowers.' : ' flower.'));				
+			message.channel.send(await tools.pick(channel, name, targetName));
 			break;
 		case 'heal':
 			// Incomplete
@@ -114,11 +117,6 @@ async function handleMessage(message) {
 				let timeString = tools.getTimeString(target.aliveDate - now);
 				message.channel.send(`**${name}** heals **${target.name}**, but they still won't be able to fight for ${timeString}.`);
 			}
-			break;
-		case 'plant':
-			// Incomplete
-			player.actionTime = now;
-			message.channel.send(tools.plant(data, player));
 			break;
 		case 'expand':
 			// Incomplete
@@ -169,6 +167,10 @@ async function handleMessage(message) {
 			// Delete this before S3 starts
 			await sql.clone(channel, name, targetName);
 			break;
+		case 'autofight':
+			// Delete this before S3 starts
+			await sql.autofight(channel, name, targetName);
+			break;
 	}
 	let endTime = new Date().getTime();
 	let duration = (endTime - now) / 1000;
@@ -192,7 +194,6 @@ function loadData() {
 							}
 						}
 					}
-					globalData[data.id] = data;
 					console.log(`Loaded data for channel ID ${data.id}`);
 				}
 			});

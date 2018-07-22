@@ -10,7 +10,6 @@ module.exports = {
 		if(!player) {
 			console.log('Player not found');
 			return null;
-			return;
 		}
 		let embed = new Discord.RichEmbed();
 		let now = new Date().getTime();
@@ -19,14 +18,14 @@ module.exports = {
 
 		if(player.isNemesis) {
 			embed.setDescription('NEMESIS');
-		} else if(module.exports.isFusion(player)) {
+		} else if(this.isFusion(player)) {
 			embed.setDescription(`Fusion between ${player.fusionNames[0]} and ${player.fusionNames[1]}`);
 		}
 		
 		// Display Glory/Rank
 		let stats = `${player.glory} Glory\n`;
 		let glory = player.glory;
-		if(module.exports.isFusion(player)) glory = Math.floor(glory / 2);
+		if(this.isFusion(player)) glory = Math.floor(glory / 2);
 		if(glory < 50) {
 			stats += 'Unranked Warrior\n';
 		} else if(glory< 100) {
@@ -48,10 +47,10 @@ module.exports = {
 		stats += 'Power Level: '
 		let level = numeral(player.level.toPrecision(2));
 		stats += level.format('0,0');
-		if(player.status.find(s => s.type == 2) > -1) {
+		if(player.status.find(s => s.type == 2)) {
 			stats += '?';
 		}
-	
+		
 		if(player.gardenLevel >= 1) {
 			stats += '\nGardening Level: ' + Math.floor(player.gardenLevel);
 		}
@@ -69,13 +68,13 @@ module.exports = {
 			if(!s.ends || s.endTime > now) {
 				switch(s.type) {
 					case 0:
-						statuses.push(`Defeated (${module.exports.getTimeString(s.endTime - now)} remaining)`);
+						statuses.push(`Defeated (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
 					case 2:
-						statuses.push(`Training (${module.exports.getTimeString(now - s.startTime)} so far)`);
+						statuses.push(`Training (${this.getTimeString(now - s.startTime)} so far)`);
 						break;
 					case 4:
-						statuses.push(`Overdriving (${module.exports.getTimeString(s.endTime - now)} remaining)`);
+						statuses.push(`Overdriving (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
 					case 5:
 						statuses.push(`Ready to train`);
@@ -83,10 +82,10 @@ module.exports = {
 				}
 			}
 			if(player.gardenTime > now) {
-				statuses.push(`Ready to garden in ${module.exports.getTimeString(now - gardenTime)}`);
+				statuses.push(`Ready to garden in ${this.getTimeString(now - gardenTime)}`);
 			}
 			if(player.actionTime > now) {
-				statuses.push(`Ready to act in ${module.exports.getTimeString(now - actionTime)}`);
+				statuses.push(`Ready to act in ${this.getTimeString(now - actionTime)}`);
 			}
 		}
 		if(statuses.length > 0) {
@@ -110,7 +109,7 @@ module.exports = {
 			if(o.expires > now) {
 				switch(o.type) {
 					case 0:
-						offers.push(`${o.name} wants to \`!fight\` ${o.targetId ? 'you' : 'anyone'} (expires in ${module.exports.getTimeString(o.expires - now)})`);
+						offers.push(`${o.name} wants to \`!fight\` ${o.targetId ? 'you' : 'anyone'} (expires in ${this.getTimeString(o.expires - now)})`);
 						break;
 				}
 			}
@@ -122,44 +121,36 @@ module.exports = {
 		return embed;
 	},
 	// Scout a player's estimated power level and status.
-	// TODO: Needs to be rewritten for SQL DB.
-    scoutPlayer(data, player) {
-        let output = '';
-        output += player.name + '\n';
-        if(player.isNemesis) {
-            output += 'NEMESIS\n';
-        }
-		if(module.exports.isFusion(player)) {
-            output += `Fusion between ${player.fusion[0]} and ${player.fusion[1]}\n`;
+    async scoutPlayer(channel, target) {
+		let now = new Date().getTime();
+		let player = await sql.getPlayer(channel, target);
+		if(!player) {
+			console.log('Player not found');
+			return null;
+		}
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`SCANNING ${player.name.toUpperCase()}...`)
+			.setColor(0x00AE86);
+
+		if(player.isNemesis) {
+			embed.setDescription('NEMESIS');
+		} else if(this.isFusion(player)) {
+			embed.setDescription(`Fusion between ${player.fusionNames[0]} and ${player.fusionNames[1]}`);
 		}
 		
-        output += 'Power Level: '
-        let level = numeral(player.level.toPrecision(2));
-        output += level.format('0,0');
-				
-		if(player.trainingState == 2) {
-			let now = new Date().getTime();
-			output += '?\nTraining for ' + module.exports.getTimeString(now - player.trainingDate) + '\nEstimated True Power: ';
-			// Estimate power level
-			let levelGuess = player.level;
-            let hours = Math.ceil((now - player.trainingDate) / hour);
-            if(hours > 1000) hours = 1000;
-            
-			let newLevel = Math.pow(100, 1 + (data.heat + hours) / 1200);
-			if(newLevel > 1000000000000000000) newLevel = 1000000000000000000;
-			if(module.exports.isFusion(player)) {
-				newLevel *= 1.3;
-			}
-            if(hours <= 16) {
-                levelGuess += newLevel * (hours / 16);
-            } else {
-                levelGuess += newLevel * (1 + 0.01 * (hours / 16));
-            }
-			level = numeral(levelGuess.toPrecision(2));
-			output += level.format('0,0');
-		}
+		stats = 'Power Level: '
+		let level = numeral(player.level.toPrecision(2));
+		stats += level.format('0,0');
+		let training = player.status.find(s => s.type == 2);
+		if(training) {
+			stats += '?';
 
-        return output;
+			let trainingTime = now - training.startTime;
+			stats += `\nTraining for ${this.getTimeString(trainingTime)}`;
+		}
+		embed.addField('Stats', stats);
+
+		return embed;
     },
 	// Converts a time in milliseconds into a readable string.
     getTimeString(milliseconds) {
@@ -232,7 +223,7 @@ module.exports = {
 			if(p.isNemesis) {
 				level += ' [NEMESIS]';
 			}
-			if(module.exports.isFusion(p)) {
+			if(this.isFusion(p)) {
 				level += ' [FUSION]';
 			}
 			let orbs = p.items.find(i => i.type == 0);
@@ -285,7 +276,7 @@ module.exports = {
 		nemesis.attackTime = now + hour * 3;
 		await sql.setNemesis(channel, nemesis);
 		
-		return await module.exports.fight(player1, player2, embed);
+		return await this.fight(player1, player2, embed);
 	},
 	// Either fights a player or sends them a challenge, depending on whether or not they've issued a challenge.
     async tryFight(channel, player, target) {
@@ -305,7 +296,7 @@ module.exports = {
 				// FIGHT
 				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
 						.setColor(0x00AE86);
-				return module.exports.fight(player1, player2, embed);
+				return this.fight(player1, player2, embed);
 			}
 		} else {
 			await sql.addOffer(player1, null, 0);
@@ -318,6 +309,7 @@ module.exports = {
     async fight(player1, player2, embed) {
 		let channel = player1.channel;
 		let world = await sql.getWorld(channel);
+		let now = new Date().getTime();
 		
 		// If fighters are training - take them out of training and power them up
 		let trainingState1 = player1.status.find(s => s.type == 2);
@@ -325,9 +317,9 @@ module.exports = {
 			await sql.deleteStatus(player1.id, 2);
 			let hours = (now - trainingState1.startTime) / hour;
 			if(hours > 1000) hours = 1000;
-			module.exports.addHeat(data, hours);
-			let newPowerLevel = module.exports.getPowerLevel(data.heat);
-			if(module.exports.isFusion(player1)) {
+			this.addHeat(world, hours);
+			let newPowerLevel = this.getPowerLevel(world.heat);
+			if(this.isFusion(player1)) {
 				newPowerLevel *= 1.3;
 			}
 			if(player1.status.find(s => s.type == 10)) {
@@ -346,9 +338,9 @@ module.exports = {
 			await sql.deleteStatus(player2.id, 2);
 			let hours = (now - trainingState1.startTime) / hour;
 			if(hours > 1000) hours = 1000;
-			module.exports.addHeat(data, hours);
-			let newPowerLevel = module.exports.getPowerLevel(data.heat);
-			if(module.exports.isFusion(player2)) {
+			this.addHeat(world, hours);
+			let newPowerLevel = this.getPowerLevel(world.heat);
+			if(this.isFusion(player2)) {
 				newPowerLevel *= 1.3;
 			}
 			if(player2.status.find(s => s.type == 10)) {
@@ -427,7 +419,7 @@ module.exports = {
 		}
 		
 		let history = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
-		let output = await module.exports.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], history, embed);
+		let output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], history, embed);
 		embed.addField('Results', output);
 		return embed;
 	},
@@ -452,7 +444,7 @@ module.exports = {
 			// TODO: Special Nemesis
 			// Delete Nemesis, punish player
 			loser.isNemesis = false;
-			loser.level = module.exports.getPowerLevel(data.heat * 0.8);
+			loser.level = this.getPowerLevel(data.heat * 0.8);
 			hours = 24;
 			output += `${winner.name} defeated the Nemesis! Everyone's sacrifices were not in vain!`;
 
@@ -472,7 +464,7 @@ module.exports = {
 			}
 			for(let key in gloryGains) {
 				let g = gloryGains[key];
-				let rankUp = module.exports.rankUp(g.oldGlory, g.glory);
+				let rankUp = this.rankUp(g.oldGlory, g.glory);
 				output += `\n${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}`;
 				if(rankUp) {
 					output += `\n${g.name}'s Rank has increased!`;
@@ -484,7 +476,7 @@ module.exports = {
 		
 		// Award glory to the winner
 		let glory = Math.ceil(Math.min((loser.level / winner.level) * 10, 100));
-		let rankUp = module.exports.rankUp(winner.glory, glory);
+		let rankUp = this.rankUp(winner.glory, glory);
 		winner.glory += glory;
 		output += `${winner.name} is the winner! +${glory} glory. Total glory: ${winner.glory}`;
 		if(rankUp) {
@@ -522,7 +514,7 @@ module.exports = {
 		await sql.addStatus(loser.channel, loser.id, 0, now + hours * hour);
         
 		// Delete challenges
-		await sql.deleteOffersForDeath(loser);
+		await sql.deleteOffersFromFight(winner.id, loser.id);
         
 		// Save changes
 		await sql.setPlayer(loser);
@@ -572,9 +564,9 @@ module.exports = {
 				await sql.deleteStatus(target.id, 2);
 				let hours = (now - trainingState.startTime) / hour;
 				if(hours > 72) hours = 72;
-				module.exports.addHeat(data, hours);
-				let newPowerLevel = module.exports.getPowerLevel(data.heat);
-				if(module.exports.isFusion(player1)) {
+				this.addHeat(data, hours);
+				let newPowerLevel = this.getPowerLevel(data.heat);
+				if(this.isFusion(player1)) {
 					newPowerLevel *= 1.3;
 				}
 				if(target.status.find(s => s.type == 10)) {
@@ -612,21 +604,21 @@ module.exports = {
             player1.trainingState = 0;
             let hours = Math.ceil((new Date().getTime() - player1.trainingDate) / hour);
             if(hours > 1000) hours = 1000;
-            module.exports.addHeat(data, hours);
+            this.addHeat(data, hours);
         }
         
         if(player2.trainingState == 2) {
             player2.trainingState = 0;
             let hours = Math.floor((new Date().getTime() - player2.trainingDate) / hour);
             if(hours > 1000) hours = 1000;
-            module.exports.addHeat(data, hours);
+            this.addHeat(data, hours);
         }
     
 		let now = new Date().getTime();
         let name = fusionName ? fusionName : player1.name + '|' + player2.name;
         let fusedPlayer = {
             name: name,
-            level: module.exports.getPowerLevel(data.heat) + module.exports.getPowerLevel(data.heat),
+            level: this.getPowerLevel(data.heat) + this.getPowerLevel(data.heat),
 			powerWish: player1.powerWish || player2.powerWish,
             glory: player1.glory + player2.glory,
             challenges: {},
@@ -649,7 +641,7 @@ module.exports = {
 		player1.hasFused = true;
 		player2.hasFused = true;
         
-        return module.exports.getPlayerDescription(data, fusedPlayer);
+        return this.getPlayerDescription(data, fusedPlayer);
 	},
 	// Establish a character as a new Nemesis.
     async setNemesis(channel, username) {
@@ -667,7 +659,7 @@ module.exports = {
 			.setColor(0x00AE86);
 		
 		// Raise heat, abort training
-		module.exports.addHeat(data, 100);
+		this.addHeat(data, 100);
 		await sql.deleteStatus(player.id, 5);
 		
 		if(!nemesis) {
@@ -683,11 +675,11 @@ module.exports = {
 		
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
-			player.level = module.exports.getPowerLevel(data.heat) * 4;
+			player.level = this.getPowerLevel(data.heat) * 4;
 			nemesis.type = 1;
 		} else {
 			// A normal Nemesis
-			player.level = module.exports.getPowerLevel(data.heat) * 10;
+			player.level = this.getPowerLevel(data.heat) * 10;
 			nemesis.type = 0;
 		}
 		
@@ -735,8 +727,8 @@ module.exports = {
 	// End a fusion.
 	// TODO: Needs to be rewritten for SQL DB.
 	breakFusion(data, fusion) {
-		let player1 = module.exports.loadPlayer(data, fusion.fusion[0], true);
-		let player2 = module.exports.loadPlayer(data, fusion.fusion[1], true);
+		let player1 = this.loadPlayer(data, fusion.fusion[0], true);
+		let player2 = this.loadPlayer(data, fusion.fusion[1], true);
 		if(!player1 || !player2) {
 			console.log("Fusion break failed - a player doesn't exist");
 			return;
@@ -765,33 +757,106 @@ module.exports = {
 		}
 		delete data.players[fusion.name];
 	},
-	// Update the garden for !plant.
-	// TODO: Needs to be rewritten for SQL DB.
-	plant(data, player) {
-		let output = '';
-		let time = (Math.random() * 25 + 5) * (1 + 0.09 * player.gardenLevel) * 1000 * 60;
-		console.log(`${player.name} advanced flower clock by ${Math.floor(time / (1000 * 60))} minutes`);
-		let oldFlowers = data.flowers;
-		data.gardenTime -= time;
-		
-		module.exports.updateGarden(data);
-		
-		let newFlowers = data.flowers;
-		let percent = Math.floor((100 * time * Math.pow(1.05, data.gardenLevel)) / (6 * hour));
-		
-		output += `**${player.name}** works on the garden, with a gardening rating of ${percent}%. `;
-		let flowers = newFlowers - oldFlowers;
-		if(flowers) {
-			output += '\n' + flowers > 1 ? (flowers + ' healing flowers grew!') : 'A healing flower grew!';
+	// Add a new plant to the garden.
+	async plant(channel, name, plantName) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+
+		// Which spot is open?
+		let slot = 0;
+		while(slot < 3 && garden.plants[slot]) {
+			slot++;
 		}
+		if(slot == 3) {
+			return;
+		}
+
+		if(!plantName) {
+			plantName = 'flower';
+		}
+
+		let plantId = -1;
+		switch(plantName.toLowerCase()) {
+			case 'flower':
+				plantId = 1;
+				break;
+			case 'rose':
+				plantId = 2;
+				break;
+			case 'carrot':
+				plantId = 3;
+				break;
+			case 'bean':
+				plantId = 4;
+				break;
+			case 'algae':
+				plantId = 5;
+				break;
+			case 'fern':
+				plantId = 6;
+				break;
+		}
+		if(plantId == -1) {
+			return;
+		}
+
+		await sql.addPlant(channel, plantId, slot);
+		let output = `${player.name} plants a ${plantName.toLowerCase()} in the garden.`;
 		
+		// Update garden level
+		if(!player.gardenLevel) player.gardenLevel = 0;
 		let oldGardenLevel = Math.floor(player.gardenLevel);
 		player.gardenLevel += 1 / (1 + player.gardenLevel);
 		let newGardenLevel = Math.floor(player.gardenLevel);
 		if(newGardenLevel > oldGardenLevel) {
 			output += '\nGardening level increased!';
 		}
+		player.gardenTime = now + hour;
+		await sql.setPlayer(player);
+
 		return output;
+	},
+	async water(channel, name) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+
+		let time = ((Math.random() * 20 + 5) * 60 * 1000) * (1 + 0.09 * player.gardenLevel);
+		let output = `${player.name} works on the garden.`;
+		for(let i in garden.plants) {
+			let plant = garden.plants[i];
+			if(plant) {
+				let duration = plant.growTime * hour;
+				let oldProgress = ((now - plant.startTime) / duration) * 100;
+				if(oldProgress < 100) {
+					plant.startTime -= time;
+					let newProgress = ((now - plant.startTime) / duration) * 100;
+					let growth = Math.ceil(newProgress - oldProgress);
+					output += `\n${plant.name} growth increases by ${growth}%.`;
+					if(newProgress >= 100) {
+						output += ` It's ready to be picked!`;
+					}
+					await sql.setPlant(plant);
+				}
+			}
+		}
+		
+		// Update garden level
+		if(!player.gardenLevel) player.gardenLevel = 0;
+		let oldGardenLevel = Math.floor(player.gardenLevel);
+		player.gardenLevel += 1 / (1 + player.gardenLevel);
+		let newGardenLevel = Math.floor(player.gardenLevel);
+		if(newGardenLevel > oldGardenLevel) {
+			output += '\nGardening level increased!';
+		}
+		player.gardenTime = now + hour;
+		await sql.setPlayer(player);
+
+		return output;
+	},
+	async pick(channel, name, slot) {
+		//
 	},
 	// Expand the garden.
 	// TODO: Needs to be rewritten for SQL DB.
@@ -802,10 +867,10 @@ module.exports = {
 		let percent = Math.floor(100 * expansion);
 		output += `**${player.name}** works on the garden, with a gardening rating of ${percent}%.`;
 		data.gardenLevel += expansion;
-		module.exports.updateGarden(data);
+		this.updateGarden(data);
 		
 		let gardenTime = hour * 6 / Math.pow(1.05, data.gardenLevel);
-		output += `\nThe garden will now grow a healing flower every ${module.exports.getTimeString(gardenTime)}.`;
+		output += `\nThe garden will now grow a healing flower every ${this.getTimeString(gardenTime)}.`;
 		
 		let oldGardenLevel = Math.floor(player.gardenLevel);
 		player.gardenLevel += 1 / (1 + player.gardenLevel);
@@ -816,53 +881,39 @@ module.exports = {
 		return output;
 	},
 	// Reset the universe.
-	// TODO: Needs to be rewritten for SQL DB.
-	resetData(data) {
-		let now = new Date().getTime();
-		data.heat = 0;
-		for(let key in data.players) {
-			let player = data.players[key];
-			if(module.exports.isFusion(player)) {
-				module.exports.breakFusion(data, player);
-				delete player;
+	async resetData(channel) {
+		await sql.resetWorld(channel);
+		let players = await sql.getPlayers(channel);
+		for(let i in players) {
+			let player = players[i];
+			if(this.isFusion(player)) {
+				await sql.deletePlayer(player.id);
+			} else {
+				player.glory = Math.floor(player.glory / 2);
+				player.level = this.getPowerLevel(0);
+				player.gardenTime = now;
+				player.gardenLevel = 0;
+				player.actionTime = now;
+				player.actionLevel = 0;
+				player.fusionId = null;
+				player.nemesisFlag = false;
+				player.fusionFlag = false;
+				player.wishFlag = false;
+				await sql.setPlayer(player);
 			}
 		}
-		for(let key in data.players) {
-			let player = data.players[key];
-			player.level = module.exports.getPowerLevel(data.heat);
-			player.trainingState = 0;
-			player.trainingDate = now;
-			player.aliveDate = now;
-			player.challenges = {};
-			player.flowers = 0;
-			player.orbs = 0;
-			player.actionTime = 0;
-			player.gardenLevel = 0;
-			player.searchLevel = 0;
-			player.fusion = [];
-			player.powerWish = false;
-			data.isNemesis = false;
-		}
-		data.flowers = 0;
-		data.nemesis = null;
-		data.gardenTime = now;
-		data.gardenLevel = 0;
-		data.lostOrbs = 7;
-		data.orbs = 0;
-		data.wishTime = now;
-		data.resets++;
 	},
 	// Register a new player.
 	async registerPlayer(channel, username, name) {
 		let world = await sql.getWorld(channel);
 		let now = new Date().getTime();
-		module.exports.addHeat(world, 10);
+		this.addHeat(world, 10);
 		let player = {
 			name: name,
 			username: username,
 			channel: channel,
 			glory: 0,
-			level: module.exports.getPowerLevel(world.heat),
+			level: this.getPowerLevel(world.heat),
 			lastActive: now,
 			gardenTime: now - hour,
 			gardenLevel: 0,
@@ -882,19 +933,46 @@ module.exports = {
 		console.log(`Registered ${username} as ${name}`);
 	},
 	// Display the garden status.
-	// TODO: Needs to be rewritten for SQL DB.
-	displayGarden(data) {
-		module.exports.updateGarden(data);
-		let output = '';
-		output += 'GARDEN STATUS\n'
-		output += 'Healing Flowers: ' + data.flowers + '/3\n';
+	async displayGarden(channel) {
+		let embed = new Discord.RichEmbed();
+		let garden = await sql.getGarden(channel);
+
+		embed.setTitle('The Garden')
+			.setColor(0x00AE86);
 		
-		let maxTime = (6 * hour) / Math.pow(1.05, data.gardenLevel);
-		let timeLeft = maxTime - (new Date().getTime() - data.gardenTime);
-		let timePercent = 100 - Math.ceil(timeLeft * 100 / maxTime);
-		output += 'Next flower is ' + timePercent + '% complete\n';
-		output += 'A flower grows every ' + module.exports.getTimeString(maxTime)
-		return output;
+		let plants = garden.plants.map(p => this.getPlantStatus(p));
+		let plantStatus = '';
+		for(let i = 0; i < 3; i++) {
+			plantStatus += `Plant #${i+1}: ${plants[i]}\n`
+		}
+
+		let gardenLevel = Math.floor(garden.gardenLevel);
+		let gardenProgress = Math.floor((gardenLevel - Math.floor(gardenLevel)) * 100);
+		let researchLevel = Math.floor(garden.researchLevel);
+		let researchProgress = Math.floor((researchLevel - Math.floor(researchLevel)) * 100);
+
+		plantStatus += `\nGarden Level: ${gardenLevel} (${gardenProgress}%)\nResearch Level: ${researchLevel} (${researchProgress}%)`
+		embed.setDescription(plantStatus);
+
+		return embed;
+	},
+	getPlantStatus(plant) {
+		let now = new Date().getTime();
+		let output = '';
+		if(plant) {
+			let duration = plant.growTime * hour;
+			let endTime = plant.startTime + duration;
+			if(now > endTime) {
+				return `${plant.name} (ready to pick)`;
+			} else {
+				console.log(now - plant.startTime);
+				console.log((now - plant.startTime) / duration);
+				let progress = Math.floor(((now - plant.startTime) / duration) * 100 );
+				return `${plant.name} (${progress}% complete)`;
+			}
+		} else {
+			return '(Nothing planted)';
+		}
 	},
 	// Update the garden based on time passing.
 	// TODO: Needs to be rewritten for SQL DB.
