@@ -366,6 +366,25 @@ module.exports = {
 				break;
 		}
 	},
+	// Gives a new item to a player
+	async addItems(channel, playerId, itemId, count) {
+		let existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
+			{$playerId: playerId, $itemId: itemId});
+		if(existingItem) {
+			var newCount = existingItem.Count + count;
+			if(newCount <= 0) {
+				await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
+					{$playerId: playerId, $itemId: itemId});
+			} else {
+				await sql.run(`UPDATE HeldItems SET Count = $count WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
+					{$playerId: playerId, $itemId: itemId, $count: existingItem.Count + count});
+			}
+		} else {
+			await sql.run(`INSERT INTO HeldItems (Channel, Player_ID, Item_ID, Count) VALUES
+				($channel, $playerId, $itemId, $count)`,
+				{$channel: channel, $playerId: playerId, $itemId: itemId, $count: count});
+		}
+	},
 	async setPlant(plant) {
 		await sql.run(`UPDATE Plants SET Plant_Type = $type, StartTime = $startTime WHERE ID = $id`, 
 			{$type: plant.type, $startTime: plant.startTime, $id: plant.id});
@@ -379,8 +398,15 @@ module.exports = {
 		await sql.run(`DELETE FROM PlayerStatus WHERE Player_ID = $playerId AND Status_ID = $type`, {$playerId: playerId, $type: type});
 	},
 	// Delete a Status.
-	async deleteStatus(playerId) {
+	async deletePlayer(playerId) {
 		await sql.run(`DELETE FROM Players WHERE Player_ID = $playerId`, {$playerId: playerId});
+	},
+	// Delete a Plant.
+	async deletePlant(plantId) {
+		await sql.run(`DELETE FROM Plants WHERE ID = $plantId`, {$plantId: plantId});
+		await sql.run(`UPDATE Gardens SET Plant1_ID = 0 WHERE Plant1_ID = $plantId`, {$plantId: plantId});
+		await sql.run(`UPDATE Gardens SET Plant2_ID = 0 WHERE Plant2_ID = $plantId`, {$plantId: plantId});
+		await sql.run(`UPDATE Gardens SET Plant3_ID = 0 WHERE Plant3_ID = $plantId`, {$plantId: plantId});
 	},
 	// Get Nemesis info for a channel.
 	async getNemesis(channel) {
@@ -469,7 +495,7 @@ module.exports = {
 					garden.plants[1] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
-						name: plantRow.Type_Name,
+						name: plantInfo ? plantInfo.Type_Name : null,
 						growTime: plantInfo ? plantInfo.Grow_Time : null,
 						startTime: plantRow.StartTime
 					};
@@ -482,7 +508,7 @@ module.exports = {
 					garden.plants[2] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
-						name: plantRow.Type_Name,
+						name: plantInfo ? plantInfo.Type_Name : null,
 						growTime: plantInfo ? plantInfo.Grow_Time : null,
 						startTime: plantRow.StartTime
 					};
