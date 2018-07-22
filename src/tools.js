@@ -855,8 +855,25 @@ module.exports = {
 
 		return output;
 	},
-	async pick(channel, name, slot) {
-		//
+	async pick(channel, name, plantType) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+
+		// Find the plant
+		let plant = plantType ?
+			garden.plants.find(p => p && p.name.toLowerCase() == plantType.toLowerCase() && p.startTime + p.growTime * hour < now) :
+			garden.plants.find(p => p && p.startTime + p.growTime * hour < now);
+		if(!plant) return;
+
+		// Transfer it into the inventory
+		await sql.addItems(channel, player.id, plant.type, 1);
+		await sql.deletePlant(plant.id);
+
+		return `${player.name} picks a ${plant.name.toLowerCase()}.`;
+	},
+	async useItem(channel, name, plantType, targetName) {
+		// TODO
 	},
 	// Expand the garden.
 	// TODO: Needs to be rewritten for SQL DB.

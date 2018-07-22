@@ -161,6 +161,10 @@ module.exports = {
 				if(player) this.validateNotNemesis(errors, player);
 				if(targetName) {
 					let plantType = this.getPlantType(targetName);
+					let heldPlants = player.items.find(i => i.type == plantType);
+					if(heldPlants && heldPlants.count >= 3) {
+						errors.push("You can't carry any more of that plant.");
+					}
 					let plantCount = garden.plants.filter(p => p && p.type == plantType && p.startTime + p.growTime * hour < now).length;
 					if(plantType == -1) {
 						errors.push("You've never heard of that plant.");
@@ -168,6 +172,12 @@ module.exports = {
 						errors.push("That plant isn't in the garden.");
 					}
 				} else {
+					// If there's no plant specified, then it defaults to picking the first thing in the garden
+					let plant = garden.plants.find(p => p && p.startTime + p.growTime * hour < now);
+					let heldPlants = player.items.find(i => i.type == plant.type);
+					if(heldPlants && heldPlants.count >= 3) {
+						errors.push("You can't carry any more of that plant.");
+					}
 					let plantCount = garden.plants.filter(p => p && p.growTime < now).length;
 					if(plantCount == 0) {
 						errors.push('There are no finished plants in the garden.');
@@ -252,7 +262,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
-					//this.validateGardenTime(errors, player);
+					this.validateGardenTime(errors, player);
 					let plantCount = garden.plants.filter(p => p && p.startTime + p.growTime * hour > now).length;
 					if(plantCount == 0) {
 						errors.push("There aren't any plants that need watering right now.");
@@ -452,28 +462,28 @@ module.exports = {
 		let now = new Date().getTime();
 		if(player.gardenTime > now) {
 			let timeString = tools.getTimeString(player.gardenTime - now);
-			errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
+			//errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
 		}
 	},
 	getPlantType(plantName) {
 		switch(plantName.toLowerCase()) {
 			case 'flower':
-				return 0;
-				break;
-			case 'rose':
 				return 1;
 				break;
-			case 'carrot':
+			case 'rose':
 				return 2;
 				break;
-			case 'bean':
+			case 'carrot':
 				return 3;
 				break;
-			case 'algae':
+			case 'bean':
 				return 4;
 				break;
-			case 'fern':
+			case 'algae':
 				return 5;
+				break;
+			case 'fern':
+				return 6;
 				break;
 			default:
 				return -1;

@@ -107,16 +107,8 @@ async function handleMessage(message) {
 		case 'pick':
 			message.channel.send(await tools.pick(channel, name, targetName));
 			break;
-		case 'heal':
-			// Incomplete
-			player.flowers--;
-			target.aliveDate -= 6 * hour;
-			if(target.aliveDate < now) {
-				message.channel.send(`**${name}** heals **${target.name}** back to fighting shape!`);
-			} else {
-				let timeString = tools.getTimeString(target.aliveDate - now);
-				message.channel.send(`**${name}** heals **${target.name}**, but they still won't be able to fight for ${timeString}.`);
-			}
+		case 'use':
+			message.channel.send(await tools.useItem(channel, name, args[0], args[1]));
 			break;
 		case 'expand':
 			// Incomplete
