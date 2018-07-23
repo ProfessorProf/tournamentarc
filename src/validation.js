@@ -291,7 +291,7 @@ module.exports = {
 					this.validateActionTime(errors, player);
 				}
 				break;
-			case 'fusefakecommand':
+			case 'fuse':
 				// !fuse validation rules:
 				// - Target must exist
 				// - Player and Target must be different people
@@ -299,29 +299,31 @@ module.exports = {
 				// - Both must be Rank B+
 				// - Both must not be fusions
 				this.validatePlayerRegistered(errors, player);
-				if(player) {
-					this.validateNotNemesis(errors, player);
-					if(args.length > 2) {
-						errors.push('Fusion Name must not contain spaces.');
+				if (! player) {
+					break;
+				}
+				this.validateNotNemesis(errors, player);
+				if(args.length > 2) {
+					errors.push('Fusion Name must not contain spaces.');
+				}
+				if(player.fusionFlag) {
+					errors.push(`**${player.name} can't fuse again until the game resets.`);
+				}
+				let defeated = player.status.find(s => s.type == 0);
+				if(defeated) {
+					let timeString = tools.getTimeString(defeated.endTime - now);
+					errors.push('**' + player.name + '** cannot fuse for another ' + timeString + '.');
+				}
+				if(player.glory < 100) {
+					errors.push(`**${player.name}** must be at least Rank B to use Fusion.`);
+				}
+				if(target) {
+					if(target.fusionFlag) {
+						errors.push(`**${target.name} can't fuse again until the game resets.`);
 					}
-					if(player.fusionFlag) {
-						errors.push(`**${player.name} can't fuse again until the game resets.`);
-					}
-					let defeated = player.status.find(s => s.type == 0);
-					if(defeated) {
-						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push('**' + player.name + '** cannot fuse for another ' + timeString + '.');
-					}
-					if(player.glory < 100) {
-						errors.push(`**${player.name}** must be at least Rank B to use Fusion.`);
-					}
-					if(target) {
-						if(target.fusionFlag) {
-							errors.push(`**${target.name} can't fuse again until the game resets.`);
-						}
-						if(player.name == target.name) {
-							errors.push("You can't fuse with yourself!");
-						}
+					if(player.name == target.name) {
+						errors.push("You can't fuse with yourself!");
+					} else {
 						let targetDefeated = target.status.find(s => s.type == 0);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
@@ -330,12 +332,15 @@ module.exports = {
 						if(target.glory < 100) {
 							errors.push(`**${target.name}** must be at least Rank B to use Fusion.`);
 						}
-					} else {
-						errors.push('Must specify a valid target.');
+						if(tools.isFusion(target)) {
+							errors.push("Fused players can't fuse again.");
+						}
 					}
-					if(tools.isFusion(player) || tools.isFusion(target)) {
-						errors.push("Fused players can't fuse again.");
-					}
+				} else {
+					errors.push('Must specify a valid target.');
+				}
+				if(tools.isFusion(player)) {
+					errors.push("Fused players can't fuse again.");
 				}
 				break;
 			case 'nemesis':

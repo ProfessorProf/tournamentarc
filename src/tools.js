@@ -596,35 +596,9 @@ module.exports = {
 
 		const sourcePlayer = await sql.getPlayerByUsername(channel, sourcePlayerName);
 		sourcePlayerName = sourcePlayer.name;
-
-		// Make sure the requestor isn't already a fusion.
-		if (sourcePlayer.fusionId === sourcePlayer.id) {
-			return 'Your fusion can\'t support any more members.';
-		} else if (sourcePlayer.fusionId) {
-			return 'You are already a member of a fusion! Also, how did you even manage to see this message?';
-		}
-
 		const targetPlayer = await sql.getPlayer(channel, targetPlayerName);
 		targetPlayerName = targetPlayer.name;
 		const now = new Date().getTime();
-
-		// Make sure the target actually exists
-		if (! targetPlayer || ! targetPlayer.id) {
-			return 'Player not found.';
-		}
-
-		// Make sure the player isn't trying to fuse with themselves.
-		if (targetPlayer.id == sourcePlayer.id) {
-			return 'You can\'t fuse with yourself! This is a PG game!';
-		}
-
-		// Make sure the target isn't already a fusion.
-		if (targetPlayer.fusionId === targetPlayer.id) {
-			return 'That is already a fusion! Their combined power repels you.';
-		} else if (targetPlayer.fusionId) {
-			return 'That person is already a member of a fusion! Their combined power repels you.';
-		}
-
 		const world = await sql.getWorld(channel);
 
 		// Check to see if we're accepting an offer
