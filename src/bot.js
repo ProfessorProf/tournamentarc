@@ -41,8 +41,8 @@ async function handleMessage(message) {
 
 	if(cmd == 'as' && name == auth.admin) {
 		name = args[0];
-		args = args.splice(1);
-		cmd = args[0].toLowerCase();
+		cmd = args[1].toLowerCase();
+		args = args.splice(2);
 	}
 
 	if(cmd == 'init' ) {
@@ -125,20 +125,8 @@ async function handleMessage(message) {
 			message.channel.send(`\`\`\`\n${output}\`\`\``);;
 			break;
 		case 'fuse':
-			// Incomplete
-			let fusionName = args.length > 1 ? args[1] : null;
-			if(player.fuseOffers[target.name] && player.fuseOffers[target.name].expires > now && player.fuseOffers[target.name].fusionName == fusionName) {
-				// They've issued you a fusion offer recently - fight them!
-				message.channel.send('```\n' + tools.fuse(data, player, target, fusionName) + '```');
-			} else {
-				// No valid offer was found - send one!
-				tools.sendFusionOffer(player, target, fusionName);
-				let fuseCommand = '!fuse ' + name;
-				if(fusionName) fuseCommand += ' ' + fusionName;
-				message.channel.send('**' + name + '** wants to fuse with **' + target.name + '**! ' + target.name + ', enter `' + fuseCommand + '` to accept the offer and fuse.\n' +
-					"**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n" + 
-					'The offer will expire in six hours.');
-			}
+			const fusionName = args.length > 1 ? args[1] : null;
+			message.channel.send(await tools.fuse(channel, message, name, targetName, fusionName));
 			break;
 		case 'nemesis':
 			message.channel.send({embed: await tools.setNemesis(channel, name)});

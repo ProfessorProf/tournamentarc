@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS PlayerStatus (ID INTEGER PRIMARY KEY, Channel TEXT, P
 CREATE TABLE IF NOT EXISTS Statuses (ID INTEGER, Name TEXT, Ends INTEGER, Priority INTEGER);
 CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID INTEGER, Count INTEGER);
 CREATE TABLE IF NOT EXISTS Items (ID TEXT, Channel TEXT, Type_Name TEXT, Known_Flag INTEGER, Plant_Flag INTEGER, Grow_Time INTEGER);
-CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Expires INTEGER);
+CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Extra TEXT, Expires INTEGER);
 CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID INTEGER, Plant3_ID INTEGER,
     Garden_Level REAL, Reseach_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
@@ -155,12 +155,13 @@ module.exports = {
 	},
 	// Creates a new player in the DB.
     async addPlayer(player) {
-		await sql.run(insertPlayerSql,
+		const result = await sql.run(insertPlayerSql,
 			[player.username, player.name, player.channel, player.level,
 				player.actionLevel, player.actionTime, player.gardenLevel, player.gardenTime, 
 				player.glory, player.aliveTime, player.lastActive,
 				player.nemesisFlag, player.fusionFlag, player.wishFlag, player.npcFlag, 
 				player.config.alwaysPrivate, player.config.ping, player.config.pronoun]);
+		return result.lastID;
 	},
 	// Updates a player's attributes.
     async setPlayer(player) {
@@ -245,7 +246,7 @@ module.exports = {
 			LEFT JOIN Items i ON hi.Item_ID = i.ID
 			WHERE hi.Player_ID = $id`, {$id: row.ID});
 		let nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
-		let fusionRows = await sql.all(`SELECT * FROM Players WHERE Fusion_ID = $id`, {$id: row.ID});
+		let fusionRows = await sql.all(`SELECT * FROM Players WHERE Fusion_ID = $id AND ID != $id`, {$id: row.ID});
 
 		let player = {
 			id: row.ID,
@@ -273,9 +274,14 @@ module.exports = {
 			status: [],
 			items: [],
 			fusionId: row.Fusion_ID,
-			fusionNames: []
+			fusionNames: [],
+			fusionIDs: []
 		};
 
+		// Offer types:
+		// 0 = fight
+		// 1 = fusion
+		// 2 = henchman
 		for(let i in offerRows) {
 			let o = offerRows[i];
 			player.offers.push({
@@ -283,7 +289,8 @@ module.exports = {
 				targetId: o.Target_ID,
 				type: o.Type,
 				expires: o.Expires,
-				name: o.Name
+				name: o.Name,
+				extra: o.Extra
 			});
 		}
 		for(let i in statusRows) {
@@ -307,8 +314,10 @@ module.exports = {
 		}
 		
 		if(fusionRows.length == 2) {
-			fusionNames.push(fusionRows[0].Name);
-			fusionNames.push(fusionRows[1].Name);
+			player.fusionNames.push(fusionRows[0].Name);
+			player.fusionIDs.push(fusionRows[0].ID);
+			player.fusionNames.push(fusionRows[1].Name);
+			player.fusionIDs.push(fusionRows[1].ID);
 		}
 		
 		player.isNemesis = nemesisRow && nemesisRow.Player_ID == player.id;
@@ -316,23 +325,25 @@ module.exports = {
 		return player;
 	},
 	// Create a new offer.
-	async addOffer(player, target, type) {
+	async addOffer(player, target, type, extra) {
 		if(!target) {
 			await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId AND Target_ID IS NULL AND Type = $type`, {$playerId: player.id, $type: type});
-			await sql.run(`INSERT INTO Offers (Channel, Player_ID, Type, Expires) VALUES ($channel, $playerId, $type, $expires)`,
+			await sql.run(`INSERT INTO Offers (Channel, Player_ID, Type, Extra, Expires) VALUES ($channel, $playerId, $type, $extra, $expires)`,
 				{
 					$channel: player.channel,
 					$playerId: player.id,
 					$type: type,
+					$extra: extra,
 					$expires: new Date().getTime() + hour * 6
 				});
 		} else {
-			await sql.run(`INSERT OR REPLACE INTO Offers (Channel, Player_ID, Target_ID, Type, Expires) VALUES ($channel, $playerId, $targetId, $type, $expires)`,
+			await sql.run(`INSERT OR REPLACE INTO Offers (Channel, Player_ID, Target_ID, Type, Extra, Expires) VALUES ($channel, $playerId, $targetId, $type, $extra, $expires)`,
 			{
 				$channel: player.channel,
 				$playerId: player.id,
 				$targetId: target.id,
 				$type: type,
+				$extra: extra,
 				$expires: new Date().getTime() + hour * 6
 			});
 		}
@@ -399,7 +410,9 @@ module.exports = {
 	},
 	// Delete a Status.
 	async deletePlayer(playerId) {
-		await sql.run(`DELETE FROM Players WHERE Player_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM Players WHERE ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM PlayerStatus WHERE Player_ID = $playerId`, {$playerId: playerId});
 	},
 	// Delete a Plant.
 	async deletePlant(plantId) {
@@ -531,6 +544,14 @@ module.exports = {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: loserId});
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId AND Target_ID IS NULL`, {$playerId: winnerId});
 	},
+	// Delete all fusion offers (for instance, for a player that just fused).
+	async deleteAllFusionOffers(playerId) {
+		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId AND type = 1`, {$playerId: playerId});
+	},
+	// Set fusion ID (when creating or removing fusions)
+	async setFusionId(playerId, fusionId) {
+		await sql.run(`UPDATE Players SET Fusion_ID = $fusionId WHERE ID = $playerId`, {$playerId: playerId, $fusionId: fusionId});
+	},
 	// Update channel heat.
 	async setHeat(channel, heat) {
 		await sql.run(`UPDATE Worlds SET Heat = $heat WHERE Channel = $channel`, {$channel: channel, $heat: heat});
@@ -576,8 +597,59 @@ module.exports = {
 			var status = statusRows[i];
 			switch(status.Status_ID) {
 				case 0:
+				    // Death
 					messages.push(`**${status.Name}** is ready to fight.`);
-					this.addStatus()
+					this.addStatus();
+					break;
+				case 9:
+					// Fusion
+					const fusedCharacter = await this.getPlayerById(status.Player_ID);
+					const fusedPlayer1 = await this.getPlayerById(fusedCharacter.fusionIDs[0]);
+					const fusedPlayer2 = await this.getPlayerById(fusedCharacter.fusionIDs[1]);
+
+					// Divvy up skill and glory gains
+					const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
+					const gardenDiff = (fusedCharacter.gardenLevel - preGarden) / 2;
+					fusedPlayer1.gardenLevel += gardenDiff;
+					fusedPlayer2.gardenLevel += gardenDiff;
+
+					const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
+					const actionDiff = (fusedCharacter.actionLevel - preAction) / 2;
+					fusedPlayer1.actionLevel += actionDiff;
+					fusedPlayer2.actionLevel += actionDiff;
+
+					const preLevel = fusedPlayer1.level + fusedPlayer2.level;
+					const levelDiff = (fusedCharacter.level - preLevel) / 2;
+					fusedPlayer1.level += levelDiff;
+					fusedPlayer2.level += levelDiff;
+
+					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
+					const gloryDiff = Math.floor((fusedCharacter.glory - preGlory) / 2);
+					fusedPlayer1.glory += gloryDiff;
+					fusedPlayer2.glory += gloryDiff;
+
+					await this.setPlayer(fusedPlayer1);
+					await this.setPlayer(fusedPlayer2);
+
+					// Roll for items like this is some kind of old-school MMO raid
+					for (const item of fusedCharacter.items) {
+						for (let i = 0; i < item.count; i++) {
+							if (Math.random() >= 0.5) {
+								await this.addItems(channel, fusedPlayer1.id, item.type, 1);
+							} else {
+								await this.addItems(channel, fusedPlayer2.id, item.type, 1);
+							}
+						}
+					}
+
+					// Unfuse
+					await this.setFusionId(fusedPlayer1.id, 0);
+					await this.setFusionId(fusedPlayer2.id, 0);
+
+					// Clean up the fusion player
+					await this.deletePlayer(fusedCharacter.id);
+
+					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
 					break;
 			}
 		}

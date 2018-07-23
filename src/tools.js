@@ -6,8 +6,13 @@ const hour = (60 * 60 * 1000);
 module.exports = {
 	// Gets an Embed showing a player's status.
 	async getPlayerDescription(channel, username) {
-		let player = await sql.getPlayerByUsername(channel, username);
-		if(!player) {
+		return this.generatePlayerDescription(await sql.getPlayerByUsername(channel, username));
+	},
+	async getPlayerDescriptionById(id) {
+		return this.generatePlayerDescription(await sql.getPlayerById(id));
+	},
+	async generatePlayerDescription(player) {
+		if(! player) {
 			console.log('Player not found');
 			return null;
 		}
@@ -187,6 +192,9 @@ module.exports = {
 		let rows = [];
 		for(let i in players) {
 			let p = players[i];
+			if (p.fusionId && p.fusionId != p.id) {
+				continue;
+			}
 			let row = [];
 			row.push(p.name);
 			if(p.name.length > headers[0]) headers[0] = p.name.length;
@@ -305,6 +313,34 @@ module.exports = {
 			return embed;
 		}
 	},
+	// End training and power up a player. Will do nothing if player is not training.
+	async completeTraining(player) {
+		const now = new Date().getTime();
+		const trainingState = player.status.find(s => s.type == 2);
+		if (! trainingState) {
+			// Not training, so no need to do anything
+			return;
+		}
+		await sql.deleteStatus(player.id, 2);
+		const hours = (now - trainingState.startTime) / hour;
+		if (hours > 1000) {
+			hours = 1000;
+		}
+		this.addHeat(world, hours);
+		const newPowerLevel = this.getPowerLevel(world.heat);
+		if (this.isFusion(player)) {
+			newPowerLevel *= 1.3;
+		}
+		if (player.status.find(s => s.type == 10)) {
+			newPowerLevel *= 1.5;
+		}
+		console.log(`Upgrading ${player.name}'s power level after ${hours} hours of training, +${newPowerLevel}`);
+		if (hours <= 16) {
+			player.level += newPowerLevel * (hours / 16);
+		} else {
+			player.level += newPowerLevel * (1 + 0.01 * (hours / 16));
+		}
+	},
 	// Fight between two players.
     async fight(player1, player2, embed) {
 		let channel = player1.channel;
@@ -312,48 +348,9 @@ module.exports = {
 		let now = new Date().getTime();
 		
 		// If fighters are training - take them out of training and power them up
-		let trainingState1 = player1.status.find(s => s.type == 2);
-		if(trainingState1) {
-			await sql.deleteStatus(player1.id, 2);
-			let hours = (now - trainingState1.startTime) / hour;
-			if(hours > 1000) hours = 1000;
-			this.addHeat(world, hours);
-			let newPowerLevel = this.getPowerLevel(world.heat);
-			if(this.isFusion(player1)) {
-				newPowerLevel *= 1.3;
-			}
-			if(player1.status.find(s => s.type == 10)) {
-				newPowerLevel *= 1.5;
-			}
-			console.log(`Upgrading ${player1.name}'s power level after ${hours} hours of training, +${newPowerLevel}`);
-			if(hours <= 16) {
-				player1.level += newPowerLevel * (hours / 16);
-			} else {
-				player1.level += newPowerLevel * (1 + 0.01 * (hours / 16));
-			}
-		}
-	
-		let trainingState2 = player2.status.find(s => s.type == 2);
-		if(trainingState2) {
-			await sql.deleteStatus(player2.id, 2);
-			let hours = (now - trainingState1.startTime) / hour;
-			if(hours > 1000) hours = 1000;
-			this.addHeat(world, hours);
-			let newPowerLevel = this.getPowerLevel(world.heat);
-			if(this.isFusion(player2)) {
-				newPowerLevel *= 1.3;
-			}
-			if(player2.status.find(s => s.type == 10)) {
-				newPowerLevel *= 1.5;
-			}
-			console.log(`Upgrading ${player2.name}'s power level after ${Math.ceil(hours)} hours of training, +${newPowerLevel}`);
-			if(hours <= 16) {
-				player2.level += newPowerLevel * (hours / 16);
-			} else {
-				player2.level += newPowerLevel * (1 + 0.01 * (hours / 16));
-			}
-		}
-		
+		await this.completeTraining(player1);
+		await this.completeTraining(player2);
+
 		embed.addField('Power Levels', `${player1.name}: ${numeral(player1.level.toPrecision(2)).format('0,0')}\n${player2.name}: ${numeral(player2.level.toPrecision(2)).format('0,0')}`);
 		
 		// Randomize, then adjust skill ratings
@@ -597,51 +594,79 @@ module.exports = {
 		embed.addField('Damage Report', output);
 		return embed;
 	},
-	// Create a new Fusion.
-	// TODO: Needs to be rewritten for SQL DB.
-    fuse(data, player1, player2, fusionName) {
-        if(player1.trainingState == 2) {
-            player1.trainingState = 0;
-            let hours = Math.ceil((new Date().getTime() - player1.trainingDate) / hour);
-            if(hours > 1000) hours = 1000;
-            this.addHeat(data, hours);
-        }
-        
-        if(player2.trainingState == 2) {
-            player2.trainingState = 0;
-            let hours = Math.floor((new Date().getTime() - player2.trainingDate) / hour);
-            if(hours > 1000) hours = 1000;
-            this.addHeat(data, hours);
-        }
-    
-		let now = new Date().getTime();
-        let name = fusionName ? fusionName : player1.name + '|' + player2.name;
-        let fusedPlayer = {
-            name: name,
-            level: this.getPowerLevel(data.heat) + this.getPowerLevel(data.heat),
-			powerWish: player1.powerWish || player2.powerWish,
-            glory: player1.glory + player2.glory,
-            challenges: {},
-            lastActive: now,
-            aliveDate: now,
-            trainingState: 0,
-            trainingDate: now,
-            gardenLevel: player1.gardenLevel + player2.gardenLevel,
-			flowers: player1.flowers + player2.flowers,
-			orbs: player1.orbs + player2.orbs,
-            fusion: [player1.name, player2.name],
-			fusionTime: now
-        };
+	// Attempt to create a new Fusion.
+    async fuse(channel, message, sourcePlayerName, targetPlayerName, fusionName) {
+
+		const sourcePlayer = await sql.getPlayerByUsername(channel, sourcePlayerName);
+		sourcePlayerName = sourcePlayer.name;
+		const targetPlayer = await sql.getPlayer(channel, targetPlayerName);
+		targetPlayerName = targetPlayer.name;
+		const now = new Date().getTime();
+		const world = await sql.getWorld(channel);
+
+		// Check to see if we're accepting an offer
+		for (const offer of sourcePlayer.offers) {
+			if (offer.type === 1 && offer.targetId === sourcePlayer.id && fusionName === offer.extra) {
+				await this.completeTraining(sourcePlayer);
+				await this.completeTraining(targetPlayer);
+				const name = fusionName ? fusionName : sourcePlayer.name + '|' + targetPlayer.name;
+				const fusedPlayer = {
+					name: name,
+					channel: channel,
+					level: Math.max(sourcePlayer.level, this.getPowerLevel(world.heat)) + Math.max(targetPlayer.level, this.getPowerLevel(world.heat)),
+					powerWish: sourcePlayer.powerWish || targetPlayer.powerWish,
+					glory: sourcePlayer.glory + targetPlayer.glory,
+					challenges: {},
+					lastActive: now,
+					aliveDate: now,
+					trainingState: 0,
+					trainingDate: now,
+					gardenTime: now - hour,
+					actionTime: now - hour,
+					gardenLevel: sourcePlayer.gardenLevel + targetPlayer.gardenLevel,
+					flowers: sourcePlayer.flowers + targetPlayer.flowers,
+					orbs: sourcePlayer.orbs + targetPlayer.orbs,
+					fusionTime: now,
+					nemesisFlag: false,
+					fusionFlag: true,
+					wishFlag: false,
+					config: {
+						alwaysPrivate: false,
+						ping: false,
+						pronoun: 'they'
+					}
+				};
+				const fusionId = await sql.addPlayer(fusedPlayer);
+				fusedPlayer.id = fusionId;
+				await sql.setFusionId(fusionId, fusionId);
+				await sql.setFusionId(sourcePlayer.id, fusionId);
+				await sql.setFusionId(targetPlayer.id, fusionId);
+				await sql.deleteAllFusionOffers(sourcePlayer.id);
+				await sql.deleteAllFusionOffers(targetPlayer.id);
+				await sql.addStatus(channel, fusionId, 9, now + 24 * hour);
+				for (const item of sourcePlayer.items) {
+					await sql.addItems(channel, fusionId, item.type, item.count);
+					await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
+				}
+				for (const item of targetPlayer.items) {
+					await sql.addItems(channel, fusionId, item.type, item.count);
+					await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
+				}
+				console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
+				message.channel.send('The two warriors pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!');
+				return {embed: await this.getPlayerDescriptionById(fusionId)};
+			}
+		}
+
+		// Send an offer to the other player
 		
-        data.players[fusedPlayer.name] = fusedPlayer;
-        player1.fusion = [name];
-        player2.fusion = [name];
-		player1.fusionTime = now;
-		player2.fusionTime = now;
-		player1.hasFused = true;
-		player2.hasFused = true;
-        
-        return this.getPlayerDescription(data, fusedPlayer);
+		const expiration = now + hour * 6;
+		const fuseCommand = `!fuse ${sourcePlayerName}` + (fusionName ? ' ' + fusionName : '');
+		sql.addOffer(sourcePlayer, targetPlayer, 1, fusionName);
+		console.log(`'New fusion offer from ${sourcePlayerName} for player ${targetPlayerName} expires at ${new Date(expiration)}`);
+		return `**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter ${fuseCommand} to accept the offer and fuse.\n` +
+			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
+			'The offer will expire in six hours.';
 	},
 	// Establish a character as a new Nemesis.
     async setNemesis(channel, username) {
@@ -689,26 +714,9 @@ module.exports = {
 		embed.setDescription(`**${player.name}** has become a Nemesis, and is invading the whole galaxy! Their rampage will continue until they are defeated in battle.\nThe Nemesis can no longer use most peaceful actions, but in exchange, they have access to several powerful new abilities. For more information, enter \`!help nemesis\`.`);
 		return embed;
 	},
-	// Check whether or not a player is a Nemesis.
+	// Check whether or not a player is a fusion.
     isFusion(player) {
         return player.fusionNames.length == 2;
-	},
-	// Request to fuse with another player.
-	// TODO: Needs to be rewritten for SQL DB.
-    sendFusionOffer(player, target, fusionName) {
-        let expirationDate = new Date();
-        expirationDate.setHours(expirationDate.getHours() + 6);
-
-        if(!target) return;
-        if(!target.fuseOffers) target.fuseOffers = {};
-        let offer = {
-            fuser: player.name,
-            expires: expirationDate.getTime(),
-			fusionName: fusionName
-        }
-        target.fuseOffers[player.name] = offer;
-		delete player.fuseOffers[target.name];
-        console.log('New fusion offer for player ' + target.name + ' expires at ' + new Date(offer.expires));
 	},
 	// Generates a new power level based on the current Heat.
     getPowerLevel(heat) {
