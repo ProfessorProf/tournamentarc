@@ -624,7 +624,7 @@ module.exports = {
 					fusedPlayer2.level += levelDiff;
 
 					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
-					const gloryDiff = (fusedCharacter.glory - preGlory) / 2;
+					const gloryDiff = Math.floor((fusedCharacter.glory - preGlory) / 2);
 					fusedPlayer1.glory += gloryDiff;
 					fusedPlayer2.glory += gloryDiff;
 
