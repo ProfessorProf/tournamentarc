@@ -274,7 +274,8 @@ module.exports = {
 			status: [],
 			items: [],
 			fusionId: row.Fusion_ID,
-			fusionNames: []
+			fusionNames: [],
+			fusionIDs: []
 		};
 
 		// Offer types:
@@ -314,7 +315,9 @@ module.exports = {
 		
 		if(fusionRows.length == 2) {
 			player.fusionNames.push(fusionRows[0].Name);
+			player.fusionIDs.push(fusionRows[0].ID);
 			player.fusionNames.push(fusionRows[1].Name);
+			player.fusionIDs.push(fusionRows[1].ID);
 		}
 		
 		player.isNemesis = nemesisRow && nemesisRow.Player_ID == player.id;
@@ -407,7 +410,9 @@ module.exports = {
 	},
 	// Delete a Status.
 	async deletePlayer(playerId) {
-		await sql.run(`DELETE FROM Players WHERE Player_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM Players WHERE ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM PlayerStatus WHERE Player_ID = $playerId`, {$playerId: playerId});
 	},
 	// Delete a Plant.
 	async deletePlant(plantId) {
@@ -592,8 +597,59 @@ module.exports = {
 			var status = statusRows[i];
 			switch(status.Status_ID) {
 				case 0:
+				    // Death
 					messages.push(`**${status.Name}** is ready to fight.`);
-					this.addStatus()
+					this.addStatus();
+					break;
+				case 9:
+					// Fusion
+					const fusedCharacter = await this.getPlayerById(status.Player_ID);
+					const fusedPlayer1 = await this.getPlayerById(fusedCharacter.fusionIDs[0]);
+					const fusedPlayer2 = await this.getPlayerById(fusedCharacter.fusionIDs[1]);
+
+					// Divvy up skill and glory gains
+					const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
+					const gardenDiff = Math.ceil((fusedCharacter.gardenLevel - preGarden) / 2);
+					fusedPlayer1.gardenLevel += gardenDiff;
+					fusedPlayer2.gardenLevel += gardenDiff;
+
+					const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
+					const actionDiff = Math.ceil((fusedCharacter.actionLevel - preAction) / 2);
+					fusedPlayer1.actionLevel += actionDiff;
+					fusedPlayer2.actionLevel += actionDiff;
+
+					const preLevel = fusedPlayer1.level + fusedPlayer2.level;
+					const levelDiff = Math.ceil((fusedCharacter.level - preLevel) / 2);
+					fusedPlayer1.level += levelDiff;
+					fusedPlayer2.level += levelDiff;
+
+					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
+					const gloryDiff = Math.ceil((fusedCharacter.glory - preGlory) / 2);
+					fusedPlayer1.glory += gloryDiff;
+					fusedPlayer2.glory += gloryDiff;
+
+					await this.setPlayer(fusedPlayer1);
+					await this.setPlayer(fusedPlayer2);
+
+					// Roll for items like this is some kind of old-school MMO raid
+					for (const item of fusedCharacter.items) {
+						for (let i = 0; i < item.count; i++) {
+							if (Math.random() >= 0.5) {
+								await this.addItems(channel, fusedPlayer1.id, item.type, 1);
+							} else {
+								await this.addItems(channel, fusedPlayer2.id, item.type, 1);
+							}
+						}
+					}
+
+					// Unfuse
+					await this.setFusionId(fusedPlayer1.id, 0);
+					await this.setFusionId(fusedPlayer2.id, 0);
+
+					// Clean up the fusion player
+					await this.deletePlayer(fusedCharacter.id);
+
+					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
 					break;
 			}
 		}

@@ -8,7 +8,7 @@ module.exports = {
 	async getPlayerDescription(channel, username) {
 		return this.generatePlayerDescription(await sql.getPlayerByUsername(channel, username));
 	},
-	async getPlayerDescriptionByID(channel, id) {
+	async getPlayerDescriptionById(channel, id) {
 		return this.generatePlayerDescription(await sql.getPlayerById(channel, id));
 	},
 	async generatePlayerDescription(player) {
@@ -192,6 +192,9 @@ module.exports = {
 		let rows = [];
 		for(let i in players) {
 			let p = players[i];
+			if (p.fusionId && p.fusionId != p.id) {
+				continue;
+			}
 			let row = [];
 			row.push(p.name);
 			if(p.name.length > headers[0]) headers[0] = p.name.length;
@@ -634,15 +637,24 @@ module.exports = {
 					}
 				};
 				const fusionId = await sql.addPlayer(fusedPlayer);
+				fusedPlayer.id = fusionId;
 				await sql.setFusionId(fusionId, fusionId);
 				await sql.setFusionId(sourcePlayer.id, fusionId);
 				await sql.setFusionId(targetPlayer.id, fusionId);
 				await sql.deleteAllFusionOffers(sourcePlayer.id);
 				await sql.deleteAllFusionOffers(targetPlayer.id);
 				await sql.addStatus(channel, fusionId, 9, now + 24 * hour);
+				for (const item of sourcePlayer.items) {
+					await sql.addItems(channel, fusionId, item.type, item.count);
+					await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
+				}
+				for (const item of targetPlayer.items) {
+					await sql.addItems(channel, fusionId, item.type, item.count);
+					await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
+				}
 				console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
 				message.channel.send('The two warriors pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!');
-				return this.getPlayerDescriptionById(channel, fusionId);
+				return {embed: await this.getPlayerDescriptionById(channel, fusionId)};
 			}
 		}
 
