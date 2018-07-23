@@ -291,7 +291,7 @@ module.exports = {
 					this.validateActionTime(errors, player);
 				}
 				break;
-			case 'fuse':
+			case 'fusefakecommand':
 				// !fuse validation rules:
 				// - Target must exist
 				// - Player and Target must be different people
