@@ -609,22 +609,22 @@ module.exports = {
 
 					// Divvy up skill and glory gains
 					const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
-					const gardenDiff = Math.ceil((fusedCharacter.gardenLevel - preGarden) / 2);
+					const gardenDiff = (fusedCharacter.gardenLevel - preGarden) / 2;
 					fusedPlayer1.gardenLevel += gardenDiff;
 					fusedPlayer2.gardenLevel += gardenDiff;
 
 					const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
-					const actionDiff = Math.ceil((fusedCharacter.actionLevel - preAction) / 2);
+					const actionDiff = (fusedCharacter.actionLevel - preAction) / 2;
 					fusedPlayer1.actionLevel += actionDiff;
 					fusedPlayer2.actionLevel += actionDiff;
 
 					const preLevel = fusedPlayer1.level + fusedPlayer2.level;
-					const levelDiff = Math.ceil((fusedCharacter.level - preLevel) / 2);
+					const levelDiff = (fusedCharacter.level - preLevel) / 2;
 					fusedPlayer1.level += levelDiff;
 					fusedPlayer2.level += levelDiff;
 
 					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
-					const gloryDiff = Math.ceil((fusedCharacter.glory - preGlory) / 2);
+					const gloryDiff = (fusedCharacter.glory - preGlory) / 2;
 					fusedPlayer1.glory += gloryDiff;
 					fusedPlayer2.glory += gloryDiff;
 
