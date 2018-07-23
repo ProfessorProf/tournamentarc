@@ -8,8 +8,8 @@ module.exports = {
 	async getPlayerDescription(channel, username) {
 		return this.generatePlayerDescription(await sql.getPlayerByUsername(channel, username));
 	},
-	async getPlayerDescriptionById(channel, id) {
-		return this.generatePlayerDescription(await sql.getPlayerById(channel, id));
+	async getPlayerDescriptionById(id) {
+		return this.generatePlayerDescription(await sql.getPlayerById(id));
 	},
 	async generatePlayerDescription(player) {
 		if(! player) {
@@ -654,7 +654,7 @@ module.exports = {
 				}
 				console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
 				message.channel.send('The two warriors pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!');
-				return {embed: await this.getPlayerDescriptionById(channel, fusionId)};
+				return {embed: await this.getPlayerDescriptionById(fusionId)};
 			}
 		}
 
