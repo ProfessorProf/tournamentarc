@@ -417,30 +417,32 @@ module.exports = {
 					if(player.wishFlag) {
 						errors.push("You can only wish upon the orbs once per season.");
 					}
-					let wish = args[0].toLowerCase();
-					switch(wish) {
-						case 'power':
-						case 'immortality':
-						case 'gardening':
-							if(player.isNemesis) {
-								errors.push('The Nemesis can only wish for ruin.');
-							}
-							break;
-						case 'resurrection':
-							if(player.isNemesis) {
-								errors.push('The Nemesis can only wish for ruin.');
-							}
-							break;
-						case 'ruin':
-							if(!player.isNemesis) {
-								errors.push('Only the Nemesis can wish for ruin.');
-							}
-							if(player.glory < 400) {
-								errors.push('requires Rank SS.');
-							}
-							break;
-						default:
-							errors.push('Unrecognized wish.');
+					if(args.length > 0) {
+						let wish = args[0].toLowerCase();
+						switch(wish) {
+							case 'power':
+							case 'immortality':
+							case 'gardening':
+								if(player.isNemesis) {
+									errors.push('The Nemesis can only wish for ruin.');
+								}
+								break;
+							case 'resurrection':
+								if(player.isNemesis) {
+									errors.push('The Nemesis can only wish for ruin.');
+								}
+								break;
+							case 'ruin':
+								if(!player.isNemesis) {
+									errors.push('Only the Nemesis can wish for ruin.');
+								}
+								if(player.glory < 400) {
+									errors.push('requires Rank SS.');
+								}
+								break;
+							default:
+								errors.push('Unrecognized wish.');
+						}
 					}
 				}
 				break;
@@ -478,7 +480,7 @@ module.exports = {
 		let now = new Date().getTime();
 		if(player.gardenTime > now) {
 			let timeString = tools.getTimeString(player.gardenTime - now);
-			//errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
+			errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
 		}
 	},
 	getPlantType(plantName) {
