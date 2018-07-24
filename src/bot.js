@@ -115,9 +115,7 @@ async function handleMessage(message) {
 			message.channel.send(await tools.useItem(channel, name, args[0], args[1]));
 			break;
 		case 'expand':
-			// Incomplete
-			player.actionTime = now;
-			message.channel.send(tools.expand(data, player));
+			message.channel.send(await tools.expand(channel, name));
 			break;
 		case 'search':
 			// Incomplete

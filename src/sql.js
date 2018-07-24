@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID I
 CREATE TABLE IF NOT EXISTS Items (ID TEXT, Channel TEXT, Type_Name TEXT, Known_Flag INTEGER, Plant_Flag INTEGER, Grow_Time INTEGER);
 CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Extra TEXT, Expires INTEGER);
 CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID INTEGER, Plant3_ID INTEGER,
-    Garden_Level REAL, Reseach_Level REAL);
+    Growth_Level REAL, Research_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Type INTEGER, Nemesis_Time INTEGER, Attack_Time INTEGER, 
     Destroy_Time INTEGER, Revive_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
@@ -400,6 +400,10 @@ module.exports = {
 		await sql.run(`UPDATE Plants SET Plant_Type = $type, StartTime = $startTime WHERE ID = $id`, 
 			{$type: plant.type, $startTime: plant.startTime, $id: plant.id});
 	},
+	async setGarden(garden) {
+		await sql.run(`UPDATE Gardens SET Growth_Level = $growthLevel, Research_Level = $researchLevel WHERE Channel = $channel`, 
+			{$growthLevel: garden.growthLevel, $researchLevel: garden.researchLevel, $channel: garden.channel});
+	},
 	async setStatus(status) {
 		await sql.run(`UPDATE PlayerStatus SET StartTime = $startTime, EndTime = $endTime WHERE ID = $id`, 
 			{$startTime: status.startTime, $endTime: status.endTime, $id: status.id});
@@ -491,21 +495,24 @@ module.exports = {
 		let itemRows = await sql.all(`SELECT * FROM Items WHERE Channel = $channel AND Plant_Flag <> 0`, {$channel: channel});
 		if(gardenRow) {
 			let garden = {
+				channel: channel,
 				plants: [null, null, null],
 				plantTypes: [],
-				gardenLevel: 0,
-				researchLevel: 0
+				growthLevel: gardenRow.Growth_Level ? gardenRow.Growth_Level : 0,
+				researchLevel: gardenRow.Research_Level ? gardenRow.Research_Level : 0
 			};
 			if(gardenRow.Plant1_ID) {
 				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant1_ID);
 				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
+					var growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[0] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
 						name: plantInfo ? plantInfo.Type_Name : null,
-						growTime: plantInfo ? plantInfo.Grow_Time : null,
-						startTime: plantRow.StartTime
+						growTime: growTime,
+						startTime: plantRow.StartTime,
+						endTime: plantRow.StartTime + (growTime * hour / (1 + 0.1 * garden.growthLevel))
 					};
 				}
 			}
@@ -513,12 +520,14 @@ module.exports = {
 				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant2_ID);
 				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
+					var growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[1] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
 						name: plantInfo ? plantInfo.Type_Name : null,
-						growTime: plantInfo ? plantInfo.Grow_Time : null,
-						startTime: plantRow.StartTime
+						growTime: growTime,
+						startTime: plantRow.StartTime,
+						endTime: plantRow.StartTime + (growTime * hour / (1 + 0.1 * garden.growthLevel))
 					};
 				}
 			}
@@ -526,12 +535,14 @@ module.exports = {
 				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant3_ID);
 				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
+					var growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[2] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
 						name: plantInfo ? plantInfo.Type_Name : null,
-						growTime: plantInfo ? plantInfo.Grow_Time : null,
-						startTime: plantRow.StartTime
+						growTime: growTime,
+						startTime: plantRow.StartTime,
+						endTime: plantRow.StartTime + (growTime * hour / (1 + 0.1 * garden.growthLevel))
 					};
 				}
 			}
