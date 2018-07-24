@@ -880,7 +880,7 @@ module.exports = {
 		for(let i in garden.plants) {
 			let plant = garden.plants[i];
 			if(plant) {
-				let duration = plant.growTime * hour;
+				let duration = plant.endTime - plant.startTime;
 				let oldProgress = ((now - plant.startTime) / duration) * 100;
 				if(oldProgress < 100) {
 					plant.startTime -= time;
@@ -917,8 +917,8 @@ module.exports = {
 
 		// Find the plant
 		let plant = plantType ?
-			garden.plants.find(p => p && p.name.toLowerCase() == plantType.toLowerCase() && p.startTime + p.growTime * hour < now) :
-			garden.plants.find(p => p && p.startTime + p.growTime * hour < now);
+			garden.plants.find(p => p && p.name.toLowerCase() == plantType.toLowerCase() && p.endTime < now) :
+			garden.plants.find(p => p && p.endTime < now);
 		if(!plant) return;
 
 		// Transfer it into the inventory
@@ -1001,24 +1001,38 @@ module.exports = {
 	},
 	// Expand the garden.
 	// TODO: Needs to be rewritten for SQL DB.
-	expand(data, player) {
+	async expand(channel, name) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+
 		let output = '';
-		let expansion = (Math.random() * 25 + 5) * (1 + 0.09 * player.gardenLevel) / (100 * (3 + data.gardenLevel));
-		console.log(`${player.name} advanced garden level by ${Math.floor(expansion * 10) / 10}`);
+
+		let expansion = (Math.random() * 25 + 5) * (1 + 0.09 * player.gardenLevel) / (100 * (3 + garden.growthLevel));
+		console.log(`${player.name} advanced garden level by ${Math.floor(expansion * 100) / 100}`);
 		let percent = Math.floor(100 * expansion);
 		output += `**${player.name}** works on the garden, with a gardening rating of ${percent}%.`;
-		data.gardenLevel += expansion;
-		this.updateGarden(data);
+		garden.growthLevel += expansion;
 		
-		let gardenTime = hour * 6 / Math.pow(1.05, data.gardenLevel);
-		output += `\nThe garden will now grow a healing flower every ${this.getTimeString(gardenTime)}.`;
+		let gardenEfficiency = 1 + 0.1 * garden.growthLevel;
+		var rate = Math.floor(1000 / gardenEfficiency) / 10;
+		output += `\nYour plants now take ${rate}% the usual time to grow.`;
 		
-		let oldGardenLevel = Math.floor(player.gardenLevel);
-		player.gardenLevel += 1 / (1 + player.gardenLevel);
-		let newGardenLevel = Math.floor(player.gardenLevel);
-		if(newGardenLevel > oldGardenLevel) {
-			output += '\nGardening level increased!';
+		// Update garden level
+		if(player) {
+			if(!player.gardenLevel) player.gardenLevel = 0;
+			let oldGardenLevel = Math.floor(player.gardenLevel);
+			player.gardenLevel += 1 / (1 + player.gardenLevel);
+			let newGardenLevel = Math.floor(player.gardenLevel);
+			if(newGardenLevel > oldGardenLevel) {
+				output += '\nGardening level increased!';
+			}
+			player.gardenTime = now + hour;
+			await sql.setPlayer(player);
 		}
+
+		await sql.setGarden(garden);
+
 		return output;
 	},
 	// Reset the universe.
@@ -1087,12 +1101,12 @@ module.exports = {
 			plantStatus += `Plant #${i+1}: ${plants[i]}\n`
 		}
 
-		let gardenLevel = Math.floor(garden.gardenLevel);
-		let gardenProgress = Math.floor((gardenLevel - Math.floor(gardenLevel)) * 100);
+		let growthLevel = Math.floor(garden.growthLevel);
+		let growthProgress = Math.floor((garden.growthLevel - Math.floor(growthLevel)) * 100);
 		let researchLevel = Math.floor(garden.researchLevel);
-		let researchProgress = Math.floor((researchLevel - Math.floor(researchLevel)) * 100);
+		let researchProgress = Math.floor((garden.researchLevel - Math.floor(researchLevel)) * 100);
 
-		plantStatus += `\nGarden Level: ${gardenLevel} (${gardenProgress}%)\nResearch Level: ${researchLevel} (${researchProgress}%)`
+		plantStatus += `\nGrowth Level: ${growthLevel} (${growthProgress}%)\nResearch Level: ${researchLevel} (${researchProgress}%)`
 		embed.setDescription(plantStatus);
 
 		return embed;
@@ -1101,13 +1115,10 @@ module.exports = {
 		let now = new Date().getTime();
 		let output = '';
 		if(plant) {
-			let duration = plant.growTime * hour;
-			let endTime = plant.startTime + duration;
-			if(now > endTime) {
+			let duration = plant.endTime - plant.startTime;
+			if(now > plant.endTime) {
 				return `${plant.name} (ready to pick)`;
 			} else {
-				console.log(now - plant.startTime);
-				console.log((now - plant.startTime) / duration);
 				let progress = Math.floor(((now - plant.startTime) / duration) * 100 );
 				return `${plant.name} (${progress}% complete)`;
 			}

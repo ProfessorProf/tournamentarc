@@ -165,7 +165,7 @@ module.exports = {
 					if(heldPlants && heldPlants.count >= 3) {
 						errors.push("You can't carry any more of that plant.");
 					}
-					let plantCount = garden.plants.filter(p => p && p.type == plantType && p.startTime + p.growTime * hour < now).length;
+					let plantCount = garden.plants.filter(p => p && p.type == plantType && p.startTime + p.endTime < now).length;
 					if(plantType == -1) {
 						errors.push("You've never heard of that plant.");
 					} else if(plantCount == 0) {
@@ -173,12 +173,12 @@ module.exports = {
 					}
 				} else {
 					// If there's no plant specified, then it defaults to picking the first thing in the garden
-					let plant = garden.plants.find(p => p && p.startTime + p.growTime * hour < now);
+					let plant = garden.plants.find(p => p && p.endTime < now);
 					let heldPlants = player.items.find(i => i.type == plant.type);
 					if(heldPlants && heldPlants.count >= 3) {
 						errors.push("You can't carry any more of that plant.");
 					}
-					let plantCount = garden.plants.filter(p => p && p.growTime < now).length;
+					let plantCount = garden.plants.filter(p => p && p.endTime < now).length;
 					if(plantCount == 0) {
 						errors.push('There are no finished plants in the garden.');
 					}
@@ -232,7 +232,7 @@ module.exports = {
 							if(!player.items.find(i => i.type == plantType)) {
 								errors.push("You don't have any of that plant.");
 							}
-							let plantCount = garden.plants.filter(p => p && p.startTime + p.growTime * hour > now).length;
+							let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
 							if(plantCount == 0) {
 								errors.push("There aren't any growing plants right now.");
 							}
@@ -265,6 +265,7 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 				}
+				break;
 			case 'water':
 				// !plant validation rules:
 				// - Must not have done any gardening/searching in past hour
@@ -273,7 +274,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
-					let plantCount = garden.plants.filter(p => p && p.startTime + p.growTime * hour > now).length;
+					let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
 					if(plantCount == 0) {
 						errors.push("There aren't any plants that need watering right now.");
 					}
