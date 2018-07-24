@@ -118,9 +118,7 @@ async function handleMessage(message) {
 			message.channel.send(await tools.expand(channel, name));
 			break;
 		case 'search':
-			// Incomplete
-			player.actionTime = now;
-			message.channel.send(tools.search(data, player));
+			message.channel.send(await tools.search(channel, name));
 			break;
 		case 'roster':
 			let output = await tools.displayRoster(channel);
@@ -135,9 +133,7 @@ async function handleMessage(message) {
 			message.channel.send({embed: await tools.getPlayerDescription(channel, name)});
 			break;
 		case 'wish':
-			// Incomplete
-			message.channel.send('**' + name + '** makes a wish, and the orbs shine with power...!\n' + tools.wish(data, player, args[0]));
-			message.channel.send('The magic orbs have been lost once more.');
+			message.channel.send(await tools.wish(channel, name, args[0]));
 			break;
 		case 'help':
 			message.channel.send({embed: await help.showHelp(args[0])});

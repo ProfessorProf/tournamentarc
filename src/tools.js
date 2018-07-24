@@ -67,8 +67,8 @@ module.exports = {
 			stats += '\nGardening Level: ' + Math.floor(player.gardenLevel);
 		}
 		
-		if(player.searchLevel >= 1) {
-			stats += '\nSearch Level: ' + Math.floor(player.actionLevel);
+		if(player.actionLevel >= 1) {
+			stats += '\nAction Level: ' + Math.floor(player.actionLevel);
 		}
 
 		embed.addField('Stats', stats);
@@ -100,14 +100,20 @@ module.exports = {
 					case 8:
 						statuses.push(`Power level hidden (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
+					case 10:
+						statuses.push(`Blessed with power`);
+						break;
+					case 11:
+						statuses.push(`Immortal`);
+						break;
 				}
 			}
-			if(player.gardenTime > now) {
-				statuses.push(`Ready to garden in ${this.getTimeString(player.gardenTime - now)}`);
-			}
-			if(player.actionTime > now) {
-				statuses.push(`Ready to act in ${this.getTimeString(player.actionTime - now)}`);
-			}
+		}
+		if(player.gardenTime > now) {
+			statuses.push(`Ready to garden in ${this.getTimeString(player.gardenTime - now)}`);
+		}
+		if(player.actionTime > now) {
+			statuses.push(`Ready to act in ${this.getTimeString(player.actionTime - now)}`);
 		}
 		if(statuses.length > 0) {
 			embed.addField('Status', statuses.join('\n'));
@@ -270,8 +276,8 @@ module.exports = {
 				level += ' [FUSION]';
 			}
 			let orbs = p.items.find(i => i.type == 0);
-			if(orbs > 0) {
-				level += `[${'*'.repeat(orbs)}]`;
+			if(orbs && orbs.count > 0) {
+				level += ` [${'*'.repeat(orbs.count)}]`;
 			}
 			
 			row.push(level);
@@ -776,39 +782,6 @@ module.exports = {
         data.heat += addedHeat;
         console.log('Heat increased by ' + heat + ' to ' + data.heat);
 	},
-	// End a fusion.
-	// TODO: Needs to be rewritten for SQL DB.
-	breakFusion(data, fusion) {
-		let player1 = this.loadPlayer(data, fusion.fusion[0], true);
-		let player2 = this.loadPlayer(data, fusion.fusion[1], true);
-		if(!player1 || !player2) {
-			console.log("Fusion break failed - a player doesn't exist");
-			return;
-		}
-		let fusionWins = fusion.glory - player1.glory - player2.glory;
-		let fusionGardening = fusion.gardenLevel - player1.gardenLevel - player2.gardenLevel;
-		player1.level = fusion.level / 2;
-		player2.level = fusion.level / 2;
-		player1.glory += Math.floor(fusionWins / 2);
-		player2.glory += Math.floor(fusionWins / 2);
-		player1.gardenLevel += fusionGardening / 2;
-		player2.gardenLevel += fusionGardening / 2;
-		player1.fusion = null;
-		player2.fusion = null;
-		player1.lastActive = new Date().getTime();
-		player2.lastActive = new Date().getTime();
-
-		// Semi-randomly distribute orbs
-		while(fusion.orbs > 0) {
-			if(Math.random() > 0.5) {
-				player1.orbs++;
-			} else {
-				player2.orbs++;
-			}
-			fusion.orbs--;
-		}
-		delete data.players[fusion.name];
-	},
 	// Add a new plant to the garden.
 	async plant(channel, name, plantName) {
 		let player = await sql.getPlayerByUsername(channel, name);
@@ -1000,7 +973,6 @@ module.exports = {
 		return output;
 	},
 	// Expand the garden.
-	// TODO: Needs to be rewritten for SQL DB.
 	async expand(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
@@ -1126,101 +1098,159 @@ module.exports = {
 			return '(Nothing planted)';
 		}
 	},
-	// Update the garden based on time passing.
-	// TODO: Needs to be rewritten for SQL DB.
-	updateGarden(data) {
-		let now = new Date().getTime();
-		let maxTime = (6 * hour) / Math.pow(1.05, data.gardenLevel);
-		
-		let oneFlowerAgo = now - maxTime;
-		while(data.gardenTime < oneFlowerAgo) {
-			data.gardenTime += maxTime;
-			data.flowers++;
-		}
-		if(data.flowers >= Math.floor(3)) {
-			data.flowers = 3;
-			data.gardenTime = now;
-		}
-	},
 	// Search for orbs.
-	// TODO: Needs to be rewritten for SQL DB.
-	search(data, player) {
-		let output = '';
+	async search(channel, name) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let world = await sql.getWorld(channel);
 		let now = new Date().getTime();
-		if(!data.wishTime) data.wishTime = now;
-		let effectiveTime = Math.min(now - data.wishTime, hour * 72);
+		let output = '';
+
+		let effectiveTime = Math.min(now - world.lastWish, hour * 72);
 		let searchModifier = effectiveTime / (hour * 72);
-		let searchChance = (0.03 + 0.01 * player.searchLevel) * searchModifier;
-		if (data.lostOrbs > 0) {
+		let searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
+		if (world.lostOrbs > 0) {
 			let roll = Math.random();
 			if(roll < searchChance) {
 				console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 				// They found an orb!
-				player.orbs++;
-				data.lostOrbs--;
+				await sql.addItems(channel, player.id, 0, 1);
+				world.lostOrbs--;
 				output = `${player.name} searches the world, and finds a magic orb!`;
-				if(player.orbs == 7) {
+				var existingOrbs = player.items.find(i => i.type == 0);
+				if(existingOrbs && existingOrbs.count == 6) {
 					output += "\nYou've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.";
 				}
 			} else {
-				console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-				output = `${player.name} searches the world, but finds nothing of value.`;
+				searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
+				if(Math.random() < 0.05) {
+					//They found a plant!
+					var plantType = Math.floor(Math.random() % 6) + 1;
+					var plantName;
+					switch(plantType) {
+						case 1:
+							plantName = 'flower';
+							break;
+						case 2:
+							plantName = 'rose';
+							break;
+						case 3:
+							plantName = 'carrot';
+							break;
+						case 4:
+							plantName = 'bean';
+							break;
+						case 5:
+							plantName = 'sedge';
+							break;
+						case 6:
+							plantName = 'fern';
+							break;
+					}
+					console.log(`${player.name} found nota plant hing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+					output = `${player.name} searches the world, and finds a ${plantName}!`;
+					let existingPlants = player.items.find(i => i.type == plantType);
+					if(existingPlants && existingPlants.count >= 3) {
+						output += ` But you can't carry any more.`;
+					} else {
+						await sql.addItems(channel, player.id, plantType, 1);
+					}
+				} else {
+					if(Math.random() < 0.1) {
+						// They found some junk!
+						const junkItems = [
+							'a magic orb?! ...Nope, just a coconut.',
+							"a time machine... but it's broken.",
+							"a chaos emerald. Only hedgehogs can use it.",
+							"a power star. Someone find a plumber.",
+							"a Pokémon.",
+							"a missile capacity upgrade.",
+							"a heart piece.",
+							"a clow card.",
+							"a dojo sign.",
+							"a gym badge.",
+							"a golden banana.",
+							"a korok seed. Yahaha!",
+							"the Holy Grail... wait, it's a fake."
+						];
+						let junk = junkItems[Math.floor(Math.random() * junkItems.length)];
+						console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+						output = `${player.name} searches the world, and finds ${junk}`;
+					} else {
+						console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+						output = `${player.name} searches the world, but finds nothing of value.`;
+					}
+				}
 			} 
 		} else {
 			output += `${player.name} searches the world, but there are no orbs left to find.`;
 		}
 		
-		let oldSearchLevel = Math.floor(player.searchLevel);
-		player.searchLevel += 1 / (1 + player.searchLevel);
-		let newSearchLevel = Math.floor(player.searchLevel);
-		if(newSearchLevel > oldSearchLevel) {
-			output += '\nSearch level increased!';
+		if(!player.actionLevel) player.actionLevel = 0;
+		let oldActionLevel = Math.floor(player.actionLevel);
+		player.actionLevel += 1 / (1 + player.actionLevel);
+		let newActionLevel = Math.floor(player.actionLevel);
+		if(newActionLevel > oldActionLevel) {
+			output += '\nAction level increased!';
 		}
+		player.actionTime = now + hour;
+		await sql.setPlayer(player);
+		await sql.setWorld(world);
 		
 		return output;
 	},
-	// Make a wish on the orbs.
-	// TODO: Needs to be rewritten for SQL DB.
-	wish(data, player, wish) {
-		let output = '';
+	async wish(channel, name, wish) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let world = await sql.getWorld(channel);
 		let now = new Date().getTime();
+		let output = `**${player.name}** makes a wish, and the orbs shine with power...!`
 		
-		switch(wish) {
+		switch(wish.toLowerCase()) {
 			case 'power':
 				player.level *= Math.random() + 2.5;
-				player.powerWish = true;
-				output += 'You can feel great power surging within you!';
+				await sql.addStatus(channel, player.id, 10);
+				output += '\nYou can feel great power surging within you!';
 				break;
 			case 'resurrection':
-				for(let i in data.players) {
-					let p = data.players[i];
-					if(p && p.aliveDate > now) {
-						output += `${p.name} is revived!\n`;
-						p.aliveDate = now;
+				var players = await sql.getPlayers(channel);
+				for(let i in players) {
+					let p = players[i];
+					var defeatedState = p.status.find(s => s.type == 0);
+					if(defeatedState) {
+						output += `\n${p.name} is revived!`;
+						await sql.deleteStatus(channel, p.id, 0);
 						p.level *= 1.2;
+						await sql.setPlayer(p);
 					}
 				}
 				break;
 			case 'immortality':
-				output += 'No matter how great of an injury, you suffer, you will always swiftly return!';
-				player.immortalityWish = true;
-				player.aliveDate = now;
+				output += '\nNo matter how great of an injury, you suffer, you will always swiftly return!';
+				var defeatedState = player.status.find(s => s.type == 0);
+				if(defeatedState) {
+					await sql.deleteStatus(channel, player.id, 0);
+				}
+				await sql.addStatus(channel, player.id, 11);
 				break;
 			case 'gardening':
-				output += 'You have become the master of gardening!';
+				output += '\nYou have become the master of gardening!';
 				player.gardenLevel += 12;
+				await sql.setPlayer(player);
 				break;
 			case 'ruin':
 				output += '**The countdown to the destruction of the galaxy has begun!**\n'
 					+ 'You have 24 hours to defeat the Nemesis! If the Nemesis is still alive when time runs out, everything will be destroyed.';
-				data.nemesis.ruinTime = now;
-				data.nemesis.ruinCheckTime = now;
+				let nemesis = await sql.getNemesis(channel);
+				nemesis.ruinTime = now + 24 * hour;
+				await sql.setNemesis(nemesis);
 				break;
 		}
 		
-		player.orbs = 0;
-		data.wishTime = now;
-		data.lostOrbs = 7;
+		await sql.addItems(channel, player.id, 0, -7);
+		output += `\nThe orbs scatter to the furthest reaches of the world!`;
+		player.wishFlag = 1;
+		await sql.setPlayer(player);
 		
 		return output;
 	},

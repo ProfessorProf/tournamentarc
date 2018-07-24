@@ -5,7 +5,7 @@ sql.open('./data.sqlite');
 const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
-CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER);
+CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, Lost_Orbs INTEGER, Last_Wish INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
     Life_Time INTEGER, Active_Time INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID I
     Growth_Level REAL, Research_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Type INTEGER, Nemesis_Time INTEGER, Attack_Time INTEGER, 
-    Destroy_Time INTEGER, Revive_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
+    Destroy_Time INTEGER, Revive_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
 CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Rating REAL, Loser_Rating REAL,
@@ -47,7 +47,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS TournamentPlayers_ChannelPlayer ON TournamentP
 let newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
 DELETE FROM Gardens WHERE Channel = $channel;
 DELETE FROM Items WHERE Channel = $channel;
-INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population) VALUES ($channel, 0, 0, 0);
+INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish) VALUES ($channel, 0, 0, 0, 7, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (0, $channel, "Orb", 0, 0, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (1, $channel, "Flower", 18, 1, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (2, $channel, "Rose", 24, 0, 1);
@@ -97,8 +97,8 @@ Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, P
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
-(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Revive_Time, Base_Power, Nemesis_Cooldown)
-VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $reviveTime, $basePower, $cooldown)`;
+(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
+VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $reviveTime, $ruinTime, $basePower, $cooldown)`;
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
@@ -145,13 +145,26 @@ module.exports = {
 				channel: channel,
 				heat: row.Heat,
 				resets: row.Resets,
-				maxPopulation: row.Max_Population
+				maxPopulation: row.Max_Population,
+				lostOrbs: row.Lost_Orbs,
+				lastWish: row.Last_Wish
 			};
 			
 			return world;
 		} else {
 			return null;
 		}
+	},
+	async setWorld(world) {
+		await sql.run(`UPDATE Worlds SET Heat = $heat, Resets = $resets, Max_Population = $maxPopulation, 
+			Lost_Orbs = $lostOrbs, Last_Wish = $lastWish WHERE Channel = $channel`,
+		{
+			$heat: world.heat,
+			$resets: world.resets,
+			$maxPopulation: world.maxPopulation,
+			$lostOrbs: world.lostOrbs,
+			$lastWish: world.lastWish
+		});
 	},
 	// Creates a new player in the DB.
     async addPlayer(player) {
@@ -444,6 +457,7 @@ module.exports = {
 				attackTime: row.Attack_Time,
 				destroyTime: row.Destroy_Time,
 				reviveTime: row.Revive_Time,
+				ruinTime: row.Ruin_Time,
 				basePower: row.Base_Power,
 				cooldown: row.Nemesis_Cooldown
 			};
@@ -483,6 +497,7 @@ module.exports = {
 			$attackTime: nemesis.attackTime,
 			$destroyTime: nemesis.destroyTime,
 			$reviveTime: nemesis.reviveTime,
+			$ruinTime: nemesis.ruinTime,
 			$cooldown: nemesis.cooldown,
 			$basePower: nemesis.basePower
         });
