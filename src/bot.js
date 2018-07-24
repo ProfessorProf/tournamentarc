@@ -46,9 +46,13 @@ async function handleMessage(message) {
 	}
 
 	if(cmd == 'init' ) {
+		message.channel.send('Beginning initialization...');
 		await sql.initializeGame()
 		await sql.initializeChannel(message.channel.id);
 		message.channel.send('Initialization complete.');
+		let endTime = new Date().getTime();
+		let duration = (endTime - now) / 1000;
+		console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 		return;
 	}
 
@@ -149,12 +153,12 @@ async function handleMessage(message) {
 			break;
 		case 'autofight':
 			// Delete this before S3 starts
-			await sql.autofight(channel, name, targetName);
+			await sql.autofight(channel, targetName);
 			break;
 	}
 	let endTime = new Date().getTime();
 	let duration = (endTime - now) / 1000;
-	console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name}`);
+	console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 }
 
 function loadData() {

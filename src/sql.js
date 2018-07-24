@@ -53,7 +53,7 @@ INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Pla
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (2, $channel, "Rose", 24, 0, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (3, $channel, "Carrot", 12, 0, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (4, $channel, "Bean", 18, 0, 1);
-INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (5, $channel, "Algae", 6, 0, 1);
+INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (5, $channel, "Sedge", 6, 0, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (6, $channel, "Fern", 12, 0, 1);
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (0, "Dead", 1, 600);
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (1, "Journey", 1, 500);
@@ -400,13 +400,21 @@ module.exports = {
 		await sql.run(`UPDATE Plants SET Plant_Type = $type, StartTime = $startTime WHERE ID = $id`, 
 			{$type: plant.type, $startTime: plant.startTime, $id: plant.id});
 	},
+	async setStatus(status) {
+		await sql.run(`UPDATE PlayerStatus SET StartTime = $startTime, EndTime = $endTime WHERE ID = $id`, 
+			{$startTime: status.startTime, $endTime: status.endTime, $id: status.id});
+	},
 	// Delete an Offer.
 	async deleteOffer(playerId, targetId, type) {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId AND Target_ID = $targetId AND Type = $type`, {$playerId: playerId, $targetId: targetId, $type: type});
 	},
 	// Delete a Status.
-	async deleteStatus(playerId, type) {
+	async deleteStatus(channel, playerId, type) {
 		await sql.run(`DELETE FROM PlayerStatus WHERE Player_ID = $playerId AND Status_ID = $type`, {$playerId: playerId, $type: type});
+		if(type == 0) {
+			// Ending a KO status = become capable of training
+			await this.addStatus(channel, playerId, 5);
+		}
 	},
 	// Delete a Status.
 	async deletePlayer(playerId) {

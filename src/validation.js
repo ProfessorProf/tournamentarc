@@ -195,8 +195,8 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
+					let plantType = this.getPlantType(args[0]);
 					if(args.length > 1) {
-						let plantType = this.getPlantType(targetName);
 						if(plantType == -1) {
 							errors.push("You've never heard of that plant.");
 						}
@@ -228,7 +228,17 @@ module.exports = {
 							errors.push("You don't have any of that plant.");
 						}
 					} else {
-						errors.push("Syntax: `!use planttype target`");
+						if (plantType == 5) {
+							if(!player.items.find(i => i.type == plantType)) {
+								errors.push("You don't have any of that plant.");
+							}
+							let plantCount = garden.plants.filter(p => p && p.startTime + p.growTime * hour > now).length;
+							if(plantCount == 0) {
+								errors.push("There aren't any growing plants right now.");
+							}
+						} else {
+							errors.push("Syntax: `!use planttype target`");
+						}
 					}
 				}
 				break;
@@ -484,7 +494,7 @@ module.exports = {
 			case 'bean':
 				return 4;
 				break;
-			case 'algae':
+			case 'sedge':
 				return 5;
 				break;
 			case 'fern':

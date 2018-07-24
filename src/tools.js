@@ -50,12 +50,19 @@ module.exports = {
 		}
 		
 		stats += 'Power Level: '
-		let level = numeral(player.level.toPrecision(2));
-		stats += level.format('0,0');
-		if(player.status.find(s => s.type == 2)) {
-			stats += '?';
-		}
 		
+		if(player.status.find(s => s.type == 8)) {
+			stats += 'Unknown';
+		} else {
+			var level = player.level;
+			if(player.status.find(s => s.type == 7)) {
+				level *= 1.12;
+			}
+			stats += numeral(level.toPrecision(2)).format('0,0');
+			if(player.status.find(s => s.type == 2)) {
+				stats += '?';
+			}
+		}
 		if(player.gardenLevel >= 1) {
 			stats += '\nGardening Level: ' + Math.floor(player.gardenLevel);
 		}
@@ -84,13 +91,22 @@ module.exports = {
 					case 5:
 						statuses.push(`Ready to train`);
 						break;
+					case 6:
+						statuses.push(`Enhanced senses (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
+					case 7:
+						statuses.push(`Power boosted (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
+					case 8:
+						statuses.push(`Power level hidden (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
 				}
 			}
 			if(player.gardenTime > now) {
-				statuses.push(`Ready to garden in ${this.getTimeString(now - gardenTime)}`);
+				statuses.push(`Ready to garden in ${this.getTimeString(player.gardenTime - now)}`);
 			}
 			if(player.actionTime > now) {
-				statuses.push(`Ready to act in ${this.getTimeString(now - actionTime)}`);
+				statuses.push(`Ready to act in ${this.getTimeString(player.actionTime - now)}`);
 			}
 		}
 		if(statuses.length > 0) {
@@ -144,8 +160,19 @@ module.exports = {
 		}
 		
 		stats = 'Power Level: '
-		let level = numeral(player.level.toPrecision(2));
-		stats += level.format('0,0');
+		if(player.status.find(s => s.type == 8)) {
+			stats += 'Unknown';
+		} else {
+			let seenLevel = player.level;
+			if(player.status.find(s => s.type == 7)) {
+				seenLevel *= 1.12;
+			}
+			let level = numeral(seenLevel.toPrecision(2));
+			stats += level.format('0,0');
+			if(player.status.find(s => s.type == 2)) {
+				stats += '?';
+			}
+		}
 		let training = player.status.find(s => s.type == 2);
 		if(training) {
 			stats += '?';
@@ -217,15 +244,23 @@ module.exports = {
 			}
 			row.push(rank);
 			
-			p.status.sort((a,b) => b.priority - a.priority).filter(s => s.priority > 0);
+			p.status.sort((a,b) => b.priority - a.priority);
+			let statuses = p.status.filter(s => s.priority > 0);
 			
-			let status = p.status.length > 0 ? p.status[0].name : 'Normal';
+			let status = statuses.length > 0 ? statuses[0].name : 'Normal';
 			
 			row.push(status);
 			if(status.length > headers[2]) headers[2] = status.length;
 			
-			let level = numeral(p.level.toPrecision(2)).format('0,0');
-			if(p.status.find(s => s.type == 2)) {
+			let seenLevel = p.level;
+			if(p.status.find(s => s.type == 7)) {
+				seenLevel *= 1.12;
+			}
+			let level = numeral(seenLevel.toPrecision(2)).format('0,0');
+			
+			if(p.status.find(s => s.type == 8)) {
+				level = 'Unknown'
+			} else if(p.status.find(s => s.type == 2)) {
 				level += '?'
 			}
 			if(p.isNemesis) {
@@ -351,7 +386,16 @@ module.exports = {
 		await this.completeTraining(player1);
 		await this.completeTraining(player2);
 
-		embed.addField('Power Levels', `${player1.name}: ${numeral(player1.level.toPrecision(2)).format('0,0')}\n${player2.name}: ${numeral(player2.level.toPrecision(2)).format('0,0')}`);
+		// Bean bonuses
+		var level1 = player1.level;
+		var level2 = player2.level;
+		if(player1.status.find(s => s.type == 7)) {
+			level1 *= 1.12;
+		}
+		if(player2.status.find(s => s.type == 7)) {
+			level2 *= 1.12;
+		}
+		embed.addField('Power Levels', `${player1.name}: ${numeral(level1.toPrecision(2)).format('0,0')}\n${player2.name}: ${numeral(level2.toPrecision(2)).format('0,0')}`);
 		
 		// Randomize, then adjust skill ratings
 		let skill1 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
@@ -377,8 +421,8 @@ module.exports = {
 		console.log(`${player2.name}: PL ${Math.floor(player2.level * 10) / 10}, Skill ${Math.floor(skill2 * 10) / 10}`);
 		
 		// Final battle scores!
-		let score1 = Math.sqrt(player1.level * skill1);
-		let score2 = Math.sqrt(player2.level * skill2);
+		let score1 = Math.sqrt(level1 * skill1);
+		let score2 = Math.sqrt(level2 * skill2);
 		
 		let battleLog = '';
 		if(skill1 < 0.8) {
@@ -427,7 +471,7 @@ module.exports = {
 		
 		// Loser gains the Ready status, winner loses ready status if training
 		if(winner.status.find(s => s.type == 2)) {
-			await sql.deleteStatus(winner.id, 2);
+			await sql.deleteStatus(channel, winner.id, 2);
 		}
 		
 		// Determine length of KO
@@ -558,7 +602,7 @@ module.exports = {
 			let target = targetPlayers[(firstTarget + i) % targetPlayers.length];
 			let trainingState = target.status.find(s => s.type == 2);
 			if(trainingState) {
-				await sql.deleteStatus(target.id, 2);
+				await sql.deleteStatus(channel, target.id, 2);
 				let hours = (now - trainingState.startTime) / hour;
 				if(hours > 72) hours = 72;
 				this.addHeat(data, hours);
@@ -685,7 +729,7 @@ module.exports = {
 		
 		// Raise heat, abort training
 		this.addHeat(data, 100);
-		await sql.deleteStatus(player.id, 5);
+		await sql.deleteStatus(channel, player.id, 5);
 		
 		if(!nemesis) {
 			nemesis = {
@@ -798,7 +842,7 @@ module.exports = {
 			case 'bean':
 				plantId = 4;
 				break;
-			case 'algae':
+			case 'sedge':
 				plantId = 5;
 				break;
 			case 'fern':
@@ -825,13 +869,14 @@ module.exports = {
 
 		return output;
 	},
-	async water(channel, name) {
+	async water(channel, name, fixedTime) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
 		let now = new Date().getTime();
 
-		let time = ((Math.random() * 20 + 5) * 60 * 1000) * (1 + 0.09 * player.gardenLevel);
-		let output = `${player.name} works on the garden.`;
+		let time = player ? ((Math.random() * 20 + 5) * 60 * 1000) * (1 + 0.09 * player.gardenLevel)
+			: fixedTime;
+		let output = player ? `${player.name} works on the garden.` : '';
 		for(let i in garden.plants) {
 			let plant = garden.plants[i];
 			if(plant) {
@@ -851,15 +896,17 @@ module.exports = {
 		}
 		
 		// Update garden level
-		if(!player.gardenLevel) player.gardenLevel = 0;
-		let oldGardenLevel = Math.floor(player.gardenLevel);
-		player.gardenLevel += 1 / (1 + player.gardenLevel);
-		let newGardenLevel = Math.floor(player.gardenLevel);
-		if(newGardenLevel > oldGardenLevel) {
-			output += '\nGardening level increased!';
+		if(player) {
+			if(!player.gardenLevel) player.gardenLevel = 0;
+			let oldGardenLevel = Math.floor(player.gardenLevel);
+			player.gardenLevel += 1 / (1 + player.gardenLevel);
+			let newGardenLevel = Math.floor(player.gardenLevel);
+			if(newGardenLevel > oldGardenLevel) {
+				output += '\nGardening level increased!';
+			}
+			player.gardenTime = now + hour;
+			await sql.setPlayer(player);
 		}
-		player.gardenTime = now + hour;
-		await sql.setPlayer(player);
 
 		return output;
 	},
@@ -881,7 +928,76 @@ module.exports = {
 		return `${player.name} picks a ${plant.name.toLowerCase()}.`;
 	},
 	async useItem(channel, name, plantType, targetName) {
-		// TODO
+		let player = await sql.getPlayerByUsername(channel, name);
+		let target = await sql.getPlayer(channel, targetName);
+		let plantItem = player.items.find(i => i.name.toLowerCase() == plantType.toLowerCase());
+		let now = new Date().getTime();
+
+		if(!target && plantItem.type != 5) {
+			return;
+		}
+		if(!plantItem) {
+			return;
+		}
+
+		let output = '';
+		let defeatedState;
+		switch(plantItem.type) {
+			case 1:
+				// Flower
+				defeatedState = target.status.find(s => s.type == 0);
+				if(defeatedState) {
+					defeatedState.endTime -= 6 * hour;
+					if(defeatedState.endTime < now) {
+						await sql.deleteStatus(channel, target.id, 0);
+						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
+					} else {
+						await sql.setStatus(defeated);
+						let duration = defeatedState.endTime - now;
+						output = `**${player.name}** heals **${target.name}**, but they still won't be able to fight for ${this.getTimeString(duration)}.`;
+					}
+				}
+				break;
+			case 2:
+				// Rose
+				defeatedState = target.status.find(s => s.type == 0);
+				if(defeatedState) {
+					defeatedState.endTime -= 12 * hour;
+					if(defeatedState.endTime < now) {
+						await sql.deleteStatus(channel, target.id, 0);
+						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
+					} else {
+						await sql.setStatus(defeated);
+						let duration = defeatedState.endTime - now;
+						output = `**${player.name}** heals **${target.name}**, but they still won't be able to fight for ${this.getTimeString(duration)}.`;
+					}
+				}
+				break;
+			case 3:
+				// Carrot
+				await sql.addStatus(channel, target.id, 6, now + hour * 6);
+				output = `**${target.name}** eats the carrot. Their senses feel sharper!`;
+				break;
+			case 4:
+				// Bean
+				await sql.addStatus(channel, target.id, 7, now + hour);
+				var levelBoost = target.level * .12;
+				output = `**${target.name}** eats the bean. Their power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
+				break;
+			case 5:
+				// Sedge
+				output = await this.water(channel, null, 2.2 * hour);
+				// TODO: Increase garden level
+				break;
+			case 6:
+				// Fern
+				await sql.addStatus(channel, target.id, 8, now + hour * 12);
+				output = `**${target.name}** eats the fern. Their power cannot be scanned!`;
+				break;
+		}
+
+		await sql.addItems(channel, player.id, plantItem.type, -1);
+		return output;
 	},
 	// Expand the garden.
 	// TODO: Needs to be rewritten for SQL DB.
@@ -1099,7 +1215,7 @@ module.exports = {
 	},
 	async train(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
-		await sql.deleteStatus(player.id, 5);
+		await sql.deleteStatus(channel, player.id, 5);
 		await sql.addStatus(channel, player.id, 2);
 	}
 }
