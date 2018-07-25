@@ -6,7 +6,7 @@ const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, Lost_Orbs INTEGER, Last_Wish INTEGER);
-CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
+CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
     Active_Time INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
     NPC_Flag INTEGER, AlwaysPrivate_Flag INTEGER, Ping_Flag INTEGER, Pronoun INTEGER);
@@ -90,10 +90,10 @@ let updatePlayerSql = `UPDATE Players SET
     Pronoun = $pronoun
 WHERE ID = $id`;
 
-let insertPlayerSql = `INSERT INTO Players (Username, Name, Channel, Power_Level,
+let insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
 Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Active_Time, 
 Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, Pronoun) 
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
 (Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
@@ -168,7 +168,7 @@ module.exports = {
 	// Creates a new player in the DB.
     async addPlayer(player) {
 		const result = await sql.run(insertPlayerSql,
-			[player.username, player.name, player.channel, player.level,
+			[player.username, player.userId, player.name, player.channel, player.level,
 				player.actionLevel, player.actionTime, player.gardenLevel, player.gardenTime, 
 				player.glory, player.lastActive, player.nemesisFlag,
 				player.fusionFlag, player.wishFlag, player.npcFlag, 
@@ -262,6 +262,7 @@ module.exports = {
 		let player = {
 			id: row.ID,
 			username: row.Username,
+			userId: row.User_ID,
 			name: row.Name,
 			channel: row.Channel,
 			level: row.Power_Level,
