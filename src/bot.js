@@ -19,7 +19,9 @@ client.on('error', (e) => {
 
 client.on('message', message => {
     // Our bot needs to know if it will execute a command
-    // It will listen for messages that will start with `!`
+	// It will listen for messages that will start with `!`
+	if(message.author.bot) return;
+
     if (message.channel.name == auth.channel &&
         message.content.substring(0, 1) == '!') {
 		try {
@@ -38,6 +40,18 @@ async function handleMessage(message) {
 	args = args.splice(1);
 
 	let channel = message.channel.id;
+
+	var outputMessage = {
+		print: [],
+		embed: null,
+		private: false,
+		informational: false
+	};
+
+    if (cmd.substring(0, 1) == '!') {
+		outputMessage.private = true;
+		cmd = cmd.substring(1);
+	}
 
 	if(cmd == 'as' && name == auth.admin) {
 		name = args[0];
@@ -72,15 +86,20 @@ async function handleMessage(message) {
 	switch(cmd) {
 		case 'reg':
 			// Add a new player
-			await tools.registerPlayer(channel, name, targetName);
-			message.channel.send(`Registered player ${name}!`);
-			message.channel.send({embed: await tools.getPlayerDescription(channel, name)});
+			await tools.registerPlayer(channel, name, message.author.id, targetName);
+			outputMessage.embed = await tools.getPlayerDescription(channel, name);
+			outputMessage.print.push(`Registered player ${name}!`);
 			break;
 		case 'check':
-			message.channel.send({embed: await tools.getPlayerDescription(channel, name)});
+			outputMessage.embed = await tools.getPlayerDescription(channel, name);
+			outputMessage.informational = true;
 			break;
 		case 'fight':
-			message.channel.send({embed: await tools.tryFight(channel, name, targetName)});
+			const result = await tools.tryFight(channel, name, targetName);
+			outputMessage.embed = result.embed;
+			if(result.ping) {
+				outputMessage.print.push(`<@${result.ping}>`);
+			}
 			break;
 		case 'unfight':
 			// TODO
@@ -111,50 +130,53 @@ async function handleMessage(message) {
 			break;
 		case 'train':
 			await tools.train(channel, name);
-			message.channel.send(`**${name}** has begun training.`);
+			outputMessage.print.push(`**${name}** has begun training.`);
 			break;
 		case 'scan':
 			message.channel.send({embed: await tools.scoutPlayer(channel, targetName)});
+			output.informational = true;
 			break;
 		case 'reset':
 			await tools.resetData(channel);
-			message.channel.send('Onwards, to a new universe...! Some Glory is preserved, but all Power Levels and player status has been reverted.');
+			outputMessage.print.push('Onwards, to a new universe...! Some Glory is preserved, but all Power Levels and player status has been reverted.');
 			break;
 		case 'garden':
 			message.channel.send({embed: await tools.displayGarden(channel)});
+			output.informational = true;
 			break;
 		case 'plant':
-			message.channel.send(await tools.plant(channel, name, targetName));
+			outputMessage.print.push(await tools.plant(channel, name, targetName));
 			break;
 		case 'water':
-			message.channel.send(await tools.water(channel, name));
+			outputMessage.print.push(await tools.water(channel, name));
 			break;
 		case 'pick':
-			message.channel.send(await tools.pick(channel, name, targetName));
+			outputMessage.print.push(await tools.pick(channel, name, targetName));
 			break;
 		case 'use':
-			message.channel.send(await tools.useItem(channel, name, args[0], args[1]));
+			outputMessage.print.push(await tools.useItem(channel, name, args[0], args[1]));
 			break;
 		case 'expand':
-			message.channel.send(await tools.expand(channel, name));
+			outputMessage.print.push(await tools.expand(channel, name));
 			break;
 		case 'search':
-			message.channel.send(await tools.search(channel, name));
+			outputMessage.print.push(await tools.search(channel, name));
 			break;
 		case 'roster':
 			const output = await tools.displayRoster(channel);
-			message.channel.send(`\`\`\`\n${output}\`\`\``);;
+			outputMessage.print.push(`\`\`\`\n${output}\`\`\``);;
+			output.informational = true;
 			break;
 		case 'fuse':
 			const fusionName = args.length > 1 ? args[1] : null;
-			message.channel.send(await tools.fuse(channel, message, name, targetName, fusionName));
+			outputMessage.print.push(await tools.fuse(channel, message, name, targetName, fusionName));
 			break;
 		case 'nemesis':
 			message.channel.send({embed: await tools.setNemesis(channel, name)});
 			message.channel.send({embed: await tools.getPlayerDescription(channel, name)});
 			break;
 		case 'wish':
-			message.channel.send(await tools.wish(channel, name, args[0]));
+			outputMessage.print.push(await tools.wish(channel, name, args[0]));
 			break;
 		case 'research':
 			// TODO
@@ -179,15 +201,18 @@ async function handleMessage(message) {
 			break;
 		case 'tournament':
 			// TODO
+			output.informational = true;
 			break;
 		case 'taunt':
 			// TODO
 			break;
 		case 'config':
 			message.channel.send({embed: await tools.config(channel, name, args[0], args[1])});
+			output.informational = true;
 			break;
 		case 'help':
 			message.channel.send({embed: await help.showHelp(args[0])});
+			output.informational = true;
 			break;
 		case 'debug':
 			await sql.execute(args[0], args.slice(1).join(' '));
@@ -200,6 +225,31 @@ async function handleMessage(message) {
 			// Delete this before S3 starts
 			await sql.autofight(channel, targetName);
 			break;
+	}
+
+	if(outputMessage.informational) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		// Check if the user has AlwaysPrivate enabled
+		if(player && player.config && player.config.alwaysPrivate) {
+			outputMessage.private = !outputMessage.private;
+		}
+	}
+	// Display the output
+	if(outputMessage.embed) {
+		if(outputMessage.informational && outputMessage.private) {
+			message.author.sendMessage({embed: outputMessage.embed});
+		} else {
+			message.channel.send({embed: outputMessage.embed});
+		}
+	}
+
+	for(var i in outputMessage.print) {
+		var text = outputMessage.print[i];
+		if(outputMessage.informational && outputMessage.private) {
+			message.author.sendMessage(text);
+		} else {
+			message.channel.send(text);
+		}
 	}
 	let endTime = new Date().getTime();
 	let duration = (endTime - now) / 1000;

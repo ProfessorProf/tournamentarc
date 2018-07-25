@@ -27,7 +27,7 @@ module.exports = {
                     output.setDescription('Configuration Commands:')
                         .addField('!config', 'Displays your current config options.')
                         .addField('!config flag value', 'Set a config setting to a value.')
-                        .addField('Config Flags:', 'AlwaysPrivate: Valid values: "on"/"off". Sends messages via DM by default. Default: Off.\n' +
+                        .addField('Config Flags:', 'AlwaysPrivate: Valid values: "on"/"off". Sends messages via DM by default. If you want a specific message to send via DM, preface it with "!!" instead of "!". Commands this works with: check, scan, garden, roster, tournament, config, help. Default: Off.\n' +
                             'PingMe: Valid values: "on"/"off". Pings you in the channel when you revive or when someone accepts your challenge. Default: Off.\n' + 
                             'Pronoun: Valid values: "he"/"she"/"they". Determines what pronouns the game uses for messages about you. Default: They.');
                     break;

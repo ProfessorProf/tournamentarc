@@ -340,7 +340,7 @@ module.exports = {
 				embed.setTitle('BATTLE CHALLENGE')
 					.setDescription(`**${player1.name}** has issued a battle challenge to **${player2.name}**! ${player2.name}, enter \`!fight ${player1.name}\` to accept the challenge and begin the battle.`);
 				await sql.addOffer(player1, player2, 0);
-				return embed;
+				return {embed: embed};
 			} else {
 				// FIGHT
 				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
@@ -351,7 +351,7 @@ module.exports = {
 			await sql.addOffer(player1, null, 0);
 			embed.setTitle('BATTLE CHALLENGE')
 				.setDescription(`**${player1.name}** wants to fight anyone! The next person to enter \`!fight ${player1.name}\` will accept the challenge and begin the battle.`);
-			return embed;
+			return {embed: embed};
 		}
 	},
 	// End training and power up a player. Will do nothing if player is not training.
@@ -387,6 +387,12 @@ module.exports = {
 		let channel = player1.channel;
 		let world = await sql.getWorld(channel);
 		let now = new Date().getTime();
+
+		// Give the attacked player a ping if they want one
+		let ping = null;
+		if(player2.config.ping) {
+			ping = player2.userId;
+		}
 		
 		// If fighters are training - take them out of training and power them up
 		await this.completeTraining(player1);
@@ -468,7 +474,11 @@ module.exports = {
 		let history = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
 		let output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], history, embed);
 		embed.addField('Results', output);
-		return embed;
+
+		return {
+			embed: embed,
+			ping: ping
+		};
 	},
 	// Process updates based on who won and lost a fight.
 	async handleFightOutcome(data, winner, loser, winnerSkill, loserSkill, nemesisHistory) {
@@ -570,8 +580,6 @@ module.exports = {
 		await sql.setPlayer(loser);
 		await sql.setPlayer(winner);
 		
-		// TODO: Update battle history
-
 		return output;
 	},
 	// Determines whether or not a glory increase resulted in a rank increase.
@@ -1039,13 +1047,14 @@ module.exports = {
 		}
 	},
 	// Register a new player.
-	async registerPlayer(channel, username, name) {
+	async registerPlayer(channel, username, userId, name) {
 		let world = await sql.getWorld(channel);
 		let now = new Date().getTime();
 		this.addHeat(world, 10);
 		let player = {
 			name: name,
 			username: username,
+			userId: userId,
 			channel: channel,
 			glory: 0,
 			level: this.getPowerLevel(world.heat),
