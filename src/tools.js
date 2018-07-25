@@ -432,26 +432,26 @@ module.exports = {
 		
 		let battleLog = '';
 		if(skill1 < 0.8) {
-			battleLog += player1.name + ' underestimates their foe!';
+			battleLog += `${player1.name} underestimates ${this.their(player1.config.pronoun)} foe!`;
 		} else if(skill1 > 1.2) {
-			battleLog += player1.name + ' surpasses their limits!';
+			battleLog += `${player1.name} surpasses ${this.their(player1.config.pronoun)} limits!`;
 		} else if(skill1 > 1.5) {
-			battleLog += player1.name + ' goes even *further beyond!*';
+			battleLog += `${player1.name} goes *even further beyond!*`;
 		} else {
-			battleLog += player1.name + ' fights hard!';
+			battleLog += `${player1.name} fights hard!`;
 		}
-		battleLog += ' Battle rating: ' + numeral(score1.toPrecision(2)).format('0,0') + '\n';
+		battleLog += ` Battle rating: ${numeral(score1.toPrecision(2)).format('0,0')}\n`;
 		
 		if(skill2 < 0.8) {
-			battleLog += player2.name + ' underestimates their foe!';
+			battleLog += `${player2.name} underestimates ${this.their(player2.config.pronoun)} foe!`;
 		} else if(skill2 > 1.2) {
-			battleLog += player2.name + ' surpasses their limits!';
+			battleLog += `${player2.name} surpasses ${this.their(player2.config.pronoun)} limits!`;
 		} else if(skill2 > 1.5) {
-			battleLog += player2.name + ' goes *even further beyond!*';
+			battleLog += `${player2.name} goes *even further beyond!*`;
 		} else {
-			battleLog += player2.name + ' fights hard!';
+			battleLog += `${player2.name} fights hard!`;
 		}
-		battleLog += ' Battle rating: ' + numeral(score2.toPrecision(2)).format('0,0') + '\n';
+		battleLog += ` Battle rating: ${numeral(score2.toPrecision(2)).format('0,0')}\n`;
 		
 		embed.addField('Ready? Fight!', battleLog);
 	
@@ -562,7 +562,10 @@ module.exports = {
         
 		// Delete challenges
 		await sql.deleteOffersFromFight(winner.id, loser.id);
-        
+		
+		// Add new row to history
+		await sql.addHistory(winner.channel, winner.id, winner.level, winnerSkill, loser.id, loser.level, loserSkill);
+		
 		// Save changes
 		await sql.setPlayer(loser);
 		await sql.setPlayer(winner);
@@ -587,11 +590,12 @@ module.exports = {
 		let data = await sql.getWorld(channel);
 		let players = await sql.getPlayers(channel);
 		let nemesis = await sql.getNemesis(channel);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.playerId);
 		let now = new Date().getTime();
 		let embed = new Discord.RichEmbed();
 		
 		embed.setTitle('DESTRUCTION')
-			.setDescription('The Nemesis uses their full power to destroy an entire planet!')
+			.setDescription(`The Nemesis uses ${this.their(nemesisPlayer.config.pronoun)} full power to destroy an entire planet!`)
 			.setColor(0x00AE86);
 		
 		let targetPlayers = [];
@@ -761,7 +765,11 @@ module.exports = {
 		await sql.setHeat(channel, data.heat);
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
-		embed.setDescription(`**${player.name}** has become a Nemesis, and is invading the whole galaxy! Their rampage will continue until they are defeated in battle.\nThe Nemesis can no longer use most peaceful actions, but in exchange, they have access to several powerful new abilities. For more information, enter \`!help nemesis\`.`);
+		embed.setDescription(`**${player.name}** has become a Nemesis, and is invading the whole galaxy! ` +
+			`Their rampage will continue until ${player.config.pronoun} are defeated in battle.\n` + 
+			`The Nemesis can no longer use most peaceful actions, but in exchange, ` +
+			`${player.config.pronoun} ${this.have(player.config.pronoun)} access to several powerful new abilities. ` + 
+			`For more information, enter \`!help nemesis\`.`);
 		return embed;
 	},
 	// Check whether or not a player is a fusion.
@@ -780,7 +788,7 @@ module.exports = {
 		if(!data) return;
         let addedHeat = heat * Math.pow(1.05, data.resets);
         data.heat += addedHeat;
-        console.log('Heat increased by ' + heat + ' to ' + data.heat);
+        console.log(`Heat increased by ${heat} to ${data.heat}`);
 	},
 	// Add a new plant to the garden.
 	async plant(channel, name, plantName) {
@@ -927,7 +935,7 @@ module.exports = {
 					} else {
 						await sql.setStatus(defeated);
 						let duration = defeatedState.endTime - now;
-						output = `**${player.name}** heals **${target.name}**, but they still won't be able to fight for ${this.getTimeString(duration)}.`;
+						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
 				}
 				break;
@@ -942,20 +950,20 @@ module.exports = {
 					} else {
 						await sql.setStatus(defeated);
 						let duration = defeatedState.endTime - now;
-						output = `**${player.name}** heals **${target.name}**, but they still won't be able to fight for ${this.getTimeString(duration)}.`;
+						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
 				}
 				break;
 			case 3:
 				// Carrot
 				await sql.addStatus(channel, target.id, 6, now + hour * 6);
-				output = `**${target.name}** eats the carrot. Their senses feel sharper!`;
+				output = `**${target.name}** eats the carrot, and ${this.their(target.config.pronoun)} senses feel sharper!`;
 				break;
 			case 4:
 				// Bean
 				await sql.addStatus(channel, target.id, 7, now + hour);
 				var levelBoost = target.level * .12;
-				output = `**${target.name}** eats the bean. Their power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
+				output = `**${target.name}** eats the bean, and ${this.their(target.config.pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
 			case 5:
 				// Sedge
@@ -965,7 +973,7 @@ module.exports = {
 			case 6:
 				// Fern
 				await sql.addStatus(channel, target.id, 8, now + hour * 12);
-				output = `**${target.name}** eats the fern. Their power cannot be scanned!`;
+				output = `**${target.name}** eats the fern, and ${this.their(target.config.pronoun)} power is hidden!`;
 				break;
 		}
 
@@ -1147,7 +1155,7 @@ module.exports = {
 							plantName = 'fern';
 							break;
 					}
-					console.log(`${player.name} found nota plant hing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+					console.log(`${player.name} found a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 					output = `${player.name} searches the world, and finds a ${plantName}!`;
 					let existingPlants = player.items.find(i => i.type == plantType);
 					if(existingPlants && existingPlants.count >= 3) {
@@ -1171,7 +1179,13 @@ module.exports = {
 							"a gym badge.",
 							"a golden banana.",
 							"a korok seed. Yahaha!",
-							"the Holy Grail... wait, it's a fake."
+							"the Holy Grail... wait, it's a fake.",
+							"a limited edition magic orb model.",
+							"a hotspring! Sadly, it has no healing properties.",
+							"a dinosaur egg.",
+							"a single delicious muffin.",
+							"a giant catfish.",
+							"two huge snakes."
 						];
 						let junk = junkItems[Math.floor(Math.random() * junkItems.length)];
 						console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
@@ -1258,5 +1272,85 @@ module.exports = {
 		let player = await sql.getPlayerByUsername(channel, name);
 		await sql.deleteStatus(channel, player.id, 5);
 		await sql.addStatus(channel, player.id, 2);
+	},
+	async config(channel, name, configFlag, value) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		if(configFlag) {
+			// Update the config
+			switch(configFlag.toLowerCase()) {
+				case 'alwaysprivate':
+					player.config.alwaysPrivate = this.readConfigBoolean(value);
+					break;
+				case 'ping':
+					player.config.ping = this.readConfigBoolean(value);
+					break;
+				case 'pronoun':
+					if(value.toLowerCase() == 'he') {
+						player.config.pronoun = 'he';
+					} else if(value.toLowerCase() == 'she') {
+						player.config.pronoun = 'she';
+					} else {
+						player.config.pronoun = 'they';
+					}
+					player.config.alwaysPrivate = this.readConfigBoolean(value, player.config.alwaysPrivate);
+					break;
+			}
+		}
+
+		await sql.setPlayer(player);
+		return this.displayConfig(player);
+	},
+	async displayConfig(player) {
+		let embed = new Discord.RichEmbed();
+		let now = new Date().getTime();
+		let config = player.config;
+		embed.setTitle(`${player.name} Config`)
+			.setColor(0x00AE86);
+		//
+		var output = `AlwaysPrivate: ${config.alwaysPrivate ? 'On' : 'Off'}\n`;
+		output += `Ping: ${config.ping ? 'On' : 'Off'}\n`;
+		output += `Pronoun: ${config.pronoun}`;
+		embed.setDescription(output);
+
+		return embed;
+	},
+	readConfigBoolean(value, oldValue) {
+		var v = value.toLowerCase();
+		if(v == 'off' || v == '0' || v == 'false') {
+			return false;
+		} else if(v == 'on' || v == '1' || v == 'true') {
+			return true;
+		}
+		return oldValue;
+	},
+	their(pronoun) {
+		switch(pronoun) {
+			case 'he':
+				return 'his';
+			case 'she':
+				return 'her';
+			default:
+				return 'their';
+		}
+	},
+	are(pronoun) {
+		switch(pronoun) {
+			case 'he':
+				return 'is';
+			case 'she':
+				return 'is';
+			default:
+				return 'are';
+		}
+	},
+	have(pronoun) {
+		switch(pronoun) {
+			case 'he':
+				return 'have';
+			case 'she':
+				return 'have';
+			default:
+				return 'has';
+		}
 	}
 }

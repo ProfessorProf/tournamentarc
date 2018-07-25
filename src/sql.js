@@ -8,7 +8,7 @@ const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, Lost_Orbs INTEGER, Last_Wish INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
-    Life_Time INTEGER, Active_Time INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
+    Active_Time INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
     NPC_Flag INTEGER, AlwaysPrivate_Flag INTEGER, Ping_Flag INTEGER, Pronoun INTEGER);
 CREATE TABLE IF NOT EXISTS PlayerStatus (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Status_ID INTEGER, StartTime INTEGER, EndTime INTEGER);
 CREATE TABLE IF NOT EXISTS Statuses (ID INTEGER, Name TEXT, Ends INTEGER, Priority INTEGER);
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Typ
     Destroy_Time INTEGER, Revive_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
 CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
-    Winner_Rating REAL, Loser_Rating REAL,
+    Winner_Level REAL, Loser_Level REAL,
     Winner_Skill REAL, Loser_Skill REAL);
 CREATE TABLE IF NOT EXISTS Tournaments (Channel TEXT, Organizer_ID INTEGER, Status INTEGER, Type INTEGER, 
     Round INTEGER, Round_Time INTEGER, Next_Tournament_Time INTEGER);
@@ -80,7 +80,6 @@ let updatePlayerSql = `UPDATE Players SET
     Garden_Level = $gardenLevel,
     Garden_Time = $gardenTime,
     Glory = $glory,
-    Life_Time = $lifeTime,
     Active_Time = $activeTime,
     Nemesis_Flag = $nemesisFlag,
     Fusion_Flag = $fusionFlag,
@@ -92,9 +91,9 @@ let updatePlayerSql = `UPDATE Players SET
 WHERE ID = $id`;
 
 let insertPlayerSql = `INSERT INTO Players (Username, Name, Channel, Power_Level,
-Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Life_Time, Active_Time, 
+Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Active_Time, 
 Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, Pronoun) 
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
 (Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
@@ -171,8 +170,8 @@ module.exports = {
 		const result = await sql.run(insertPlayerSql,
 			[player.username, player.name, player.channel, player.level,
 				player.actionLevel, player.actionTime, player.gardenLevel, player.gardenTime, 
-				player.glory, player.aliveTime, player.lastActive,
-				player.nemesisFlag, player.fusionFlag, player.wishFlag, player.npcFlag, 
+				player.glory, player.lastActive, player.nemesisFlag,
+				player.fusionFlag, player.wishFlag, player.npcFlag, 
 				player.config.alwaysPrivate, player.config.ping, player.config.pronoun]);
 		return result.lastID;
 	},
@@ -190,7 +189,6 @@ module.exports = {
             $gardenTime: player.gardenTime,
             $actionTime: player.actionTime,
             $glory: player.glory,
-            $lifeTime: player.aliveTime,
             $activeTime: player.lastActive,
             $nemesisFlag: player.nemesisFlag ? 1 : 0,
             $fusionFlag: player.fusionFlag ? 1 : 0,
@@ -268,7 +266,6 @@ module.exports = {
 			channel: row.Channel,
 			level: row.Power_Level,
 			glory: row.Glory,
-			aliveTime: row.Life_Time,
 			lastActive: row.Active_Time,
 			gardenLevel: row.Garden_Level,
 			actionLevel: row.Action_Level,
@@ -720,6 +717,19 @@ module.exports = {
 		} else {
 			return null;
 		}
+	},
+	async addHistory(channel, winnerId, winnerLevel, winnerSkill, loserId, loserLevel, loserSkill) {
+		await sql.run(`INSERT INTO History (Channel, Battle_Time, Winner_Id, Loser_ID, Winner_Level, Loser_Level, Winner_Skill, Loser_Skill)
+			VALUES ($channel, $battleTime, $winnerId, $loserId, $winnerLevel, $loserLevel, $winnerSkill, $loserSkill)`, {
+			$channel: channel,
+			$battleTime: new Date().getTime(),
+			$winnerId: winnerId,
+			$winnerSkill: winnerSkill,
+			$winnerLevel: winnerLevel,
+			$loserId: loserId,
+			$loserLevel: loserLevel,
+			$loserSkill: loserSkill
+		});
 	},
 	async resetWorld(channel) {
 		let row = await sql.get(`SELECT Channel, Resets FROM Worlds WHERE Channel = $channel`, {$channel: channel});
