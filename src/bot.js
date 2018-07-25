@@ -82,11 +82,32 @@ async function handleMessage(message) {
 		case 'fight':
 			message.channel.send({embed: await tools.tryFight(channel, name, targetName)});
 			break;
+		case 'unfight':
+			// TODO
+			break;
 		case 'attack':
 			message.channel.send({embed: await tools.attack(channel, name, targetName)});
 			break;
 		case 'destroy':
 			message.channel.send({embed: await tools.destroy(channel)});
+			break;
+		case 'burn':
+			// TODO
+			break;
+		case 'recruit':
+			// TODO
+			break;
+		case 'join':
+			// TODO
+			break;
+		case 'banish':
+			// TODO
+			break;
+		case 'energize':
+			// TODO
+			break;
+		case 'revive':
+			// TODO
 			break;
 		case 'train':
 			await tools.train(channel, name);
@@ -134,6 +155,33 @@ async function handleMessage(message) {
 			break;
 		case 'wish':
 			message.channel.send(await tools.wish(channel, name, args[0]));
+			break;
+		case 'research':
+			// TODO
+			break;
+		case 'overdrive':
+			// TODO
+			break;
+		case 'empower':
+			// TODO
+			break;
+		case 'give':
+			// TODO
+			break;
+		case 'journey':
+			// TODO
+			break;
+		case 'history':
+			// TODO
+			break;
+		case 'graveyard':
+			// TODO
+			break;
+		case 'tournament':
+			// TODO
+			break;
+		case 'config':
+			// TODO
 			break;
 		case 'help':
 			message.channel.send({embed: await help.showHelp(args[0])});
