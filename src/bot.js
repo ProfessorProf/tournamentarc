@@ -142,7 +142,7 @@ async function handleMessage(message) {
 			message.channel.send(await tools.search(channel, name));
 			break;
 		case 'roster':
-			let output = await tools.displayRoster(channel);
+			const output = await tools.displayRoster(channel);
 			message.channel.send(`\`\`\`\n${output}\`\`\``);;
 			break;
 		case 'fuse':
@@ -180,8 +180,11 @@ async function handleMessage(message) {
 		case 'tournament':
 			// TODO
 			break;
-		case 'config':
+		case 'taunt':
 			// TODO
+			break;
+		case 'config':
+			message.channel.send({embed: await tools.config(channel, name, args[0], args[1])});
 			break;
 		case 'help':
 			message.channel.send({embed: await help.showHelp(args[0])});
@@ -202,41 +205,5 @@ async function handleMessage(message) {
 	let duration = (endTime - now) / 1000;
 	console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 }
-
-function loadData() {
-	fs.readdir('./data', function(err, files) {
-		for(let i = 0; i < files.length; i++) {
-			fs.readFile('./data/' + files[i], 'utf8', function(err, json) {
-				if(!err && json) {
-					let now = new Date().getTime();
-					let data = JSON.parse(json);
-					for(let player in data.players) {
-						for(let challenge in data.players[player].challenges) {
-							if(!data.players[player].challenges[challenge] || data.players[player].challenges[challenge].expires < now) {
-								delete data.players[player].challenges[challenge];
-							}
-							if(!data.players[player].revenge) {
-								data.players[player].revenge = {};
-							}
-						}
-					}
-					console.log(`Loaded data for channel ID ${data.id}`);
-				}
-			});
-		}
-	});
-}
-
-function saveData(data) {
-	if(!data) return;
-	let json = JSON.stringify(data);
-	fs.writeFile(`./data/${data.id}.txt`, json, function(err) {
-		if(err) {
-			console.log(err);
-		}
-	});
-}
-
-//loadData();
 
 client.login(auth.token);
