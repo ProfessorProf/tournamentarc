@@ -447,14 +447,48 @@ module.exports = {
 				}
 				break;
 			case 'unfight':
+				// !unfight validation
+				// - Must be registered
+				// - Must not be the Nemesis
+				// - Must not be Berserk
+				this.validatePlayerRegistered(errors, player);
 				if(player.isNemesis || player.status.find(s => s.type == 12)) {
 					errors.push("You can't stop fighting!");
 				}
 				break;
 			case 'give':
+				// !give validation
+				// - Must be registered
+				// - Target must exist
+				// - Target must not be you
+				// - Must have at least one orb
+				this.validatePlayerRegistered(errors, player);
 				if(!player.items.find(i => i.type == 0)) {
 					errors.push("You don't have any orbs to give!");
 				}
+				if(target) {
+					if(player.name == target.name) {
+						errors.push("You can't give yourself orbs!");
+					}
+				} else {
+					errors.push('Must specify a valid target.');
+				}
+				break;
+			case 'history':
+				// !history validation
+				// - Must be registered
+				// - Must specify a valid target
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					if(target) {
+						if(player.name == target.name) {
+							errors.push('When you fight yourself, you lose every time.');
+						}
+					} else {
+						errors.push('Must specify a valid target.');
+					}
+				}
+				break;
 		}
 
 		if(errors.length > 0) {
