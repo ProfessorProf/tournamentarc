@@ -313,6 +313,17 @@ module.exports = {
 					this.validateActionTime(errors, player);
 				}
 				break;
+			case 'overdrive':
+				// !overdrive validation rules:
+				// - Must be registered
+				// - Must not be the Nemesis
+				// - Must not have done any world actions in past hour
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateNotNemesis(errors, player);
+					this.validateActionTime(errors, player);
+				}
+				break;
 			case 'empower':
 				// !empower validation rules:
 				// - Must be registered

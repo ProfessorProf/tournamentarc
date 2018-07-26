@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_
 	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
-    Last_Active INTEGER, Last_Fought INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
+    Last_Active INTEGER, Last_Fought INTEGER, Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
     NPC_Flag INTEGER, AlwaysPrivate_Flag INTEGER, Ping_Flag INTEGER, Pronoun INTEGER);
 CREATE TABLE IF NOT EXISTS PlayerStatus (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Status_ID INTEGER,
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
@@ -86,6 +86,7 @@ let updatePlayerSql = `UPDATE Players SET
     Glory = $glory,
 	Last_Active = $lastActive,
 	Last_Fought = $lastFought,
+	Overdrive_Count = $overdriveCount,
     Nemesis_Flag = $nemesisFlag,
     Fusion_Flag = $fusionFlag,
     Wish_Flag = $wishFlag,
@@ -96,10 +97,10 @@ let updatePlayerSql = `UPDATE Players SET
 WHERE ID = $id`;
 
 let insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
-	Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Last_Active, Last_Fought, 
+	Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Last_Active, Last_Fought, Overdrive_Count,
 	Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, Pronoun) 
 VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $actionTime, $gardenLevel, $gardenTime, $glory, 
-	$lastActive, $lastFought, $nemesisFlag, $fusionFlag, $wishFlag, $npcFlag, $alwaysPrivate, $ping, $pronoun)`;
+	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npcFlag, $alwaysPrivate, $ping, $pronoun)`;
 
 let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
 (Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
@@ -193,6 +194,7 @@ module.exports = {
 				$glory: player.glory, 
 				$lastActive: player.lastActive,
 				$lastFought: player.lastFought,
+				$overdriveCount: player.overdriveCount,
 				$nemesisFlag:  player.nemesisFlag ? 1 : 0,
 				$fusionFlag: player.fusionFlag ? 1 : 0, 
 				$wishFlag: player.wishFlag ? 1 : 0, 
@@ -219,6 +221,7 @@ module.exports = {
             $glory: player.glory,
 			$lastActive: player.lastActive,
 			$lastFought: player.lastFought,
+			$overdriveCount: player.overdriveCount,
             $nemesisFlag: player.nemesisFlag ? 1 : 0,
             $fusionFlag: player.fusionFlag ? 1 : 0,
             $wishFlag: player.wishFlag ? 1 : 0,
@@ -234,14 +237,14 @@ module.exports = {
 			return null;
 		}
         // Exact name match
-		let row = await sql.get(`SELECT * FROM Players p WHERE UPPER(p.name) = $name`, {$name: name.toUpperCase()});
+		let row = await sql.get(`SELECT * FROM Players p WHERE Channel = $channel AND UPPER(p.name) = $name`, {$name: name.toUpperCase(), $channel: channel});
 		if(!row) {
 			// Starts With name match
-			row = await sql.get(`SELECT * FROM Players p WHERE UPPER(p.name) LIKE ($namePattern)`, {$namePattern: name.toUpperCase() + '%'});
+			row = await sql.get(`SELECT * FROM Players p WHERE Channel = $channel AND UPPER(p.name) LIKE ($namePattern)`, {$namePattern: name.toUpperCase() + '%', $channel: channel});
 		}
 		if(!row) {
 			// Contains name match
-			row = await sql.get(`SELECT * FROM Players p WHERE UPPER(p.name) LIKE ($namePattern)`, {$namePattern: '%' + name.toUpperCase() + '%'});
+			row = await sql.get(`SELECT * FROM Players p WHERE Channel = $channel AND UPPER(p.name) LIKE ($namePattern)`, {$namePattern: '%' + name.toUpperCase() + '%', $channel: channel});
 		}
 		if(row) {
 			return await this.fusionCheck(row);
@@ -302,6 +305,7 @@ module.exports = {
 			actionLevel: row.Action_Level,
 			gardenTime: row.Garden_Time,
 			actionTime: row.Action_Time,
+			overdriveCount: row.Overdrive_Count,
 			nemesisFlag: row.Nemesis_Flag != 0,
 			fusionFlag: row.Fusion_Flag != 0,
 			wishFlag: row.Wish_Flag != 0,
@@ -731,6 +735,11 @@ module.exports = {
 					await this.deletePlayer(fusedCharacter.id);
 
 					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
+					break;
+				
+				case 12:
+				    // Death
+					messages.push(`**${status.Name}** calms down from their battle frenzy.`);
 					break;
 			}
 		}
