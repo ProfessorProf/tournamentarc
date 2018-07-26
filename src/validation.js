@@ -244,7 +244,7 @@ module.exports = {
 				break;
 			case 'plant':
 				// !plant validation rules:
-				// - Must not have done any gardening/searching in past hour
+				// - Must not have done any gardening in past hour
 				// - Must be room in the garden for a new plant
 				// - TODO: Must be a known plant
 				this.validatePlayerRegistered(errors, player);
@@ -259,7 +259,7 @@ module.exports = {
 				break;
 			case 'expand':
 				// !plant validation rules:
-				// - Must not have done any gardening/searching in past hour
+				// - Must not have done any gardening in past hour
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
@@ -268,7 +268,7 @@ module.exports = {
 				break;
 			case 'water':
 				// !plant validation rules:
-				// - Must not have done any gardening/searching in past hour
+				// - Must not have done any gardening in past hour
 				// - Must be at least one waterable plant
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
@@ -282,20 +282,35 @@ module.exports = {
 				break;
 			case 'research':
 				// !plant validation rules:
-				// - Must not have done any gardening/searching in past hour
+				// - Must be registered
+				// - Must not be the Nemesis
+				// - Must not have done any world actions in past hour
 				// - Must not be over the limit
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known).length;
-					if(garden.researchLevel >= knownPlants) {
+					if(garden.researchLevel >= knownPlants - 1) {
 						errors.push("You can't research further right now - try `!expand` to work on the garden instead.");
 					}
 				}
 			case 'search':
 				// !search validation rules:
-				// - Must not have done any gardening/searching in past hour
+				// - Must be registered
+				// - Must not be the Nemesis
+				// - Must not have done any world actions in past hour
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateNotNemesis(errors, player);
+					this.validateActionTime(errors, player);
+				}
+				break;
+			case 'empower':
+				// !empower validation rules:
+				// - Must be registered
+				// - Must not be the Nemesis
+				// - Must not have done any world actions in past hour
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);

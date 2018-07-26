@@ -1598,5 +1598,22 @@ module.exports = {
 		}
 
 		return embed;
+	},
+	async empower(channel, name, targetName) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let target = await sql.getPlayer(channel, targetName);
+		let now = new Date().getTime();
+
+		let transfer = Math.min(player.level * 0.1, target.level * 0.25);
+
+		player.level -= transfer;
+		target.level += transfer;
+
+		player.actionTime = now + hour;
+		await sql.setPlayer(player);
+		await sql.setPlayer(target);
+
+		return `${player.name} sends ${this.their(player.config.pronoun)} energy, ` +
+			`increasing ${this.their(target.config.pronoun)} Power Level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
 	}
 }
