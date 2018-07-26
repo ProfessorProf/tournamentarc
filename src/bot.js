@@ -1,13 +1,10 @@
 const Discord = require("discord.js");
 const client = new Discord.Client();
 const auth = require('../auth.json');
-const fs = require('fs');
 const tools = require('./tools.js');
 const validation = require('./validation.js');
 const sql = require ('./sql.js');
 const help = require('./help.js');
-
-const hour = (60 * 60 * 1000);
 
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
@@ -131,7 +128,7 @@ async function handleMessage(message) {
 			}
 			break;
 		case 'unfight':
-			// TODO
+			outputMessage.print.push(await tools.unfight(channel, name));
 			break;
 		case 'attack':
 			message.channel.send({embed: await tools.attack(channel, name, targetName)});
@@ -217,7 +214,7 @@ async function handleMessage(message) {
 			// TODO
 			break;
 		case 'give':
-			// TODO
+			outputMessage.print.push(await tools.give(channel, name, args[0]));
 			break;
 		case 'journey':
 			// TODO
