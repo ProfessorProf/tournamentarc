@@ -16,11 +16,13 @@ module.exports = {
                 .addField('!roster', 'Displays the status and power levels of all active players.')
                 .addField('!check', 'Displays your current stats.')
                 .addField('!scan name', "Displays another player's power level. However, it's not always right.")
+                .addField('!graveyard', "Displays all currently-defeated players.")
                 .addField('!history name', 'Displays your battle history with another player.')
                 .addField('!fight name', "Challenge someone else to a fight! If they fight you back, you will  clash in a battle of power levels. If you don't include a name, you will send an open challenge to the whole channel to fight.")
                 .addField('!unfight', 'Cancel all your outgoing challenges.')
                 .addField('!train', "Begin training! You must lose a fight before you can train. The longer you train, the bigger the jump in power - but after a point, there will be diminishing returns, and after 48 hours, training doesn't help at all. Train hard, and you can always catch up with the strongest fighters!")
                 .addField('!help topic', 'Learn more about specific topics.')
+                .addField('Private commands', 'For certain informational commands, you can start it with `!!` instead of `!` and it will only show you the result.')
                 .addField('Available Help Topics', 'config, rank, garden, plants, actions, fusion, nemesis, henchmen, wish, tournament');
         } else {
             switch(topic.toLowerCase()) {
@@ -81,7 +83,6 @@ Rank ??? 100 wins
                         }
                     }
                     break;
-
                 default:
                     output.addField('Available Help Topics', 'config, rank, garden, plants, actions, fusion, nemesis, henchmen, wish, tournament');
             }
