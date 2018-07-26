@@ -1048,6 +1048,54 @@ module.exports = {
 
 		return output;
 	},
+	// Research new plants.
+	async research(channel, name) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+
+		let output = '';
+
+		let research = (Math.random() * 15 + 5) * (1 + 0.075 * player.gardenLevel) / (100 * (3 + garden.researchLevel));
+		console.log(`${player.name} advanced plant research by ${Math.floor(research * 100) / 100}`);
+		let percent = Math.floor(100 * research);
+		output += `**${player.name}** researches new kinds of plants, with a rating of ${percent}%.`;
+		var oldResearchLevel = garden.researchLevel;
+		garden.researchLevel += research;
+		
+		if(Math.floor(oldResearchLevel) < Math.floor(garden.researchLevel)) {
+			// Research max!
+			if(garden.growthLevel < 3) {
+				// Garden growth required
+				output += "\nResearch can't continue until Growth Level is 3 or higher.";
+				garden.researchLevel = Math.floor(garden.researchLevel) - 0.01;
+			} else {
+				// Discover a new plant species
+				let unknownPlants = await sql.getUnknownPlants(channel);
+				let newPlant = unknownPlants[Math.floor(Math.random() * unknownPlants.length)];
+				output += `\nResearch level increased! New plant "${newPlant.name}" can now be planted in the garden.`;
+				garden.growthLevel -= 3;
+				await sql.researchPlant(channel, newPlant.id);
+			}
+		}
+		
+		// Update garden level
+		if(player) {
+			if(!player.gardenLevel) player.gardenLevel = 0;
+			let oldGardenLevel = Math.floor(player.gardenLevel);
+			player.gardenLevel += 1 / (1 + player.gardenLevel);
+			let newGardenLevel = Math.floor(player.gardenLevel);
+			if(newGardenLevel > oldGardenLevel) {
+				output += '\nGardening level increased!';
+			}
+			player.gardenTime = now + hour;
+			await sql.setPlayer(player);
+		}
+
+		await sql.setGarden(garden);
+
+		return output;
+	},
 	// Reset the universe.
 	async resetData(channel) {
 		await sql.resetWorld(channel);

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS PlayerStatus (ID INTEGER PRIMARY KEY, Channel TEXT, P
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
 CREATE TABLE IF NOT EXISTS Statuses (ID INTEGER, Name TEXT, Ends INTEGER, Priority INTEGER);
 CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID INTEGER, Count INTEGER);
-CREATE TABLE IF NOT EXISTS Items (ID TEXT, Channel TEXT, Type_Name TEXT, Known_Flag INTEGER, Plant_Flag INTEGER, Grow_Time INTEGER);
+CREATE TABLE IF NOT EXISTS Items (ID INTEGER, Channel TEXT, Type_Name TEXT, Known_Flag INTEGER, Plant_Flag INTEGER, Grow_Time INTEGER);
 CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Extra TEXT, Expires INTEGER);
 CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID INTEGER, Plant3_ID INTEGER,
     Growth_Level REAL, Research_Level REAL);
@@ -125,6 +125,10 @@ module.exports = {
 				await sql.run(query);
 			}
 		}
+
+		// Make one random plant known
+		var knownPlant = Math.floor(Math.random() * 5);
+		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE ID = $id`, {$id: knownPlant});
 		console.log(`Channel ${channel} initialized`);
 	},
 	// Debug commands to run arbitrary SQL. Be careful, admin.
@@ -818,5 +822,32 @@ module.exports = {
 		} else {
 			return [];
 		}
+	},
+	async getKnownPlants(channel) {
+		let rows = await sql.all(`SELECT * FROM Items WHERE Plant_Flag <> 0 AND Known_Flag <> 0 AND Channel = $channel
+			ORDER BY ID`, {$channel: channel});
+		if(rows) {
+			return rows.map(r => { return {
+				id: r.ID,
+				name: r.Type_Name
+			}});
+		} else {
+			return [];
+		}
+	},
+	async getUnknownPlants(channel) {
+		let rows = await sql.all(`SELECT * FROM Items WHERE Plant_Flag <> 0 AND Known_Flag = 0 AND Channel = $channel
+			ORDER BY ID`, {$channel: channel});
+		if(rows) {
+			return rows.map(r => { return {
+				id: r.ID,
+				name: r.Type_Name
+			}});
+		} else {
+			return [];
+		}
+	},
+	async researchPlant(channel, plantId) {
+		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE Channel = $channel AND ID = $id`, {$channel: channel, $id: plantId});
 	}
 }
