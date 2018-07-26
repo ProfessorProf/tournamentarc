@@ -422,7 +422,7 @@ module.exports = {
 		let existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
 			{$playerId: playerId, $itemId: itemId});
 		if(existingItem) {
-			var newCount = existingItem.Count + count;
+			let newCount = existingItem.Count + count;
 			if(newCount <= 0) {
 				await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
 					{$playerId: playerId, $itemId: itemId});
@@ -548,7 +548,7 @@ module.exports = {
 				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant1_ID);
 				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
-					var growTime = plantInfo ? plantInfo.Grow_Time : 0;
+					let growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[0] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
@@ -563,7 +563,7 @@ module.exports = {
 				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant2_ID);
 				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
-					var growTime = plantInfo ? plantInfo.Grow_Time : 0;
+					let growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[1] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
@@ -578,7 +578,7 @@ module.exports = {
 				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant3_ID);
 				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
-					var growTime = plantInfo ? plantInfo.Grow_Time : 0;
+					let growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[2] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
@@ -797,5 +797,26 @@ module.exports = {
 	},
 	async unfightOffers(id) {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $id`, {$id: id});
+	},
+	async getHistory(player1Id, player2Id) {
+		let history = await sql.all(`SELECT * FROM History WHERE (Winner_ID = $player1Id AND Loser_ID = $player2Id) 
+		OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time DESC`, {
+			$player1Id: player1Id,
+			$player2Id: player2Id
+		});
+
+		if(history) {
+			return history.map(h => { return {
+				battleTime: h.Battle_Time,
+				winnerId: h.Winner_ID,
+				winnerLevel: h.Winner_Level,
+				winnerSkill: h.Winner_Skill,
+				loserId: h.Loser_ID,
+				loserLevel: h.Loser_Level,
+				loserSkill: h.Loser_Skill
+			}});
+		} else {
+			return [];
+		}
 	}
 }

@@ -12,8 +12,8 @@ client.on('ready', () => {
 	sql.getChannels().then(channels => {;
 		if(channels.length > 0) {
 			for(let i in channels) {
-				var c = channels[i];
-				var channel = client.channels.find(x => x.id == c);
+				let c = channels[i];
+				let channel = client.channels.find(x => x.id == c);
 				channel.send(`Bot online! Greetings, ${channel.name}.`);
 			}
 		}
@@ -22,12 +22,12 @@ client.on('ready', () => {
     setInterval(async function() {
 		let channels = await sql.getChannels();
 		for(let i in channels) {
-			var c = channels[i];
+			let c = channels[i];
 			
 			let update = await tools.updateWorld(c);
 			if(update.embed) {
 				console.log(update.embed);
-				var channel = client.channels.find(x => x.id == c);
+				let channel = client.channels.find(x => x.id == c);
 				channel.send({embed: update.embed});
 			} else {
 				console.log('Nothing to report');
@@ -64,7 +64,7 @@ async function handleMessage(message) {
 
 	let channel = message.channel.id;
 
-	var outputMessage = {
+	let outputMessage = {
 		print: [],
 		embed: null,
 		private: false,
@@ -131,10 +131,10 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.unfight(channel, name));
 			break;
 		case 'attack':
-			message.channel.send({embed: await tools.attack(channel, name, targetName)});
+			outputMessage.embed = await tools.attack(channel, name, targetName);
 			break;
 		case 'destroy':
-			message.channel.send({embed: await tools.destroy(channel)});
+			outputMessage.embed = await tools.destroy(channel);
 			break;
 		case 'burn':
 			// TODO
@@ -159,7 +159,7 @@ async function handleMessage(message) {
 			outputMessage.print.push(`**${name}** has begun training.`);
 			break;
 		case 'scan':
-			message.channel.send({embed: await tools.scoutPlayer(channel, targetName)});
+			outputMessage.embed = await tools.scoutPlayer(channel, targetName);
 			output.informational = true;
 			break;
 		case 'reset':
@@ -167,7 +167,7 @@ async function handleMessage(message) {
 			outputMessage.print.push('Onwards, to a new universe...! Some Glory is preserved, but all Power Levels and player status has been reverted.');
 			break;
 		case 'garden':
-			message.channel.send({embed: await tools.displayGarden(channel)});
+			outputMessage.embed = await tools.displayGarden(channel);
 			outputMessage.informational = true;
 			break;
 		case 'plant':
@@ -195,11 +195,13 @@ async function handleMessage(message) {
 			break;
 		case 'fuse':
 			const fusionName = args.length > 1 ? args[1] : null;
-			outputMessage.print.push(await tools.fuse(channel, message, name, targetName, fusionName));
+			const fusionResult = await tools.fuse(channel, name, targetName, fusionName);
+			if(fusionResult.message) outputMessage.print.push(fusionResult.message);
+			if(fusionResult.embed) outputMessage.embed = fusionResult.embed;
 			break;
 		case 'nemesis':
-			message.channel.send({embed: await tools.setNemesis(channel, name)});
-			message.channel.send({embed: await tools.getPlayerDescription(channel, name)});
+			outputMessage.print.push(await tools.setNemesis(channel, name));
+			outputMessage.embed = await tools.getPlayerDescription(channel, name);
 			break;
 		case 'wish':
 			outputMessage.print.push(await tools.wish(channel, name, args[0]));
@@ -220,24 +222,21 @@ async function handleMessage(message) {
 			// TODO
 			break;
 		case 'history':
-			// TODO
+			outputMessage.embed = await tools.history(channel, name, targetName);
+			outputMessage.informational = true;
 			break;
 		case 'graveyard':
 			// TODO
-			break;
-		case 'tournament':
-			// TODO
-			outputMessage.informational = true;
 			break;
 		case 'taunt':
 			// TODO
 			break;
 		case 'config':
-			message.channel.send({embed: await tools.config(channel, name, args[0], args[1])});
+			outputMessage.embed = await tools.config(channel, name, args[0], args[1]);
 			outputMessage.informational = true;
 			break;
 		case 'help':
-			message.channel.send({embed: await help.showHelp(args[0])});
+			outputMessage.embed = await help.showHelp(args[0]);
 			outputMessage.informational = true;
 			break;
 		case 'debug':
@@ -269,8 +268,8 @@ async function handleMessage(message) {
 		}
 	}
 
-	for(var i in outputMessage.print) {
-		var text = outputMessage.print[i];
+	for(let i in outputMessage.print) {
+		let text = outputMessage.print[i];
 		if(outputMessage.informational && outputMessage.private) {
 			message.author.sendMessage(text);
 		} else {

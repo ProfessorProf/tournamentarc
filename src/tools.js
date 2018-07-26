@@ -54,7 +54,7 @@ module.exports = {
 		if(player.status.find(s => s.type == 8)) {
 			stats += 'Unknown';
 		} else {
-			var level = this.getPowerLevel(player);
+			let level = this.getPowerLevel(player);
 			stats += numeral(level.toPrecision(2)).format('0,0');
 			if(player.status.find(s => s.type == 2)) {
 				stats += '?';
@@ -401,8 +401,8 @@ module.exports = {
 		await this.completeTraining(player2);
 
 		// Bean bonuses
-		var level1 = this.getPowerLevel(player1);
-		var level2 = this.getPowerLevel(player2);
+		let level1 = this.getPowerLevel(player1);
+		let level2 = this.getPowerLevel(player2);
 		if(player1.status.find(s => s.type == 7)) {
 			level1 *= 1.12;
 		}
@@ -473,8 +473,8 @@ module.exports = {
 			skills = [skill2, skill1];
 		}
 		
-		let history = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
-		let output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], history, embed);
+		let nemesisHistory = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
+		let output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], nemesisHistory);
 		embed.addField('Results', output);
 
 		return {
@@ -572,7 +572,7 @@ module.exports = {
 			output += `\n${winner.name} took ${loserOrbs.count} magic orbs from ${loser.name}!`;
 			await sql.addItems(winner.id, 0, loserOrbs.count);
 			await sql.addItems(loser.id, 0, -loserOrbs.count);
-			if(loserOrbs.count + winnerOrbs.count == 7) {
+			if(loserOrbs.count + (winnerOrbs ? winnerOrbs.count : 0) == 7) {
 				output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 			}
 		}
@@ -679,7 +679,7 @@ module.exports = {
 		return embed;
 	},
 	// Attempt to create a new Fusion.
-    async fuse(channel, message, sourcePlayerName, targetPlayerName, fusionName) {
+    async fuse(channel, sourcePlayerName, targetPlayerName, fusionName) {
 
 		const sourcePlayer = await sql.getPlayerByUsername(channel, sourcePlayerName);
 		sourcePlayerName = sourcePlayer.name;
@@ -689,68 +689,70 @@ module.exports = {
 		const world = await sql.getWorld(channel);
 
 		// Check to see if we're accepting an offer
-		for (const offer of sourcePlayer.offers) {
-			if (offer.type === 1 && offer.targetId === sourcePlayer.id && fusionName === offer.extra) {
-				await this.completeTraining(sourcePlayer);
-				await this.completeTraining(targetPlayer);
-				const name = fusionName ? fusionName : sourcePlayer.name + '|' + targetPlayer.name;
-				const fusedPlayer = {
-					name: name,
-					channel: channel,
-					level: (sourcePlayer.level + targetPlayer.level) / 2 + this.newPowerLevel(world.heat),
-					powerWish: sourcePlayer.powerWish || targetPlayer.powerWish,
-					glory: sourcePlayer.glory + targetPlayer.glory,
-					challenges: {},
-					lastActive: now,
-					aliveDate: now,
-					trainingState: 0,
-					trainingDate: now,
-					gardenTime: now - hour,
-					actionTime: now - hour,
-					gardenLevel: sourcePlayer.gardenLevel + targetPlayer.gardenLevel,
-					flowers: sourcePlayer.flowers + targetPlayer.flowers,
-					orbs: sourcePlayer.orbs + targetPlayer.orbs,
-					fusionTime: now,
-					nemesisFlag: false,
-					fusionFlag: true,
-					wishFlag: false,
-					config: {
-						alwaysPrivate: false,
-						ping: false,
-						pronoun: 'they'
-					}
-				};
-				const fusionId = await sql.addPlayer(fusedPlayer);
-				fusedPlayer.id = fusionId;
-				await sql.setFusionId(fusionId, fusionId);
-				await sql.setFusionId(sourcePlayer.id, fusionId);
-				await sql.setFusionId(targetPlayer.id, fusionId);
-				await sql.deleteAllFusionOffers(sourcePlayer.id);
-				await sql.deleteAllFusionOffers(targetPlayer.id);
-				await sql.addStatus(channel, fusionId, 9, now + 24 * hour);
-				for (const item of sourcePlayer.items) {
-					await sql.addItems(channel, fusionId, item.type, item.count);
-					await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
+		var fusionOffer = sourcePlayer.offers.find(o => o.type == 1 && o.playerId == targetPlayer.id && fusionName == o.extra);
+		if(fusionOffer) {
+			await this.completeTraining(sourcePlayer);
+			await this.completeTraining(targetPlayer);
+			const name = fusionName ? fusionName : sourcePlayer.name + '|' + targetPlayer.name;
+			const fusedPlayer = {
+				name: name,
+				channel: channel,
+				level: (sourcePlayer.level + targetPlayer.level) / 2 + this.newPowerLevel(world.heat),
+				powerWish: sourcePlayer.powerWish || targetPlayer.powerWish,
+				glory: sourcePlayer.glory + targetPlayer.glory,
+				challenges: {},
+				lastActive: now,
+				aliveDate: now,
+				trainingState: 0,
+				trainingDate: now,
+				gardenTime: now - hour,
+				actionTime: now - hour,
+				gardenLevel: sourcePlayer.gardenLevel + targetPlayer.gardenLevel,
+				flowers: sourcePlayer.flowers + targetPlayer.flowers,
+				orbs: sourcePlayer.orbs + targetPlayer.orbs,
+				fusionTime: now,
+				nemesisFlag: false,
+				fusionFlag: true,
+				wishFlag: false,
+				config: {
+					alwaysPrivate: sourcePlayer.config.alwaysPrivate && targetPlayer.config.alwaysPrivate,
+					ping: sourcePlayer.config.ping && targetPlayer.config.ping,
+					pronoun: sourcePlayer.config.pronoun == targetPlayer.config.pronoun ? sourcePlayer.config.pronoun : 'they'
 				}
-				for (const item of targetPlayer.items) {
-					await sql.addItems(channel, fusionId, item.type, item.count);
-					await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
-				}
-				console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
-				message.channel.send('The two warriors pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!');
-				return {embed: await this.getPlayerDescriptionById(fusionId)};
+			};
+			const fusionId = await sql.addPlayer(fusedPlayer);
+			fusedPlayer.id = fusionId;
+			await sql.setFusionId(fusionId, fusionId);
+			await sql.setFusionId(sourcePlayer.id, fusionId);
+			await sql.setFusionId(targetPlayer.id, fusionId);
+			await sql.deleteAllFusionOffers(sourcePlayer.id);
+			await sql.deleteAllFusionOffers(targetPlayer.id);
+			await sql.addStatus(channel, fusionId, 9, now + 24 * hour);
+			for (const item of sourcePlayer.items) {
+				await sql.addItems(channel, fusionId, item.type, item.count);
+				await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
 			}
+			for (const item of targetPlayer.items) {
+				await sql.addItems(channel, fusionId, item.type, item.count);
+				await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
+			}
+			console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
+			
+			return {embed: await this.getPlayerDescriptionById(fusionId), message: 'The two warriors pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!' };
 		}
 
 		// Send an offer to the other player
-		
 		const expiration = now + hour * 6;
 		const fuseCommand = `!fuse ${sourcePlayerName}` + (fusionName ? ' ' + fusionName : '');
 		sql.addOffer(sourcePlayer, targetPlayer, 1, fusionName);
 		console.log(`'New fusion offer from ${sourcePlayerName} for player ${targetPlayerName} expires at ${new Date(expiration)}`);
-		return `**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter ${fuseCommand} to accept the offer and fuse.\n` +
+		
+		embed.setTitle('FUSION OFFER')
+			.setColor(0x00AE86)
+			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter ${fuseCommand} to accept the offer and fuse.\n` +
 			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
-			'The offer will expire in six hours.';
+			'The offer will expire in six hours.');
+		return { embed: null, message: message };
 	},
 	// Establish a character as a new Nemesis.
     async setNemesis(channel, username) {
@@ -796,12 +798,11 @@ module.exports = {
 		await sql.setHeat(channel, data.heat);
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
-		embed.setDescription(`**${player.name}** has become a Nemesis, and is invading the whole galaxy! ` +
+		return `**${player.name}** has become a Nemesis, and is invading the whole galaxy! ` +
 			`Their rampage will continue until ${player.config.pronoun} are defeated in battle.\n` + 
 			`The Nemesis can no longer use most peaceful actions, but in exchange, ` +
 			`${player.config.pronoun} ${this.have(player.config.pronoun)} access to several powerful new abilities. ` + 
-			`For more information, enter \`!help nemesis\`.`);
-		return embed;
+			`For more information, enter \`!help nemesis\`.`;
 	},
 	// Check whether or not a player is a fusion.
     isFusion(player) {
@@ -994,7 +995,7 @@ module.exports = {
 			case 4:
 				// Bean
 				await sql.addStatus(channel, target.id, 7, now + hour);
-				var levelBoost = this.getPowerLevel(target) * .12;
+				let levelBoost = this.getPowerLevel(target) * .12;
 				output = `**${target.name}** eats the bean, and ${this.their(target.config.pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
 			case 5:
@@ -1027,7 +1028,7 @@ module.exports = {
 		garden.growthLevel += expansion;
 		
 		let gardenEfficiency = 1 + 0.1 * garden.growthLevel;
-		var rate = Math.floor(1000 / gardenEfficiency) / 10;
+		let rate = Math.floor(1000 / gardenEfficiency) / 10;
 		output += `\nYour plants now take ${rate}% the usual time to grow.`;
 		
 		// Update garden level
@@ -1159,7 +1160,7 @@ module.exports = {
 				await sql.addItems(channel, player.id, 0, 1);
 				world.lostOrbs--;
 				output = `${player.name} searches the world, and finds a magic orb!`;
-				var existingOrbs = player.items.find(i => i.type == 0);
+				let existingOrbs = player.items.find(i => i.type == 0);
 				if(!existingOrbs) {
 					// Start the fight timer
 					player.lastFought = now;
@@ -1171,8 +1172,8 @@ module.exports = {
 				searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
 				if(Math.random() < 0.05) {
 					//They found a plant!
-					var plantType = Math.floor(Math.random() % 6) + 1;
-					var plantName;
+					let plantType = Math.floor(Math.random() % 6) + 1;
+					let plantName;
 					switch(plantType) {
 						case 1:
 							plantName = 'flower';
@@ -1264,10 +1265,10 @@ module.exports = {
 				output += '\nYou can feel great power surging within you!';
 				break;
 			case 'resurrection':
-				var players = await sql.getPlayers(channel);
+				let players = await sql.getPlayers(channel);
 				for(let i in players) {
 					let p = players[i];
-					var defeatedState = p.status.find(s => s.type == 0);
+					let defeatedState = p.status.find(s => s.type == 0);
 					if(defeatedState) {
 						output += `\n${p.name} is revived!`;
 						await sql.deleteStatus(channel, p.id, 0);
@@ -1278,7 +1279,7 @@ module.exports = {
 				break;
 			case 'immortality':
 				output += '\nNo matter how great of an injury, you suffer, you will always swiftly return!';
-				var defeatedState = player.status.find(s => s.type == 0);
+				let defeatedState = player.status.find(s => s.type == 0);
 				if(defeatedState) {
 					await sql.deleteStatus(channel, player.id, 0);
 				}
@@ -1319,7 +1320,7 @@ module.exports = {
 		let now = new Date().getTime();
 		let messages = [];
 
-		for(var i in garden.plants) {
+		for(let i in garden.plants) {
 			let p = garden.plants[i];
 			if(p && p.endTime > lastUpdate && p.endTime <= now) {
 				messages.push(`A ${p.type} has finished growing in the garden!`);
@@ -1335,14 +1336,14 @@ module.exports = {
 		let messages = [];
 
 		let activePlayers = 0;
-		for(var i in players) {
-			var p = players[i];
+		for(let i in players) {
+			let p = players[i];
 			if(p.lastActive + 24 * hour > now) {
 				// Player is active
 				activePlayers++;
 				if(p.lastFought + 24 * hour < now) {
 					// Player has gone 24 hours without fighting
-					var orbs = p.items.find(i => i.type == 0);
+					let orbs = p.items.find(i => i.type == 0);
 					if(orbs) {
 						await sql.addItems(channel, p.id, 0, -1);
 						world.lostOrbs++;
@@ -1355,7 +1356,7 @@ module.exports = {
 				}
 			} else if(p.lastActive + 24 * hour > lastUpdate) {
 				// Player has become inactive
-				var orbs = p.items.find(i => i.type == 0);
+				let orbs = p.items.find(i => i.type == 0);
 				if(orbs) {
 					await sql.addItems(channel, p.id, 0, -orbs.count);
 					world.lostOrbs += orbs.count;
@@ -1456,7 +1457,7 @@ module.exports = {
 		embed.setTitle(`${player.name} Config`)
 			.setColor(0x00AE86);
 		//
-		var output = `AlwaysPrivate: ${config.alwaysPrivate ? 'On' : 'Off'}\n`;
+		let output = `AlwaysPrivate: ${config.alwaysPrivate ? 'On' : 'Off'}\n`;
 		output += `Ping: ${config.ping ? 'On' : 'Off'}\n`;
 		output += `Pronoun: ${config.pronoun}`;
 		embed.setDescription(output);
@@ -1485,7 +1486,7 @@ module.exports = {
 		return level;
 	},
 	readConfigBoolean(value, oldValue) {
-		var v = value.toLowerCase();
+		let v = value.toLowerCase();
 		if(v == 'off' || v == '0' || v == 'false') {
 			return false;
 		} else if(v == 'on' || v == '1' || v == 'true') {
@@ -1530,12 +1531,72 @@ module.exports = {
 		await sql.addItems(channel, player.id, 0, -1);
 		await sql.addItems(channel, target.id, 0, 1);
 
-		var output = `${player.name} gives a magic orb to ${target.name}.`;
-		var existingOrbs = target.items.find(i => i.type == 0);
+		let output = `${player.name} gives a magic orb to ${target.name}.`;
+		let existingOrbs = target.items.find(i => i.type == 0);
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 		}
 
 		return output;
+	},
+	async history(channel, name1, name2) {
+		let player1 = await sql.getPlayerByUsername(channel, name1);
+		let player2 = await sql.getPlayer(channel, name2);
+		let history = await sql.getHistory(player1.id, player2.id);
+		let embed = new Discord.RichEmbed();
+		let now = new Date().getTime();
+
+		embed.setTitle(`${player1.name} VS ${player2.name} Battle History`)
+			.setColor(0x00AE86);
+		
+		if(history.length == 0) {
+			embed.setDescription(`${player1.name} and ${player2.name} have never fought.`);
+		} else {
+			let player1wins = history.filter(h => h.winnerId == player1.id).length;
+			let player2wins = history.filter(h => h.winnerId == player2.id).length;
+			let description = '';
+			if(player1wins > 1) {
+				description += `${player1.name} has beaten ${player2.name} ${player1wins} times.\n`;
+			} else if(player1wins == 1) {
+				description += `${player1.name} has beaten ${player2.name} once.\n`;
+			} else {
+				description += `${player1.name} has never beaten ${player2.name}.\n`;
+			}
+			if(player2wins > 1) {
+				description += `${player2.name} has beaten ${player1.name} ${player2wins} times.`;
+			} else if(player2wins == 1) {
+				description += `${player2.name} has beaten ${player1.name} once.`;
+			} else {
+				description += `${player2.name} has never beaten ${player1.name}.`;
+			}
+			embed.setDescription(description);
+			
+			var output = '';
+			if(history.length > 10) history = history.slice(0, 10);
+			for(let i in history) {
+				let h = history[i];
+				let battleTime = new Date(h.battleTime).toDateString('en-US', {
+					month: 'numeric',
+					day: 'numeric'
+				});
+				let winnerName = player1.id == h.winnerId ? player1.name : player2.name;
+				let loserName = player1.id == h.loserId ? player1.name : player2.name;
+
+				if(output.length > 0) output += '\n';
+				if(h.winnerLevel * h.winnerSkill > h.loserLevel * h.loserSkill* 1.30) {
+					// Easy victory
+					output += `${battleTime}: ${winnerName} easily defeated ${loserName}.`;
+				} else if(h.winnerLevel * h.winnerSkill < h.loserLevel * h.loserSkill * 1.10) {
+					// Narrow victory
+					output += `${battleTime}: ${winnerName} narrowly defeated ${loserName}.`;
+				} else {
+					// Normal fight
+					output += `${battleTime}: ${winnerName} defeated ${loserName}.`;
+				}
+			}
+			embed.addField(`Last ${history.length} Fights`, output);
+		}
+
+		return embed;
 	}
 }
