@@ -213,7 +213,7 @@ async function handleMessage(message) {
 			// TODO
 			break;
 		case 'empower':
-			// TODO
+			outputMessage.print.push(await tools.empower(channel, name, targetName));
 			break;
 		case 'give':
 			outputMessage.print.push(await tools.give(channel, name, args[0]));
