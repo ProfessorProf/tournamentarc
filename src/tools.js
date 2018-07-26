@@ -54,10 +54,7 @@ module.exports = {
 		if(player.status.find(s => s.type == 8)) {
 			stats += 'Unknown';
 		} else {
-			var level = player.level;
-			if(player.status.find(s => s.type == 7)) {
-				level *= 1.12;
-			}
+			var level = this.getPowerLevel(player);
 			stats += numeral(level.toPrecision(2)).format('0,0');
 			if(player.status.find(s => s.type == 2)) {
 				stats += '?';
@@ -169,10 +166,7 @@ module.exports = {
 		if(player.status.find(s => s.type == 8)) {
 			stats += 'Unknown';
 		} else {
-			let seenLevel = player.level;
-			if(player.status.find(s => s.type == 7)) {
-				seenLevel *= 1.12;
-			}
+			let seenLevel = this.getPowerLevel(player);
 			let level = numeral(seenLevel.toPrecision(2));
 			stats += level.format('0,0');
 			if(player.status.find(s => s.type == 2)) {
@@ -228,6 +222,10 @@ module.exports = {
 			if (p.fusionId && p.fusionId != p.id) {
 				continue;
 			}
+			if(p.lastActive + 24 * hour < now) {
+				continue;
+			}
+
 			let row = [];
 			row.push(p.name);
 			if(p.name.length > headers[0]) headers[0] = p.name.length;
@@ -258,10 +256,7 @@ module.exports = {
 			row.push(status);
 			if(status.length > headers[2]) headers[2] = status.length;
 			
-			let seenLevel = p.level;
-			if(p.status.find(s => s.type == 7)) {
-				seenLevel *= 1.12;
-			}
+			let seenLevel = this.getPowerLevel(p);
 			let level = numeral(seenLevel.toPrecision(2)).format('0,0');
 			
 			if(p.status.find(s => s.type == 8)) {
@@ -368,7 +363,7 @@ module.exports = {
 			hours = 1000;
 		}
 		this.addHeat(world, hours);
-		const newPowerLevel = this.getPowerLevel(world.heat);
+		const newPowerLevel = this.newPowerLevel(world.heat);
 		if (this.isFusion(player)) {
 			newPowerLevel *= 1.3;
 		}
@@ -399,8 +394,8 @@ module.exports = {
 		await this.completeTraining(player2);
 
 		// Bean bonuses
-		var level1 = player1.level;
-		var level2 = player2.level;
+		var level1 = this.getPowerLevel(player1);
+		var level2 = this.getPowerLevel(player2);
 		if(player1.status.find(s => s.type == 7)) {
 			level1 *= 1.12;
 		}
@@ -429,8 +424,8 @@ module.exports = {
 			skill1 *= 1.15;
 		}
 		
-		console.log(`${player1.name}: PL ${Math.floor(player1.level * 10) / 10}, Skill ${Math.floor(skill1 * 10) / 10}`);
-		console.log(`${player2.name}: PL ${Math.floor(player2.level * 10) / 10}, Skill ${Math.floor(skill2 * 10) / 10}`);
+		console.log(`${player1.name}: PL ${Math.floor(level1 * 10) / 10}, Skill ${Math.floor(skill1 * 10) / 10}`);
+		console.log(`${player2.name}: PL ${Math.floor(level2 * 10) / 10}, Skill ${Math.floor(skill2 * 10) / 10}`);
 		
 		// Final battle scores!
 		let score1 = Math.sqrt(level1 * skill1);
@@ -498,41 +493,55 @@ module.exports = {
 		
 		if(nemesisHistory) {
 			// The Nemesis is dead!
-			// TODO: Special Nemesis
-			// Delete Nemesis, punish player
-			loser.isNemesis = false;
-			loser.level = this.getPowerLevel(data.heat * 0.8);
-			hours = 24;
-			output += `${winner.name} defeated the Nemesis! Everyone's sacrifices were not in vain!`;
+			let nemesis = await sql.getNemesis(channel);
+			if(nemesis.type == 1) {
+				// Reveal true form
+				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.pronoun} revealed ${this.their(loser.config.pronoun)} true power!\n` +
+					`The real battle begins here!`;
+				nemesis.type = 2;
+				nemesis.level *= Math.random() + 2.5;
+				nemesis.attackTime = now;
+				nemesis.destroyTime = now;
+				nemesis.energizeTime = now;
+				nemesis.reviveTime = now;
+				hours = 0;
+			} else {
+				// End the nemesis
+				nemesis.playerId = null;
+				nemesis.nemesisCooldown = now + 24 * hour;
+				loser.level = this.newPowerLevel(data.heat * 0.8);
+				hours = 24;
+				output += `${winner.name} defeated the Nemesis! Everyone's sacrifices were not in vain!`;
 
-			// Give 20 Glory for each failed fight against this Nemesis
-			let gloryGains = {};
-			for(let i in nemesisHistory) {
-				let h = nemesisHistory[i];
-				if(gloryGains[h.id]) {
-					gloryGains[h.id].glory += 20;
-				} else {
-					gloryGains[h.id] = {
-						name: h.name,
-						oldGlory: h.glory,
-						glory: 20
-					};
+				// Give 20 Glory for each failed fight against this Nemesis
+				let gloryGains = {};
+				for(let i in nemesisHistory) {
+					let h = nemesisHistory[i];
+					if(gloryGains[h.id]) {
+						gloryGains[h.id].glory += 20;
+					} else {
+						gloryGains[h.id] = {
+							name: h.name,
+							oldGlory: h.glory,
+							glory: 20
+						};
+					}
+				}
+				for(let key in gloryGains) {
+					let g = gloryGains[key];
+					let rankUp = this.rankUp(g.oldGlory, g.glory);
+					output += `\n${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}`;
+					if(rankUp) {
+						output += `\n${g.name}'s Rank has increased!`;
+					}
 				}
 			}
-			for(let key in gloryGains) {
-				let g = gloryGains[key];
-				let rankUp = this.rankUp(g.oldGlory, g.glory);
-				output += `\n${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}`;
-				if(rankUp) {
-					output += `\n${g.name}'s Rank has increased!`;
-				}
-			}
-			data.nemesis = null;
-			data.nemesisDate = new Date().getTime();
+
+			await sql.setNemesis(channel, nemesis);
 		}
 		
 		// Award glory to the winner
-		let glory = Math.ceil(Math.min((loser.level / winner.level) * 10, 100));
+		let glory = Math.ceil(Math.min((this.getPowerLevel(loser) / this.getPowerLevel(winner)) * 10, 100));
 		let rankUp = this.rankUp(winner.glory, glory);
 		winner.glory += glory;
 		output += `${winner.name} is the winner! +${glory} glory. Total glory: ${winner.glory}`;
@@ -543,8 +552,8 @@ module.exports = {
 		if(winner.isNemesis) {
 			// Longer KO, but the Nemesis is weakened
 			hours = 12;
-			let maxPowerLoss = (loserSkill < 0.8 ? 0.025 : (loserSkill > 1.2 ? 0.075 : 0.05)) * loser.level;
-			let powerLoss = Math.min(maxPowerLoss, loser.level * 0.5);
+			let maxPowerLoss = (loserSkill < 0.8 ? 0.025 : (loserSkill > 1.2 ? 0.075 : 0.05)) * this.getPowerLevel(loser);
+			let powerLoss = Math.min(maxPowerLoss, this.getPowerLevel(loser) * 0.5);
 			output += `\nThe Nemesis is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
 			winner.level -= powerLoss;
 		}
@@ -567,15 +576,21 @@ module.exports = {
 		}
 		
 		// Death timer
-		output += `\n${loser.name} will be able to fight again in ${hours} ${hours > 1 ? 'hours' : 'hour'}.`;
-		await sql.addStatus(loser.channel, loser.id, 0, now + hours * hour);
+		if(hours) {
+			output += `\n${loser.name} will be able to fight again in ${hours} ${hours > 1 ? 'hours' : 'hour'}.`;
+			await sql.addStatus(loser.channel, loser.id, 0, now + hours * hour);
+		}
         
 		// Delete challenges
 		await sql.deleteOffersFromFight(winner.id, loser.id);
 		
 		// Add new row to history
-		await sql.addHistory(winner.channel, winner.id, winner.level, winnerSkill, loser.id, loser.level, loserSkill);
+		await sql.addHistory(winner.channel, winner.id, this.getPowerLevel(winner), winnerSkill, loser.id, this.getPowerLevel(loser), loserSkill);
 		
+		// Reset fight clock
+		loser.lastFought = now;
+		winner.lastFought = now;
+
 		// Save changes
 		await sql.setPlayer(loser);
 		await sql.setPlayer(winner);
@@ -624,7 +639,7 @@ module.exports = {
 				let hours = (now - trainingState.startTime) / hour;
 				if(hours > 72) hours = 72;
 				this.addHeat(data, hours);
-				let newPowerLevel = this.getPowerLevel(data.heat);
+				let newPowerLevel = this.newPowerLevel(data.heat);
 				if(this.isFusion(player1)) {
 					newPowerLevel *= 1.3;
 				}
@@ -675,7 +690,7 @@ module.exports = {
 				const fusedPlayer = {
 					name: name,
 					channel: channel,
-					level: Math.max(sourcePlayer.level, this.getPowerLevel(world.heat)) + Math.max(targetPlayer.level, this.getPowerLevel(world.heat)),
+					level: (sourcePlayer.level + targetPlayer.level) / 2 + this.newPowerLevel(world.heat),
 					powerWish: sourcePlayer.powerWish || targetPlayer.powerWish,
 					glory: sourcePlayer.glory + targetPlayer.glory,
 					challenges: {},
@@ -762,13 +777,14 @@ module.exports = {
 		
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
-			player.level = this.getPowerLevel(data.heat) * 4;
+			player.level = this.newPowerLevel(data.heat) * 4;
 			nemesis.type = 1;
 		} else {
 			// A normal Nemesis
-			player.level = this.getPowerLevel(data.heat) * 10;
+			player.level = this.newPowerLevel(data.heat) * 10;
 			nemesis.type = 0;
 		}
+		player.level *= Math.max(10, data.maxPopulation) / 10;
 		
 		await sql.setHeat(channel, data.heat);
 		await sql.setPlayer(player);
@@ -785,7 +801,7 @@ module.exports = {
         return player.fusionNames.length == 2;
 	},
 	// Generates a new power level based on the current Heat.
-    getPowerLevel(heat) {
+    newPowerLevel(heat) {
         let base = Math.ceil((1 + Math.random()) * 100);
         let level = Math.pow(base, 1 + heat / 1200);
         if(level > 1000000000000000000) level = 1000000000000000000; // JS craps out if we go higher than this
@@ -794,7 +810,8 @@ module.exports = {
 	// Increase Heat, modified by reset count.
     addHeat(data, heat) {
 		if(!data) return;
-        let addedHeat = heat * Math.pow(1.05, data.resets);
+		let multiplier = 10 / Math.max(10, data.maxPopulation);
+        let addedHeat = heat * Math.pow(1.05, data.resets) * multiplier;
         data.heat += addedHeat;
         console.log(`Heat increased by ${heat} to ${data.heat}`);
 	},
@@ -970,7 +987,7 @@ module.exports = {
 			case 4:
 				// Bean
 				await sql.addStatus(channel, target.id, 7, now + hour);
-				var levelBoost = target.level * .12;
+				var levelBoost = this.getPowerLevel(target) * .12;
 				output = `**${target.name}** eats the bean, and ${this.their(target.config.pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
 			case 5:
@@ -1033,7 +1050,7 @@ module.exports = {
 				await sql.deletePlayer(player.id);
 			} else {
 				player.glory = Math.floor(player.glory / 2);
-				player.level = this.getPowerLevel(0);
+				player.level = this.newPowerLevel(0);
 				player.gardenTime = now;
 				player.gardenLevel = 0;
 				player.actionTime = now;
@@ -1057,8 +1074,9 @@ module.exports = {
 			userId: userId,
 			channel: channel,
 			glory: 0,
-			level: this.getPowerLevel(world.heat),
+			level: this.newPowerLevel(world.heat),
 			lastActive: now,
+			lastFought: now,
 			gardenTime: now - hour,
 			gardenLevel: 0,
 			actionTime: now - hour,
@@ -1135,6 +1153,10 @@ module.exports = {
 				world.lostOrbs--;
 				output = `${player.name} searches the world, and finds a magic orb!`;
 				var existingOrbs = player.items.find(i => i.type == 0);
+				if(!existingOrbs) {
+					// Start the fight timer
+					player.lastFought = now;
+				}
 				if(existingOrbs && existingOrbs.count == 6) {
 					output += "\nYou've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.";
 				}
@@ -1231,7 +1253,7 @@ module.exports = {
 		
 		switch(wish.toLowerCase()) {
 			case 'power':
-				player.level *= Math.random() + 2.5;
+				player.level *= Math.random() + 1.5;
 				await sql.addStatus(channel, player.id, 10);
 				output += '\nYou can feel great power surging within you!';
 				break;
@@ -1266,6 +1288,7 @@ module.exports = {
 					+ 'You have 24 hours to defeat the Nemesis! If the Nemesis is still alive when time runs out, everything will be destroyed.';
 				let nemesis = await sql.getNemesis(channel);
 				nemesis.ruinTime = now + 24 * hour;
+				nemesis.lastRuinUpdate = now;
 				await sql.setNemesis(nemesis);
 				break;
 		}
@@ -1281,6 +1304,115 @@ module.exports = {
 		let player = await sql.getPlayerByUsername(channel, name);
 		await sql.deleteStatus(channel, player.id, 5);
 		await sql.addStatus(channel, player.id, 2);
+	},
+	async updateGarden(channel, lastUpdate) {
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+		let messages = [];
+
+		for(var i in garden.plants) {
+			let p = garden.plants[i];
+			if(p && p.endTime > lastUpdate && p.endTime <= now) {
+				messages.push(`A ${p.type} has finished growing in the garden!`);
+			}
+		}
+
+		return messages;
+	},
+	async updatePlayerActivity(channel, lastUpdate) {
+		let world = await sql.getWorld(channel);
+		let players = await sql.getPlayers(channel);
+		let now = new Date().getTime();
+		let messages = [];
+
+		let activePlayers = 0;
+		for(var i in players) {
+			var p = players[i];
+			if(p.lastActive + 24 * hour > now) {
+				// Player is active
+				activePlayers++;
+				if(p.lastFought + 24 * hour < now) {
+					// Player has gone 24 hours without fighting
+					var orbs = p.items.find(i => i.type == 0);
+					if(orbs) {
+						await sql.addItems(channel, p.id, 0, -1);
+						world.lostOrbs++;
+						messages.push(`${p.name} has gone for too long without fighting; one of their orbs vanishes.`);
+					}
+					p.lastFought += 24 * hour;
+				} else if(p.lastFought + 23 * hour < now &&
+						  p.lastFought + 23 * hour > lastUpdate) {
+					messages.push(`If ${p.name} must fight someone in the next hour or lose an orb.`);
+				}
+			} else if(p.lastActive + 24 * hour > lastUpdate) {
+				// Player has become inactive
+				var orbs = p.items.find(i => i.type == 0);
+				if(orbs) {
+					await sql.addItems(channel, p.id, 0, -orbs.count);
+					world.lostOrbs += orbs.count;
+					messages.push(`${p.name} has been idle for too long; ` + 
+						`${this.their(p.config.pronoun)} ${orbs} ${orbs > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
+				}
+			}
+		}
+
+		if(activePlayers > world.maxPopulation) {
+			console.log(`Updating world max active population for ${activePlayers} active players`);
+			world.maxPopulation = activePlayers;
+		}
+		await sql.setWorld(world);
+
+		return messages;
+	},
+	async ruinAlert(channel, lastUpdate) {
+		let nemesis = await sql.getNemesis(channel);
+		if(nemesis && nemesis.ruinTime > 0) {
+			let now = new Date().getTime();
+			let nemesisStartTime = nemesis.ruinTime - 24 * hour;
+			let hours = Math.floor((lastUpdate - nemesisStartTime) / hour);
+			let nextUpdateTime = nemesisStartTime + (hours + 1) * hour;
+			if(nextUpdateTime > lastUpdate && nextUpdateTime <= now) {
+				// Reminder the players about their impending doom
+				let hoursLeft = 24 - hours - 1;
+				if(hoursLeft > 0) {
+					return { message: `${hoursLeft} hours until the galaxy is destroyed!`, abort: false };
+				} else {
+					let player = await sql.getPlayerById(nemesis.playerId);
+					return { message: `It's too late! ${player.name} finishes charging, and destroys the universe.`, abort: true };
+				}
+			}
+		}
+		return null;
+	},
+	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
+	async updateWorld(channel) {
+		console.log(`Update for channel ${channel}`);
+		let world = await sql.getWorld(channel);
+		let messages = [];
+		let abort = false;
+
+		messages = messages.concat(await sql.deleteExpired(channel));
+		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate));
+		messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
+		let ruinStatus = await this.ruinAlert(channel);
+		if(ruinStatus) {
+			messages.push(ruinStatus.message);
+			abort = ruinStatus.abort;
+		}
+
+		await sql.setUpdateTime(channel);
+		
+		if(messages.length > 0) {
+			let embed = new Discord.RichEmbed();
+			embed.setTitle('Status Update')
+				.setColor(0x00AE86)
+				.setDescription(messages.join(','));
+	
+			return {embed: embed, abort: abort};
+		} else {
+			console.log('Nothing to report');
+			return {embed: null, abort: false};
+		}
 	},
 	async config(channel, name, configFlag, value) {
 		let player = await sql.getPlayerByUsername(channel, name);
@@ -1322,6 +1454,27 @@ module.exports = {
 		embed.setDescription(output);
 
 		return embed;
+	},
+	getPowerLevel(player) {
+		let level = player.level;
+		// Overdrive
+		let overdrive = player.status.find(s => s.type == 4);
+		if(overdrive) {
+			level *= overdrive.rating;
+		}
+		// Power Wish
+		if(player.status.find(s => s.type == 10)) {
+			level *= 1.5;
+		}
+		// Fusion
+		if(player.status.find(s => s.type == 9)) {
+			level *= 1.3;
+		}
+		// Bean
+		if(player.status.find(s => s.type == 7)) {
+			level *= 1.12;
+		}
+		return level;
 	},
 	readConfigBoolean(value, oldValue) {
 		var v = value.toLowerCase();

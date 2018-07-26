@@ -1,16 +1,19 @@
 const sql = require ('sqlite');
 const Discord = require('discord.js');
+const numeral = require('numeral');
 sql.open('./data.sqlite');
 
 const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
-CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, Lost_Orbs INTEGER, Last_Wish INTEGER);
+CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
+	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
-    Active_Time INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
+    Last_Active INTEGER, Last_Fought INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
     NPC_Flag INTEGER, AlwaysPrivate_Flag INTEGER, Ping_Flag INTEGER, Pronoun INTEGER);
-CREATE TABLE IF NOT EXISTS PlayerStatus (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Status_ID INTEGER, StartTime INTEGER, EndTime INTEGER);
+CREATE TABLE IF NOT EXISTS PlayerStatus (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Status_ID INTEGER,
+	StartTime INTEGER, EndTime INTEGER, Rating REAL);
 CREATE TABLE IF NOT EXISTS Statuses (ID INTEGER, Name TEXT, Ends INTEGER, Priority INTEGER);
 CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID INTEGER, Count INTEGER);
 CREATE TABLE IF NOT EXISTS Items (ID TEXT, Channel TEXT, Type_Name TEXT, Known_Flag INTEGER, Plant_Flag INTEGER, Grow_Time INTEGER);
@@ -19,7 +22,7 @@ CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID I
     Growth_Level REAL, Research_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Type INTEGER, Nemesis_Time INTEGER, Attack_Time INTEGER, 
-    Destroy_Time INTEGER, Revive_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
+    Destroy_Time INTEGER, Energize_Time INTEGER, Revive_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
 CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Level REAL, Loser_Level REAL,
@@ -80,7 +83,8 @@ let updatePlayerSql = `UPDATE Players SET
     Garden_Level = $gardenLevel,
     Garden_Time = $gardenTime,
     Glory = $glory,
-    Active_Time = $activeTime,
+	Last_Active = $lastActive,
+	Last_Fought = $lastFought,
     Nemesis_Flag = $nemesisFlag,
     Fusion_Flag = $fusionFlag,
     Wish_Flag = $wishFlag,
@@ -91,13 +95,14 @@ let updatePlayerSql = `UPDATE Players SET
 WHERE ID = $id`;
 
 let insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
-Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Active_Time, 
-Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, Pronoun) 
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+	Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Last_Active, Last_Fought, 
+	Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, Pronoun) 
+VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $actionTime, $gardenLevel, $gardenTime, $glory, 
+	$lastActive, $lastFought, $nemesisFlag, $fusionFlag, $wishFlag, $npcFlag, $alwaysPrivate, $ping, $pronoun)`;
 
 let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
-(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
-VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $reviveTime, $ruinTime, $basePower, $cooldown)`;
+(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
+VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $ruinTime, $basePower, $cooldown)`;
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
@@ -146,7 +151,8 @@ module.exports = {
 				resets: row.Resets,
 				maxPopulation: row.Max_Population,
 				lostOrbs: row.Lost_Orbs,
-				lastWish: row.Last_Wish
+				lastWish: row.Last_Wish,
+				lastUpdate: row.Last_Update
 			};
 			
 			return world;
@@ -168,11 +174,27 @@ module.exports = {
 	// Creates a new player in the DB.
     async addPlayer(player) {
 		const result = await sql.run(insertPlayerSql,
-			[player.username, player.userId, player.name, player.channel, player.level,
-				player.actionLevel, player.actionTime, player.gardenLevel, player.gardenTime, 
-				player.glory, player.lastActive, player.nemesisFlag,
-				player.fusionFlag, player.wishFlag, player.npcFlag, 
-				player.config.alwaysPrivate, player.config.ping, player.config.pronoun]);
+			{
+				$username: player.username, 
+				$userId: player.userId, 
+				$name: player.name, 
+				$channel: player.channel, 
+				$powerLevel: player.level,
+				$actionLevel: player.actionLevel, 
+				$actionTime: player.actionTime, 
+				$gardenLevel: player.gardenLevel, 
+				$gardenTime: player.gardenTime, 
+				$glory: player.glory, 
+				$lastActive: player.lastActive,
+				$lastFought: player.lastFought,
+				$nemesisFlag:  player.nemesisFlag ? 1 : 0,
+				$fusionFlag: player.fusionFlag ? 1 : 0, 
+				$wishFlag: player.wishFlag ? 1 : 0, 
+				$npcFlag: player.npcFlag ? 1 : 0,
+				$alwaysPrivate: player.config.alwaysPrivate ? 1 : 0, 
+				$ping: player.config.ping ? 1 : 0, 
+				$pronoun: player.config.pronoun
+			});
 		return result.lastID;
 	},
 	// Updates a player's attributes.
@@ -189,7 +211,8 @@ module.exports = {
             $gardenTime: player.gardenTime,
             $actionTime: player.actionTime,
             $glory: player.glory,
-            $activeTime: player.lastActive,
+			$lastActive: player.lastActive,
+			$lastFought: player.lastFought,
             $nemesisFlag: player.nemesisFlag ? 1 : 0,
             $fusionFlag: player.fusionFlag ? 1 : 0,
             $wishFlag: player.wishFlag ? 1 : 0,
@@ -267,7 +290,8 @@ module.exports = {
 			channel: row.Channel,
 			level: row.Power_Level,
 			glory: row.Glory,
-			lastActive: row.Active_Time,
+			lastActive: row.Last_Active,
+			lastFought: row.Last_Fought,
 			gardenLevel: row.Garden_Level,
 			actionLevel: row.Action_Level,
 			gardenTime: row.Garden_Time,
@@ -312,7 +336,8 @@ module.exports = {
 				startTime: s.StartTime,
 				endTime: s.EndTime,
 				ends: s.Ends != 0,
-				priority: s.Priority
+				priority: s.Priority,
+				rating: s.Rating
 			});
 		}
 		for(let i in itemRows) {
@@ -360,14 +385,16 @@ module.exports = {
 		}
 	},
 	// Create a new Status.
-	async addStatus(channel, playerId, statusId, endTime) {
-		await sql.run(`INSERT OR REPLACE INTO PlayerStatus (Channel, Player_ID, Status_ID, StartTime, EndTime) VALUES ($channel, $playerId, $statusId, $startTime, $endTime)`,
+	async addStatus(channel, playerId, statusId, endTime, rating) {
+		await sql.run(`INSERT OR REPLACE INTO PlayerStatus (Channel, Player_ID, Status_ID, StartTime, EndTime, Rating) 
+			VALUES ($channel, $playerId, $statusId, $startTime, $endTime, $rating)`,
 			{
 				$channel: channel,
 				$playerId: playerId,
 				$statusId: statusId,
 				$startTime: new Date().getTime(),
-				$endTime: endTime
+				$endTime: endTime,
+				$rating: rating
 			});
 	},
 	// Start a new plant.
@@ -454,6 +481,7 @@ module.exports = {
 				startTime: row.Nemesis_Time,
 				attackTime: row.Attack_Time,
 				destroyTime: row.Destroy_Time,
+				energizeTime: row.Energize_Time,
 				reviveTime: row.Revive_Time,
 				ruinTime: row.Ruin_Time,
 				basePower: row.Base_Power,
@@ -626,12 +654,27 @@ module.exports = {
 		let messages = [];
 		for(let i in statusRows) {
 			// React to statuses ending
-			var status = statusRows[i];
+			let status = statusRows[i];
+			let player, decrease;
 			switch(status.Status_ID) {
 				case 0:
 				    // Death
 					messages.push(`**${status.Name}** is ready to fight.`);
-					this.addStatus();
+					this.addStatus(5);
+					break;
+				case 4: 
+					// Overdrive - reduce power level
+					player = await sql.get(`SELECT ID, Power_Level FROM Players WHERE ID = $id`, {$id: ps.Player_ID});
+					decrease = player.Power_Level * 0.1;
+					player.Power_Level -= decrease;
+					await sql.run(`UPDATE Players SET Power_Level = $level WHERE ID = $id`, {$id: ps.Player_ID, $level: player.Power_Level});
+					messages.push(`**${status.Name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
+					break;
+				case 7: 
+					// Bean
+					player = await sql.get(`SELECT ID, Power_Level FROM Players WHERE ID = $id`, {$id: status.Player_ID});
+					decrease = player.Power_Level - player.Power_Level / 1.12;
+					messages.push(`**${status.Name}** is no longer bean boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case 9:
 					// Fusion
@@ -697,28 +740,6 @@ module.exports = {
 
 		return messages;
 	},
-	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
-	async updateWorld(channel) {
-		let messages = [];
-		messages = messages.concat(await this.deleteExpired(channel));
-		
-		// TODO: Update the garden
-		// TODO: Check for idle players to take their orbs
-		// TODO: Update Max_Population based on activity
-		// TODO: Check the Ruin clock
-		// TODO: Combine all the messages from these into one big status update
-		
-		if(messages.length > 0) {
-			let embed = new Discord.RichEmbed();
-			embed.setTitle('Status Update')
-				.setColor(0x00AE86)
-				.setDescription(messages.join(','));
-	
-			return embed;
-		} else {
-			return null;
-		}
-	},
 	async addHistory(channel, winnerId, winnerLevel, winnerSkill, loserId, loserLevel, loserSkill) {
 		await sql.run(`INSERT INTO History (Channel, Battle_Time, Winner_Id, Loser_ID, Winner_Level, Loser_Level, Winner_Skill, Loser_Skill)
 			VALUES ($channel, $battleTime, $winnerId, $loserId, $winnerLevel, $loserLevel, $winnerSkill, $loserSkill)`, {
@@ -755,5 +776,21 @@ module.exports = {
 	async autofight(channel, targetName) {
 		let player = await this.getPlayer(channel, targetName);
 		await this.addOffer(player, null, 0);
+	},
+	async getChannels() {
+		let initialized = await sql.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Worlds'`);
+		if(!initialized) {
+			return [];
+		}
+		let worlds = await sql.all(`SELECT Channel FROM Worlds`);
+		return worlds.map(w => w.Channel);
+	},
+	async setUpdateTime(channel) {
+		let now = new Date().getTime();
+		await sql.run(`UPDATE Worlds SET Last_Update = $now WHERE Channel = $channel`, {$now: now, $channel: channel});
+	},
+	async playerActivity(channel, username) {
+		let now = new Date().getTime();
+		await sql.run(`UPDATE Players SET Last_Active = $now WHERE Channel = $channel AND Username = $name`, {$now: now, $channel: channel, $name: username});
 	}
 }

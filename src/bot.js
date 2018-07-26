@@ -10,7 +10,33 @@ const help = require('./help.js');
 const hour = (60 * 60 * 1000);
 
 client.on('ready', () => {
-    console.log(`Logged in as ${client.user.username}!`);
+	console.log(`Logged in as ${client.user.username}!`);
+
+	sql.getChannels().then(channels => {;
+		if(channels.length > 0) {
+			for(let i in channels) {
+				var c = channels[i];
+				var channel = client.channels.find(x => x.id == c);
+				channel.send(`Bot online! Greetings, ${channel.name}.`);
+			}
+		}
+	});
+	
+    setInterval(async function() {
+		let channels = await sql.getChannels();
+		for(let i in channels) {
+			var c = channels[i];
+			
+			let update = await tools.updateWorld(c);
+			if(update.embed) {
+				console.log(update.embed);
+				var channel = client.channels.find(x => x.id == c);
+				channel.send({embed: update.embed});
+			} else {
+				console.log('Nothing to report');
+			}
+		}
+    }, 60000);
 });
 
 client.on('error', (e) => {
@@ -79,8 +105,11 @@ async function handleMessage(message) {
 		return;
 	}
 	
-	let updateEmbed = await sql.updateWorld(channel);
-	if(updateEmbed) message.channel.send({embed: updateEmbed});
+	let update = await tools.updateWorld(channel);
+	if(update.embed) { 
+		message.channel.send({embed: update.embed});
+	}
+	if(update.abort) return;
 	
 	let targetName = args[0];
 	switch(cmd) {
@@ -142,7 +171,7 @@ async function handleMessage(message) {
 			break;
 		case 'garden':
 			message.channel.send({embed: await tools.displayGarden(channel)});
-			output.informational = true;
+			outputMessage.informational = true;
 			break;
 		case 'plant':
 			outputMessage.print.push(await tools.plant(channel, name, targetName));
@@ -201,18 +230,18 @@ async function handleMessage(message) {
 			break;
 		case 'tournament':
 			// TODO
-			output.informational = true;
+			outputMessage.informational = true;
 			break;
 		case 'taunt':
 			// TODO
 			break;
 		case 'config':
 			message.channel.send({embed: await tools.config(channel, name, args[0], args[1])});
-			output.informational = true;
+			outputMessage.informational = true;
 			break;
 		case 'help':
 			message.channel.send({embed: await help.showHelp(args[0])});
-			output.informational = true;
+			outputMessage.informational = true;
 			break;
 		case 'debug':
 			await sql.execute(args[0], args.slice(1).join(' '));
@@ -251,6 +280,7 @@ async function handleMessage(message) {
 			message.channel.send(text);
 		}
 	}
+	await sql.playerActivity(channel, name);
 	let endTime = new Date().getTime();
 	let duration = (endTime - now) / 1000;
 	console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
