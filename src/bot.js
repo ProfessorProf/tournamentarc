@@ -226,7 +226,8 @@ async function handleMessage(message) {
 			outputMessage.informational = true;
 			break;
 		case 'graveyard':
-			// TODO
+			outputMessage.embed = await tools.graveyard(channel);
+			outputMessage.informational = true;
 			break;
 		case 'taunt':
 			// TODO

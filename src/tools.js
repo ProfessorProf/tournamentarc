@@ -1663,5 +1663,31 @@ module.exports = {
 
 		return `${player.name} sends ${this.their(player.config.pronoun)} energy, ` +
 			`increasing ${this.their(target.config.pronoun)} Power Level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
+	},
+	async graveyard(channel) {
+		let players = await sql.getPlayers(channel);
+		let deadPlayers = players.filter(p => p.status.find(s => s.type == 0));
+		let now = new Date().getTime();
+		let output = '';
+
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`Defeated Players`)
+			.setColor(0x00AE86);
+		
+		for(let i in deadPlayers) {
+			let p = deadPlayers[i];
+			let s = p.status.find(s => s.type == 0);
+			
+			if(output.length > 0) output += '\n';
+			output += `${p.name} (Recovers in ${this.getTimeString(s.endTime - now)})`;
+		}
+
+		if(output.length == 0) {
+			output = `No players are in need of healing right now.`;
+		}
+
+		embed.setDescription(output);
+
+		return embed;
 	}
 }
