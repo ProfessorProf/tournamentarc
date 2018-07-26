@@ -446,6 +446,15 @@ module.exports = {
 					}
 				}
 				break;
+			case 'unfight':
+				if(player.isNemesis || player.status.find(s => s.type == 12)) {
+					errors.push("You can't stop fighting!");
+				}
+				break;
+			case 'give':
+				if(!player.items.find(i => i.type == 0)) {
+					errors.push("You don't have any orbs to give!");
+				}
 		}
 
 		if(errors.length > 0) {

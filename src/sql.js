@@ -70,6 +70,7 @@ INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (8, "Fern", 1,
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (9, "Fused", 1, 0);
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (10, "PowerWish", 0, 0);
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (11, "ImmortalityWish", 0, 0);
+INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (12, "Berserk", 0, 250);
 INSERT OR REPLACE INTO Gardens (Channel) VALUES ($channel)`;
 
 let updatePlayerSql = `UPDATE Players SET
@@ -168,7 +169,8 @@ module.exports = {
 			$resets: world.resets,
 			$maxPopulation: world.maxPopulation,
 			$lostOrbs: world.lostOrbs,
-			$lastWish: world.lastWish
+			$lastWish: world.lastWish,
+			$channel: world.channel
 		});
 	},
 	// Creates a new player in the DB.
@@ -792,5 +794,8 @@ module.exports = {
 	async playerActivity(channel, username) {
 		let now = new Date().getTime();
 		await sql.run(`UPDATE Players SET Last_Active = $now WHERE Channel = $channel AND Username = $name`, {$now: now, $channel: channel, $name: username});
+	},
+	async unfightOffers(id) {
+		await sql.run(`DELETE FROM Offers WHERE Player_ID = $id`, {$id: id});
 	}
 }

@@ -322,6 +322,11 @@ module.exports = {
 		
 		return await this.fight(player1, player2, embed);
 	},
+	async unfight(channel, username) {
+		let player = await sql.getPlayerByUsername(channel, username);
+		await sql.unfightOffers(player.id);
+		return `${player.name} no longer wants to fight anyone.`;
+	},
 	// Either fights a player or sends them a challenge, depending on whether or not they've issued a challenge.
     async tryFight(channel, player, target) {
 		let player1 = await sql.getPlayerByUsername(channel, player);
@@ -333,6 +338,7 @@ module.exports = {
 			if(!player1.offers.find(o => o.playerId == player2.id)) {
 				// If they haven't offered, send a challenge
 				embed.setTitle('BATTLE CHALLENGE')
+					.setColor(0x00AE86)
 					.setDescription(`**${player1.name}** has issued a battle challenge to **${player2.name}**! ${player2.name}, enter \`!fight ${player1.name}\` to accept the challenge and begin the battle.`);
 				await sql.addOffer(player1, player2, 0);
 				return {embed: embed};
@@ -345,6 +351,7 @@ module.exports = {
 		} else {
 			await sql.addOffer(player1, null, 0);
 			embed.setTitle('BATTLE CHALLENGE')
+				.setColor(0x00AE86)
 				.setDescription(`**${player1.name}** wants to fight anyone! The next person to enter \`!fight ${player1.name}\` will accept the challenge and begin the battle.`);
 			return {embed: embed};
 		}
@@ -564,9 +571,9 @@ module.exports = {
 		if(loserOrbs) {
 			output += `\n${winner.name} took ${loserOrbs.count} magic orbs from ${loser.name}!`;
 			await sql.addItems(winner.id, 0, loserOrbs.count);
-			await sql.takeItems(winner.id, 0, loserOrbs.count);
+			await sql.addItems(loser.id, 0, -loserOrbs.count);
 			if(loserOrbs.count + winnerOrbs.count == 7) {
-				output += `\n${winner.name} has gathered all seven magic orbs!`;
+				output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 			}
 		}
 		
@@ -1246,7 +1253,6 @@ module.exports = {
 	},
 	async wish(channel, name, wish) {
 		let player = await sql.getPlayerByUsername(channel, name);
-		let garden = await sql.getGarden(channel);
 		let world = await sql.getWorld(channel);
 		let now = new Date().getTime();
 		let output = `**${player.name}** makes a wish, and the orbs shine with power...!`
@@ -1297,6 +1303,9 @@ module.exports = {
 		output += `\nThe orbs scatter to the furthest reaches of the world!`;
 		player.wishFlag = 1;
 		await sql.setPlayer(player);
+
+		world.lostOrbs = 7;
+		await sql.setWorld(world);
 		
 		return output;
 	},
@@ -1410,7 +1419,6 @@ module.exports = {
 	
 			return {embed: embed, abort: abort};
 		} else {
-			console.log('Nothing to report');
 			return {embed: null, abort: false};
 		}
 	},
@@ -1514,5 +1522,20 @@ module.exports = {
 			default:
 				return 'has';
 		}
+	},
+	async give(channel, name, targetName) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let target = await sql.getPlayer(channel, targetName);
+
+		await sql.addItems(channel, player.id, 0, -1);
+		await sql.addItems(channel, target.id, 0, 1);
+
+		var output = `${player.name} gives a magic orb to ${target.name}.`;
+		var existingOrbs = target.items.find(i => i.type == 0);
+		if(existingOrbs && existingOrbs.count == 6) {
+			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
+		}
+
+		return output;
 	}
 }
