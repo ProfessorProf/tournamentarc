@@ -210,7 +210,7 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.research(channel, name));
 			break;
 		case 'overdrive':
-			// TODO
+			outputMessage.print.push(await tools.overdrive(channel, name));
 			break;
 		case 'empower':
 			outputMessage.print.push(await tools.empower(channel, name, targetName));

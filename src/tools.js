@@ -103,6 +103,9 @@ module.exports = {
 					case 11:
 						statuses.push(`Immortal`);
 						break;
+					case 12:
+						statuses.push(`Berserk (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
 				}
 			}
 		}
@@ -489,8 +492,9 @@ module.exports = {
 		
 		// Loser gains the Ready status, winner loses ready status if training
 		if(winner.status.find(s => s.type == 2)) {
-			await sql.deleteStatus(channel, winner.id, 2);
+			await sql.deleteStatus(data.channel, winner.id, 2);
 		}
+		await sql.deleteStatus(data.channel, loser.id, 12);
 		
 		// Determine length of KO
 		let difference = winnerSkill - loserSkill + 1; 	// Effective 0-2
@@ -576,8 +580,13 @@ module.exports = {
 				output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 			}
 		}
-		
-		// Immortality processing
+
+		// Overdrive penalty
+		if(loser.status.find(s => s.type == 4)) {
+			hours += 3;
+		}
+
+		// Immortality
 		if(loser.status.find(s => s.type == 11)) {
 			hours = 1;
 		}
@@ -590,6 +599,10 @@ module.exports = {
         
 		// Delete challenges
 		await sql.deleteOffersFromFight(winner.id, loser.id);
+		if(winner.status.find(s => s.type == 12)) {
+			// Winner is berserk - re-challenge the world
+			await sql.addOffer(winner, null, 0);
+		}
 		
 		// Add new row to history
 		await sql.addHistory(winner.channel, winner.id, this.getPowerLevel(winner), winnerSkill, loser.id, this.getPowerLevel(loser), loserSkill);
@@ -1662,7 +1675,7 @@ module.exports = {
 		await sql.setPlayer(target);
 
 		return `${player.name} sends ${this.their(player.config.pronoun)} energy, ` +
-			`increasing ${this.their(target.config.pronoun)} Power Level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
+			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
 	},
 	async graveyard(channel) {
 		let players = await sql.getPlayers(channel);
@@ -1689,5 +1702,33 @@ module.exports = {
 		embed.setDescription(output);
 
 		return embed;
+	},
+	async overdrive(channel, name) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let now = new Date().getTime();
+		let output = '';
+		let rating = 1 + ((Math.random() * 10 + 15) * (1 + 0.075 * player.actionLevel)) / 100;
+		let increase = this.getPowerLevel(player) * (rating - 1);
+		await sql.addStatus(channel, player.id, 4, now + hour, rating);
+		output += `${player.name} pushes past ${this.their(player.config.pronoun)} limits, increasing ${this.their(player.config.pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
+
+		if(Math.random() < player.overdriveCount / 100) {
+			output += `\nA mighty roar! The surge in power makes ${player.config.pronoun} go berserk!`;
+			player.overdriveCount = 0;
+			await sql.addOffer(player, null, 0);
+			await sql.addStatus(channel, player.id, 12, now + hour);
+		}
+		if(!player.actionLevel) player.actionLevel = 0;
+		let oldActionLevel = Math.floor(player.actionLevel);
+		player.actionLevel += 1 / (1 + player.actionLevel);
+		let newActionLevel = Math.floor(player.actionLevel);
+		if(newActionLevel > oldActionLevel) {
+			output += '\nAction level increased!';
+		}
+		player.overdriveCount++;
+		player.actionTime = now + hour;
+		await sql.setPlayer(player);
+
+		return output;
 	}
 }
