@@ -1,10 +1,11 @@
 const Discord = require("discord.js");
+const sql = require('./sql.js');
 
 // Logic for displaying help topics.
 // TODO: Add help data for plants, actions, fusion, nemesis, henchmen, wish, tournament
 // TODO: Update rank help for Glory mechanics
 module.exports = {
-    showHelp(topic) {
+    async showHelp(channel, topic) {
         let output = new Discord.RichEmbed();
         output.setTitle('Help!')
             .setColor(0x00AE86);
@@ -42,7 +43,7 @@ Rank SS  40 wins
 Rank SSS 70 wins
 Rank ??? 100 wins
 \`\`\``);
-                break;
+                    break;
                 case 'garden':
                     output.addField('Gardening', 'The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\nAfter using any gardening command, you must wait an hour before using another. Using !water, !expand, or !research boosts your Garden Level.')
                         .addField('!garden', 'Displays the status of the garden.')
@@ -52,7 +53,35 @@ Rank ??? 100 wins
                         .addField('!research', 'Requires Rank C. Study new kinds of plants that you can add to the garden! When research reaches 100% and Garden Level is at least 3, a new plant will be discovered and Garden Level will fall by 3.')
                         .addField('!pick plantname', "Pick a plant from the garden. If you don't include a plant name, then you'll plant a flower.")
                         .addField('!use plant name', 'Use a plant on a player. You must have one in your inventory.');
-                        break;
+                    break;
+                case 'plants':
+                    output.addField('Plants', 'Enter `!help garden` for more info on growing, using and discovering plants.');
+                    let plants = await sql.getKnownPlants(channel);
+                    for(var i in plants) {
+                        let p = plants[i];
+                        switch(p.id) {
+                            case 1:
+                                output.addField('Flower (18 hours)', "Easy to grow, the standard plant for beginners. Use to reduce someone's recovery timer by six hours.");
+                                break;
+                            case 2:
+                                output.addField('Rose (24 hours)', "Harder to grow, but more powerful. Use to reduce someone's recovery timer by twelve hours.");
+                                break;
+                            case 3:
+                                output.addField('Carrot (12 hours)', "Good for your eyes. Increases someone's search level for six hours.");
+                                break;
+                            case 4: 
+                                output.addField('Bean (18 hours)', "Magic bean full of energy. Increases someone's power level for one hour.");
+                                break;
+                            case 5:
+                                output.addField('Sedge (6 hours)', "Nitrogen filter for healthier plants. Increases the Garden Level and helps all current plants grow.");
+                                break;
+                            case 6:
+                                output.addField('Fern (12 hours)', "Magic properties conceal power. Hides someone's power level for twelve hours.");
+                                break;
+                        }
+                    }
+                    break;
+
                 default:
                     output.addField('Available Help Topics', 'config, rank, garden, plants, actions, fusion, nemesis, henchmen, wish, tournament');
             }

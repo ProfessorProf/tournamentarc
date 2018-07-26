@@ -156,11 +156,11 @@ module.exports = {
 				// !pick validation rules:
 				// - Must be at least one plant in the garden
 				// - Must be carrying fewer than 3 of the plant in question
-				// TODO: Only react to discovered plants
 				this.validatePlayerRegistered(errors, player);
 				if(player) this.validateNotNemesis(errors, player);
 				if(targetName) {
-					let plantType = this.getPlantType(targetName);
+					let knownPlants = await sql.getKnownPlants(channel);
+					let plantType = this.getPlantType(targetName, knownPlants);
 					let heldPlants = player.items.find(i => i.type == plantType);
 					if(heldPlants && heldPlants.count >= 3) {
 						errors.push("You can't carry any more of that plant.");
@@ -195,37 +195,39 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
-					let plantType = this.getPlantType(args[0]);
+					let knownPlants = await sql.getKnownPlants(channel);
+					let plantType = this.getPlantType(args[0], knownPlants);
 					if(args.length > 1) {
 						if(plantType == -1) {
 							errors.push("You've never heard of that plant.");
-						}
-						if(player.items.find(i => i.type == plantType)) {
-							if(target) {
-								if(target.name == player.name) {
-									errors.push("You can't use plants on yourself.");
-								}
-								let targetDefeated = target.status.find(s => s.type == 0);
-								switch(plantType) {
-									case 1:
-									case 2:
-										if(!targetDefeated) {
-											errors.push('**' + target.name + '** is already healthy.');
-										}
-										break;
-									case 3:
-									case 4:
-									case 6:
-										if(targetDefeated) {
-											errors.push('**' + target.name + '** cannot eat that for another ' + timeString + '.');
-										}
-										break;
+						} else {
+							if(player.items.find(i => i.type == plantType)) {
+								if(target) {
+									if(target.name == player.name) {
+										errors.push("You can't use plants on yourself.");
+									}
+									let targetDefeated = target.status.find(s => s.type == 0);
+									switch(plantType) {
+										case 1:
+										case 2:
+											if(!targetDefeated) {
+												errors.push('**' + target.name + '** is already healthy.');
+											}
+											break;
+										case 3:
+										case 4:
+										case 6:
+											if(targetDefeated) {
+												errors.push('**' + target.name + '** cannot eat that for another ' + timeString + '.');
+											}
+											break;
+									}
+								} else {
+									errors.push('Must specify a valid target.');
 								}
 							} else {
-								errors.push('Must specify a valid target.');
+								errors.push("You don't have any of that plant.");
 							}
-						} else {
-							errors.push("You don't have any of that plant.");
 						}
 					} else {
 						if (plantType == 5) {
@@ -251,6 +253,11 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
+					let knownPlants = await sql.getKnownPlants(channel);
+					let plantType = this.getPlantType(targetName, knownPlants);
+					if(plantType == -1) {
+						errors.push("You've never heard of that plant.");
+					}
 					let plantCount = garden.plants.filter(p => p).length;
 					if(plantCount == 3) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
@@ -291,7 +298,7 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known).length;
-					if(garden.researchLevel >= knownPlants - 1) {
+					if(garden.researchLevel >= knownPlants - 1.01 && garden.growthLevel < 3) {
 						errors.push("You can't research further right now - try `!expand` to work on the garden instead.");
 					}
 				}
@@ -541,29 +548,36 @@ module.exports = {
 			errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
 		}
 	},
-	getPlantType(plantName) {
+	getPlantType(plantName, knownPlants) {
+		let plantType = -1;
+		if(!plantName) return -1;
 		switch(plantName.toLowerCase()) {
 			case 'flower':
-				return 1;
+				plantType = 1;
 				break;
 			case 'rose':
-				return 2;
+				plantType = 2;
 				break;
 			case 'carrot':
-				return 3;
+				plantType = 3;
 				break;
 			case 'bean':
-				return 4;
+				plantType = 4;
 				break;
 			case 'sedge':
-				return 5;
+				plantType = 5;
 				break;
 			case 'fern':
-				return 6;
+				plantType = 6;
 				break;
 			default:
-				return -1;
+				plantType = -1;
 				break;
 		}
+
+		if(!knownPlants.find(p => p.id == plantType)) {
+			return -1;
+		}
+		return plantType;
 	}
 }

@@ -160,7 +160,7 @@ async function handleMessage(message) {
 			break;
 		case 'scan':
 			outputMessage.embed = await tools.scoutPlayer(channel, targetName);
-			output.informational = true;
+			outputMessage.informational = true;
 			break;
 		case 'reset':
 			await tools.resetData(channel);
@@ -207,7 +207,7 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.wish(channel, name, args[0]));
 			break;
 		case 'research':
-			// TODO
+			outputMessage.print.push(await tools.research(channel, name));
 			break;
 		case 'overdrive':
 			// TODO
@@ -236,7 +236,7 @@ async function handleMessage(message) {
 			outputMessage.informational = true;
 			break;
 		case 'help':
-			outputMessage.embed = await help.showHelp(args[0]);
+			outputMessage.embed = await help.showHelp(channel, args[0]);
 			outputMessage.informational = true;
 			break;
 		case 'debug':
