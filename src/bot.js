@@ -160,7 +160,7 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.energize(channel, targetName));
 			break;
 		case 'revive':
-			// TODO
+			outputMessage.print.push(await tools.revive(channel, targetName));
 			break;
 		case 'train':
 			await tools.train(channel, name);

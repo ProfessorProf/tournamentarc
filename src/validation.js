@@ -623,6 +623,37 @@ module.exports = {
 							errors.push(`${target.name} doesn't work for you.`);
 						}
 					}
+					if(nemesis.energizeTime > now) {
+						let timeString = tools.getTimeString(nemesis.energizeTime - now);
+						errors.push('**' + player.name + '** cannot energize a henchman for another ' + timeString + '.');
+					}
+				} else {
+					errors.push('Must specify a valid target.');
+				}
+				break;
+			case 'revive':
+				// !revive validation
+				// - Must be registered
+				// - Must be the Nemesis
+				// - Target must exist
+				// - Target must be a henchman
+				this.validatePlayerRegistered(errors, player);
+				this.validateNemesis(errors, player);
+				if(target) {
+					if(target.id == player.id) {
+						errors.push(`You cannot revive yourself.`);
+					} else {
+						if(!target.isHenchman) {
+							errors.push(`${target.name} doesn't work for you.`);
+						}
+					}
+					if(!target.status.find(s => s.type == 0)) {
+						errors.push(`${target.name} doesn't need to be revived right now.`);
+					}
+					if(nemesis.reviveTime > now) {
+						let timeString = tools.getTimeString(nemesis.reviveTime - now);
+						errors.push('**' + player.name + '** cannot revive a henchman for another ' + timeString + '.');
+					}
 				} else {
 					errors.push('Must specify a valid target.');
 				}
