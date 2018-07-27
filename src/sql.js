@@ -665,10 +665,10 @@ module.exports = {
 		return statuses;
 	},
 	// Delete all expired offers and statuses, and message the channel accordingly.
-	async deleteExpired(channel) {
+	async deleteExpired(channel, pings) {
 		let now = new Date().getTime();
 		let offerRows = await sql.all(`SELECT * FROM Offers WHERE Channel = $channel AND Expires < $now`, {$channel: channel, $now: now});
-		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.Power_Level FROM PlayerStatus ps
+		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.User_ID, p.Ping_Flag, p.Power_Level FROM PlayerStatus ps
 			LEFT JOIN Players p ON p.ID = ps.Player_ID
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
 			WHERE ps.Channel = $channel AND s.Ends <> 0 AND ps.EndTime < $now`, {$channel: channel, $now: now});
@@ -682,6 +682,12 @@ module.exports = {
 				    // Death
 					messages.push(`**${status.Name}** is ready to fight.`);
 					await this.addStatus(channel, status.Player_ID, 5);
+					if(pings && status.Ping_Flag) pings.push(status.User_ID);
+					break;
+				case 3:
+					// Energize
+					decrease = status.Power_Level - status.Power_Level / 1.3;
+					messages.push(`**${status.Name}** is no longer energized; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case 4: 
 					// Overdrive - reduce power level
@@ -744,6 +750,12 @@ module.exports = {
 					await this.deletePlayer(fusedCharacter.id);
 
 					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
+					if(pings && fusedPlayer1.config.ping) {
+						pings.push(fusedPlayer1.userId);
+					}
+					if(pings && fusedPlayer2.config.ping) {
+						pings.push(fusedPlayer2.userId);
+					}
 					break;
 				
 				case 12:
@@ -879,10 +891,11 @@ module.exports = {
 		return await sql.all(`SELECT Player_ID AS id, Defeats as defeats FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
 	},
 	async deleteHenchmen(channel) {
-		return await sql.run(`DELETE FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM PlayerStatus WHERE Channel = $channel AND Type = 3`, {$channel: channel});
 	},
 	async deleteRecruitOffers(channel) {
-		return await sql.run(`DELETE FROM Offers WHERE Channel = $channel AND Type = 2`, {$channel: channel});
+		await sql.run(`DELETE FROM Offers WHERE Channel = $channel AND Type = 2`, {$channel: channel});
 	},
 	async recordHenchmanDefeat(channel, playerId) {
 		return await sql.all(`UPDATE Henchmen SET Defeats = Defeats + 1 WHERE Channel = $channel AND Player_ID = $id`, {$channel: channel, $id: playerId});
