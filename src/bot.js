@@ -144,13 +144,13 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.burn(channel, name));
 			break;
 		case 'recruit':
-			// TODO
+			outputMessage.print.push(await tools.recruit(channel, targetName));
 			break;
 		case 'join':
-			// TODO
+			outputMessage.print.push(await tools.joinNemesis(channel, name));
 			break;
-		case 'banish':
-			// TODO
+		case 'exile':
+			outputMessage.print.push(await tools.exile(channel, targetName));
 			break;
 		case 'energize':
 			// TODO
