@@ -17,6 +17,10 @@ module.exports = {
 		let target = await sql.getPlayer(channel, targetName);
 		let nemesis = await sql.getNemesis(channel)
 		let garden = await sql.getGarden(channel)
+		let glory = player.glory;
+		if(player.fusionNames.length == 2) {
+			glory /= 2;
+		}
 		let errors = [];
 		let now = new Date().getTime();
 		
@@ -110,7 +114,7 @@ module.exports = {
 							let timeString = tools.getTimeString(nemesis.destroyTime - now);
 							errors.push('**' + player.name + '** cannot destroy a planet for another ' + timeString + '.');
 						}
-						if(player.glory < 400) {
+						if(glory < 400) {
 							errors.push(`**${player.name}** must be at least Rank SS to use destruction.`);
 						}
 					}
@@ -241,6 +245,9 @@ module.exports = {
 											}
 											break;
 									}
+									if(player.isHenchman && !target.isNemesis) {
+										errors.push('A henchman can only use plants on the Nemesis.');
+									}
 								} else {
 									errors.push('Must specify a valid target.');
 								}
@@ -317,8 +324,15 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known).length;
+					let unknownPlants = garden.plantTypes.filter(t => !t.known).length;
 					if(garden.researchLevel >= knownPlants - 1.01 && garden.growthLevel < 3) {
 						errors.push("You can't research further right now - try `!expand` to work on the garden instead.");
+					}
+					if(unknownPlants == 0) {
+						errors.push("There are no new plant species to discover.");
+					}
+					if(glory < 50) {
+						errors.push(`**${player.name}** must be at least Rank C to research new plants.`);
 					}
 				}
 			case 'search':
@@ -341,6 +355,9 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
+					if(glory < 150) {
+						errors.push(`**${player.name}** must be at least Rank A to overdrive.`);
+					}
 				}
 				break;
 			case 'empower':
@@ -352,6 +369,12 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
+					if(glory < 50) {
+						errors.push(`**${player.name}** must be at least Rank C to send energy.`);
+					}
+					if(player.isHenchman && !target.isNemesis) {
+						errors.push('A henchman can only send energy to the Nemesis.');
+					}
 				}
 				break;
 			case 'fuse':
@@ -377,7 +400,7 @@ module.exports = {
 					let timeString = tools.getTimeString(defeated.endTime - now);
 					errors.push('**' + player.name + '** cannot fuse for another ' + timeString + '.');
 				}
-				if(player.glory < 100) {
+				if(glory < 100) {
 					errors.push(`**${player.name}** must be at least Rank B to use Fusion.`);
 				}
 				if(target) {
@@ -432,7 +455,7 @@ module.exports = {
 					if(tools.isFusion(player)) {
 						errors.push("A fusion can't become a nemesis.");
 					}
-					if(player.glory < 250) {
+					if(glory < 250) {
 						errors.push(`**${player.name}** must be at least Rank S to become a nemesis.`);
 					}
 				}
@@ -488,8 +511,8 @@ module.exports = {
 								if(!player.isNemesis) {
 									errors.push('Only the Nemesis can wish for ruin.');
 								}
-								if(player.glory < 400) {
-									errors.push('requires Rank SS.');
+								if(glory < 400) {
+									errors.push('Requires Rank SS.');
 								}
 								break;
 							default:
@@ -524,6 +547,9 @@ module.exports = {
 					}
 				} else {
 					errors.push('Must specify a valid target.');
+				}
+				if(player.isHenchman && !target.isNemesis) {
+					errors.push('A henchman can only give orbs to the Nemesis.');
 				}
 				break;
 			case 'history':
