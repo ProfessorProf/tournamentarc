@@ -241,6 +241,9 @@ async function handleMessage(message) {
 			outputMessage.embed = await help.showHelp(channel, args[0]);
 			outputMessage.informational = true;
 			break;
+		case 'link':
+			outputMessage.print.push(await tools.link(channel, name, message.author.id));
+			break;
 		case 'debug':
 			await sql.execute(args[0], args.slice(1).join(' '));
 			break;

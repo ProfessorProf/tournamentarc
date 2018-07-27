@@ -645,6 +645,37 @@ module.exports = {
 			   (glory < 700 && glory + gloryIncrease >= 700) ||
 			   (glory < 1000 && glory + gloryIncrease >= 1000);
 	},
+	// Either fights a player or sends them a challenge, depending on whether or not they've issued a challenge.
+    async tryRecruit(channel, targetName) {
+		let nemesis = await sql.getNemesis(channel);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
+
+		let embed = new Discord.RichEmbed();
+		let now = new Date().getTime();
+		
+		if(targetName) {
+			let target = await sql.getPlayer(channel, targetName);
+			if(!player.offers.find(o => o.playerId == target.id)) {
+				// If they haven't used !join, send an offer
+				embed.setTitle('HENCHMAN RECRUITMENT')
+					.setColor(0x00AE86)
+					.setDescription(`**${player1.name}** has issued a battle challenge to **${player2.name}**! ${player2.name}, enter \`!fight ${player1.name}\` to accept the challenge and begin the battle.`);
+				await sql.addOffer(player1, player2, 0);
+				return {embed: embed};
+			} else {
+				// FIGHT
+				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
+						.setColor(0x00AE86);
+				return this.fight(player1, player2, embed);
+			}
+		} else {
+			await sql.addOffer(player1, null, 0);
+			embed.setTitle('BATTLE CHALLENGE')
+				.setColor(0x00AE86)
+				.setDescription(`**${player1.name}** wants to fight anyone! The next person to enter \`!fight ${player1.name}\` will accept the challenge and begin the battle.`);
+			return {embed: embed};
+		}
+	},
 	// Destroy command.
 	async destroy(channel) {
 		let players = await sql.getPlayers(channel);
@@ -1754,5 +1785,12 @@ module.exports = {
 		await sql.setPlayer(player);
 
 		return output;
+	},
+	async link(channel, username, id) {
+		let player = await sql.getPlayerByUsername(channel, username);
+		player.userId = id;
+		await sql.setPlayer(player);
+
+		return `Character ${player.name} linked to user ${username}.`;
 	}
 }
