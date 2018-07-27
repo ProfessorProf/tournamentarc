@@ -541,6 +541,72 @@ module.exports = {
 					}
 				}
 				break;
+			case 'recruit':
+				// !recruit validation
+				// - Must be registered
+				// - Must be the Nemesis
+				// - Must not be capped out on henchmen
+				// - Target must exist and not be you
+				// - Target must not already be a henchman
+				this.validatePlayerRegistered(errors, player);
+				this.validateNemesis(errors, player);
+				if(target) {
+					let henchmen = await sql.getHenchmen(channel);
+					let world = await sql.getWorld(channel);
+					let maxHenchmen = Math.floor(world.maxPopulation / 5);
+					if(henchmen.length >= maxHenchmen) {
+						errors.push("You can't recruit more henchmen.");
+					}
+					if(target.isHenchman) {
+						errors.push(`${target.name} already works for you.`);
+					}
+					if(target.id == player.id) {
+						errors.push(`That's not what "be your own boss" means.`);
+					}
+				} else {
+					errors.push('Must specify a valid target.');
+				}
+				break;
+			case 'join':
+				// !join validation
+				// - Must be registered
+				// - Offer must be presented
+				// - Must not be a Henchman
+				this.validatePlayerRegistered(errors, player);
+				if(player.isHenchman) {
+					errors.push("You already serve the Nemesis.");
+				} else {
+					if(!player.offers.find(o => o.type == 2)) {
+						errors.push("The Nemesis needs to \`!recruit\` you first.");
+					}
+					let henchmen = await sql.getHenchmen(channel);
+					let world = await sql.getWorld(channel);
+					let maxHenchmen = Math.floor(world.maxPopulation / 5);
+					if(henchmen.length >= maxHenchmen) {
+						errors.push("The Nemesis already has too many henchmen.");
+					}
+				}
+				break;
+			case 'exile':
+				// !exile validation
+				// - Must be registered
+				// - Must be the Nemesis
+				// - Target must exist
+				// - Target must be a henchman
+				this.validatePlayerRegistered(errors, player);
+				this.validateNemesis(errors, player);
+				if(target) {
+					if(target.id == player.id) {
+						errors.push(`The only escape from being the Nemesis is death.`);
+					} else {
+						if(!target.isHenchman) {
+							errors.push(`${target.name} doesn't work for you.`);
+						}
+					}
+				} else {
+					errors.push('Must specify a valid target.');
+				}
+				break;
 		}
 
 		if(errors.length > 0) {

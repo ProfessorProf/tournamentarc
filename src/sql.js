@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID I
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Type INTEGER, Nemesis_Time INTEGER, Attack_Time INTEGER, 
     Destroy_Time INTEGER, Energize_Time INTEGER, Revive_Time INTEGER, Burn_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
-CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER);
+CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER, Defeats INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Level REAL, Loser_Level REAL,
     Winner_Skill REAL, Loser_Skill REAL);
@@ -70,7 +70,7 @@ INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (8, "Fern", 1,
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (9, "Fused", 1, 0);
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (10, "PowerWish", 0, 0);
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (11, "ImmortalityWish", 0, 0);
-INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (12, "Berserk", 0, 250);
+INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (12, "Berserk", 1, 250);
 INSERT OR REPLACE INTO Gardens (Channel) VALUES ($channel)`;
 
 let updatePlayerSql = `UPDATE Players SET
@@ -292,6 +292,7 @@ module.exports = {
 			WHERE hi.Player_ID = $id`, {$id: row.ID});
 		let nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
 		let fusionRows = await sql.all(`SELECT * FROM Players WHERE Fusion_ID = $id AND ID != $id`, {$id: row.ID});
+		let henchmenRows = await this.getHenchmen(row.Channel);
 
 		let player = {
 			id: row.ID,
@@ -369,6 +370,11 @@ module.exports = {
 		}
 		
 		player.isNemesis = nemesisRow && nemesisRow.Player_ID == player.id;
+		let h = henchmenRows.find(h => h.id == player.id);
+		if(h) {
+			player.isHenchman = true;
+			player.henchmanDefeats = h.defeats;
+		}
 		
 		return player;
 	},
@@ -489,6 +495,7 @@ module.exports = {
 		if(row) {
 			let nemesis = {
 				id: row.Player_ID,
+				channel: row.Channel,
 				type: row.Nemesis_Type,
 				startTime: row.Nemesis_Time,
 				attackTime: row.Attack_Time,
@@ -661,7 +668,7 @@ module.exports = {
 	async deleteExpired(channel) {
 		let now = new Date().getTime();
 		let offerRows = await sql.all(`SELECT * FROM Offers WHERE Channel = $channel AND Expires < $now`, {$channel: channel, $now: now});
-		let statusRows = await sql.all(`SELECT ps.*, p.Name FROM PlayerStatus ps
+		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.Power_Level FROM PlayerStatus ps
 			LEFT JOIN Players p ON p.ID = ps.Player_ID
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
 			WHERE ps.Channel = $channel AND s.Ends <> 0 AND ps.EndTime < $now`, {$channel: channel, $now: now});
@@ -669,25 +676,23 @@ module.exports = {
 		for(let i in statusRows) {
 			// React to statuses ending
 			let status = statusRows[i];
-			let player, decrease;
+			let decrease;
 			switch(status.Status_ID) {
 				case 0:
 				    // Death
 					messages.push(`**${status.Name}** is ready to fight.`);
-					this.addStatus(5);
+					await this.addStatus(channel, status.Player_ID, 5);
 					break;
 				case 4: 
 					// Overdrive - reduce power level
-					player = await sql.get(`SELECT ID, Power_Level FROM Players WHERE ID = $id`, {$id: ps.Player_ID});
-					decrease = player.Power_Level * 0.1;
-					player.Power_Level -= decrease;
-					await sql.run(`UPDATE Players SET Power_Level = $level WHERE ID = $id`, {$id: ps.Player_ID, $level: player.Power_Level});
+					decrease = status.Power_Level * 0.1;
+					let powerLevel = status.Power_Level - decrease;
+					await sql.run(`UPDATE Players SET Power_Level = $level WHERE ID = $id`, {$id: status.Player_ID, $level: powerLevel});
 					messages.push(`**${status.Name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case 7: 
 					// Bean
-					player = await sql.get(`SELECT ID, Power_Level FROM Players WHERE ID = $id`, {$id: status.Player_ID});
-					decrease = player.Power_Level - player.Power_Level / 1.12;
+					decrease = status.Power_Level - status.Power_Level / 1.12;
 					messages.push(`**${status.Name}** is no longer bean boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case 9:
@@ -742,7 +747,7 @@ module.exports = {
 					break;
 				
 				case 12:
-				    // Death
+				    // Berserk
 					messages.push(`**${status.Name}** calms down from their battle frenzy.`);
 					break;
 			}
@@ -754,8 +759,8 @@ module.exports = {
 		// Delete 'em
 		let offerIds = offerRows.map(row => row.ID).join(',');
 		let statusIds = statusRows.map(row => row.ID).join(',');
-		await sql.run(`DELETE FROM Offers WHERE ID IN ($offerIds)`, {$offerIds: offerIds});
-		await sql.run(`DELETE FROM PlayerStatus WHERE ID IN ($statusIds)`, {$statusIds: statusIds});
+		await sql.run(`DELETE FROM Offers WHERE ID IN (${offerIds})`);
+		await sql.run(`DELETE FROM PlayerStatus WHERE ID IN (${statusIds})`);
 
 		return messages;
 	},
@@ -862,5 +867,24 @@ module.exports = {
 	},
 	async researchPlant(channel, plantId) {
 		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE Channel = $channel AND ID = $id`, {$channel: channel, $id: plantId});
+	},
+	async setHenchman(channel, playerId, isHenchman) {
+		if(isHenchman) {
+			await sql.run(`INSERT OR REPLACE INTO Henchmen (Channel, Player_ID, Defeats) VALUES ($channel, $id, 0)`, {$channel: channel, $id: playerId});
+		} else {
+			await sql.run(`DELETE FROM Henchmen WHERE Channel = $channel AND Player_ID = $id`, {$channel: channel, $id: playerId});
+		}
+	},
+	async getHenchmen(channel) {
+		return await sql.all(`SELECT Player_ID AS id, Defeats as defeats FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
+	},
+	async deleteHenchmen(channel) {
+		return await sql.run(`DELETE FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
+	},
+	async deleteRecruitOffers(channel) {
+		return await sql.run(`DELETE FROM Offers WHERE Channel = $channel AND Type = 2`, {$channel: channel});
+	},
+	async recordHenchmanDefeat(channel, playerId) {
+		return await sql.all(`UPDATE Henchmen SET Defeats = Defeats + 1 WHERE Channel = $channel AND Player_ID = $id`, {$channel: channel, $id: playerId});
 	}
 }
