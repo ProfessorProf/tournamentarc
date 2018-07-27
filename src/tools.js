@@ -133,10 +133,10 @@ module.exports = {
 				statuses.push(`Ready to burn in ${this.getTimeString(nemesis.burnTime - now)}`);
 			}
 			if(nemesis.energizeTime > now) {
-				statuses.push(`Ready to energize in ${this.getTimeString(nemesis.energizeTime - now)}`);
+				statuses.push(`Ready to energize a henchman in ${this.getTimeString(nemesis.energizeTime - now)}`);
 			}
 			if(nemesis.reviveTime > now) {
-				statuses.push(`Ready to revive in ${this.getTimeString(nemesis.reviveTime - now)}`);
+				statuses.push(`Ready to revive a henchman in ${this.getTimeString(nemesis.reviveTime - now)}`);
 			}
 		}
 		if(statuses.length > 0) {
@@ -748,6 +748,7 @@ module.exports = {
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
 		
 		await sql.setHenchman(channel, target.id, false);
+		await sql.deleteStatus(channel, target.id, 3);
 
 		return `**${target.name}** is no longer ${nemesisPlayer.name}'s henchman!`;
 	},
@@ -765,6 +766,20 @@ module.exports = {
 
 		return `**${nemesisPlayer.name}** grants **${target.name}** a fragment of their mighty power!\n` +
 			`${target.name}'s power level increases by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
+	},
+	// Revive a dead henchman.
+    async revive(channel, targetName) {
+		let target = await sql.getPlayer(channel, targetName);
+		let nemesis = await sql.getNemesis(channel);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
+		let now = new Date().getTime();
+		
+		await sql.deleteStatus(channel, target.id, 0);
+		await sql.addStatus(channel, target.id, 5);
+		nemesis.reviveTime = now + hour * 12;
+		await sql.setNemesis(channel, nemesis);
+
+		return `**${nemesisPlayer.name}** breathes new life into **${target.name}**!`;
 	},
 	// Sends a player a recruitment offer to join the Nemesis.
     async joinNemesis(channel, name) {
