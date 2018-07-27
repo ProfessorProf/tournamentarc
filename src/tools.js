@@ -115,6 +115,24 @@ module.exports = {
 		if(player.actionTime > now) {
 			statuses.push(`Ready to act in ${this.getTimeString(player.actionTime - now)}`);
 		}
+		if(player.isNemesis) {
+			let nemesis = await sql.getNemesis(player.channel);
+			if(nemesis.attackTime > now) {
+				statuses.push(`Ready to attack in ${this.getTimeString(nemesis.attackTime - now)}`);
+			}
+			if(nemesis.destroyTime > now) {
+				statuses.push(`Ready to destroy in ${this.getTimeString(nemesis.destroyTime - now)}`);
+			}
+			if(nemesis.burnTime > now) {
+				statuses.push(`Ready to burn in ${this.getTimeString(nemesis.burnTime - now)}`);
+			}
+			if(nemesis.energizeTime > now) {
+				statuses.push(`Ready to energize in ${this.getTimeString(nemesis.energizeTime - now)}`);
+			}
+			if(nemesis.reviveTime > now) {
+				statuses.push(`Ready to revive in ${this.getTimeString(nemesis.reviveTime - now)}`);
+			}
+		}
 		if(statuses.length > 0) {
 			embed.addField('Status', statuses.join('\n'));
 		}
@@ -628,12 +646,10 @@ module.exports = {
 			   (glory < 1000 && glory + gloryIncrease >= 1000);
 	},
 	// Destroy command.
-	// TODO: Make sure this works.
 	async destroy(channel) {
-		let data = await sql.getWorld(channel);
 		let players = await sql.getPlayers(channel);
 		let nemesis = await sql.getNemesis(channel);
-		let nemesisPlayer = await sql.getPlayerById(nemesis.playerId);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
 		let now = new Date().getTime();
 		let embed = new Discord.RichEmbed();
 		
@@ -651,45 +667,53 @@ module.exports = {
 		let targets = Math.min(targetPlayers.length, 3);
 		let firstTarget = Math.floor(Math.random() * targetPlayers.length);
 		
+		let output = '';
 		for(let i = 0; i < targets; i++) {
 			let target = targetPlayers[(firstTarget + i) % targetPlayers.length];
-			let trainingState = target.status.find(s => s.type == 2);
-			if(trainingState) {
-				await sql.deleteStatus(channel, target.id, 2);
-				let hours = (now - trainingState.startTime) / hour;
-				if(hours > 72) hours = 72;
-				this.addHeat(data, hours);
-				let newPowerLevel = this.newPowerLevel(data.heat);
-				if(this.isFusion(player1)) {
-					newPowerLevel *= 1.3;
-				}
-				if(target.status.find(s => s.type == 10)) {
-					newPowerLevel *= 1.5;
-				}
-				console.log(`Upgrading ${player1.name}'s power level after ${hours} hours of training, +${newPowerLevel}`);
-				if(hours <= 16) {
-					target.level += newPowerLevel * (hours / 16);
-				} else {
-					target.level += newPowerLevel * (1 + 0.01 * (hours / 16));
-				}
-			}
+			await this.completeTraining(target);
 			
-			let output = '';
 			if(target.status.find(s => s.type == 11)) {
-				addStatus(target.channel, target.id, 0, now + hour * 1);
+				await sql.addStatus(target.channel, target.id, 0, now + hour * 1);
 				output += `${target.name} cannot fight for another 1 hour!\n`;
 			} else {
-				addStatus(target.channel, target.id, 0, now + hour * 12);
+				await sql.addStatus(target.channel, target.id, 0, now + hour * 12);
 				output += `${target.name} cannot fight for another 12 hours!\n`;
 			}
 			await sql.setPlayer(target);
 		}
 		
 		nemesis.destroyTime = now + 24 * hour;
-		await sql.setNemesis(nemesis);
+		await sql.setNemesis(channel, nemesis);
 		
-		embed.addField('Damage Report', output);
-		return embed;
+		if(output.length > 0) {
+			embed.addField('Damage Report', output);
+			return embed;
+		} else {
+			return null;
+		}
+	},
+	async burn(channel) {
+		let nemesis = await sql.getNemesis(channel);
+		let garden = await sql.getGarden(channel);
+		let now = new Date().getTime();
+		let embed = new Discord.RichEmbed();
+
+		let firstPick = Math.floor(Math.random() * 3);
+		for(let i = 0; i < 3; i++) {
+			let index = (i + firstPick) % 3;
+			if(garden.plants[index]) {
+				// Found a plant, burn it
+				let plant = garden.plants[index];
+				await sql.deletePlant(plant.id);
+
+				nemesis.burnTime = now + 12 * hour;
+				await sql.setNemesis(channel, nemesis);
+				
+				return `The Nemesis lays waste to the garden, destroying a ${plant.name.toLowerCase()}!`;
+			}
+		}
+
+		return `No plants were found to burn!`
 	},
 	// Attempt to create a new Fusion.
     async fuse(channel, sourcePlayerName, targetPlayerName, fusionName) {
@@ -1357,7 +1381,7 @@ module.exports = {
 				let nemesis = await sql.getNemesis(channel);
 				nemesis.ruinTime = now + 24 * hour;
 				nemesis.lastRuinUpdate = now;
-				await sql.setNemesis(nemesis);
+				await sql.setNemesis(channel, nemesis);
 				break;
 		}
 		

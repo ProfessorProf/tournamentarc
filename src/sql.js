@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID I
     Growth_Level REAL, Research_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Type INTEGER, Nemesis_Time INTEGER, Attack_Time INTEGER, 
-    Destroy_Time INTEGER, Energize_Time INTEGER, Revive_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
+    Destroy_Time INTEGER, Energize_Time INTEGER, Revive_Time INTEGER, Burn_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
 CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Level REAL, Loser_Level REAL,
@@ -103,8 +103,8 @@ VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $actionT
 	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npcFlag, $alwaysPrivate, $ping, $pronoun)`;
 
 let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
-(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
-VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $ruinTime, $basePower, $cooldown)`;
+(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Burn_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
+VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $burnTime, $ruinTime, $basePower, $cooldown)`;
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
@@ -493,6 +493,7 @@ module.exports = {
 				destroyTime: row.Destroy_Time,
 				energizeTime: row.Energize_Time,
 				reviveTime: row.Revive_Time,
+				burnTime: row.Burn_Time,
 				ruinTime: row.Ruin_Time,
 				basePower: row.Base_Power,
 				cooldown: row.Nemesis_Cooldown
@@ -533,6 +534,7 @@ module.exports = {
 			$attackTime: nemesis.attackTime,
 			$destroyTime: nemesis.destroyTime,
 			$reviveTime: nemesis.reviveTime,
+			$burnTime: nemesis.burnTime,
 			$ruinTime: nemesis.ruinTime,
 			$cooldown: nemesis.cooldown,
 			$basePower: nemesis.basePower

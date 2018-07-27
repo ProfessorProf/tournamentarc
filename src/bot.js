@@ -121,23 +121,27 @@ async function handleMessage(message) {
 			outputMessage.informational = true;
 			break;
 		case 'fight':
-			const result = await tools.tryFight(channel, name, targetName);
-			outputMessage.embed = result.embed;
-			if(result.ping) {
-				outputMessage.print.push(`<@${result.ping}>`);
+			const fightResult = await tools.tryFight(channel, name, targetName);
+			outputMessage.embed = fightResult.embed;
+			if(fightResult.ping) {
+				outputMessage.print.push(`<@${fightResult.ping}>`);
 			}
 			break;
 		case 'unfight':
 			outputMessage.print.push(await tools.unfight(channel, name));
 			break;
 		case 'attack':
-			outputMessage.embed = await tools.attack(channel, name, targetName);
+			const attackResult = await tools.attack(channel, name, targetName);
+			outputMessage.embed = attackResult.embed;
+			if(attackResult.ping) {
+				outputMessage.print.push(`<@${attackResult.ping}>`);
+			}
 			break;
 		case 'destroy':
 			outputMessage.embed = await tools.destroy(channel);
 			break;
 		case 'burn':
-			// TODO
+			outputMessage.print.push(await tools.burn(channel, name));
 			break;
 		case 'recruit':
 			// TODO
@@ -217,9 +221,6 @@ async function handleMessage(message) {
 			break;
 		case 'give':
 			outputMessage.print.push(await tools.give(channel, name, args[0]));
-			break;
-		case 'journey':
-			// TODO
 			break;
 		case 'history':
 			outputMessage.embed = await tools.history(channel, name, targetName);

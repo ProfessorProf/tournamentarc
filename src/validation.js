@@ -103,15 +103,34 @@ module.exports = {
 				// - Player must be Nemesis
 				// - Nemesis destroy cooldown must be off
 				this.validatePlayerRegistered(errors, player);
-				if(!player) {
+				if(player) {
 					this.validateNemesis(errors, player);
 					if(nemesis) {
-						if(nemesis.attackTime > now) {
-							let timeString = tools.getTimeString(nemesis.attackTime - now);
+						if(nemesis.destroyTime > now) {
+							let timeString = tools.getTimeString(nemesis.destroyTime - now);
 							errors.push('**' + player.name + '** cannot destroy a planet for another ' + timeString + '.');
 						}
 						if(player.glory < 400) {
 							errors.push(`**${player.name}** must be at least Rank SS to use destruction.`);
+						}
+					}
+				}
+				break;
+			case 'burn':
+				// !burn validation rules:
+				// - Player must be Nemesis
+				// - Nemesis burn cooldown must be off
+				// - Must be at least one plant in the garden
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateNemesis(errors, player);
+					if(nemesis) {
+						if(!garden.plants.find(p => p)) {
+							errors.push('There are no plants in the garden to burn!');
+						}
+						if(nemesis.burnTime > now) {
+							let timeString = tools.getTimeString(nemesis.burnTime - now);
+							errors.push('**' + player.name + '** cannot attack the garden for another ' + timeString + '.');
 						}
 					}
 				}
@@ -395,7 +414,7 @@ module.exports = {
 				// - 24 hours must have passed since the previous Nemesis died
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					if(nemesis.cooldown > now) {
+					if(nemesis && nemesis.cooldown > now) {
 						let timeString = tools.getTimeString(nemesis.cooldown - now);
 						errors.push(`A new nemesis won't rise for at least ${timeString}.`);
 					}
