@@ -17,8 +17,8 @@ module.exports = {
 		let target = await sql.getPlayer(channel, targetName);
 		let nemesis = await sql.getNemesis(channel)
 		let garden = await sql.getGarden(channel)
-		let glory = player.glory;
-		if(player.fusionNames.length == 2) {
+		let glory = player ? player.glory : 0;
+		if(player && player.fusionNames.length == 2) {
 			glory /= 2;
 		}
 		let errors = [];
@@ -43,6 +43,9 @@ module.exports = {
 						errors.push(`There is already a character named ${player.name}.`);
 					}
 				}
+				break;
+			case 'check':
+				this.validatePlayerRegistered(errors, player);
 				break;
 			case 'fight':
 				// !fight validation rules:
@@ -281,7 +284,7 @@ module.exports = {
 					this.validateGardenTime(errors, player);
 					let knownPlants = await sql.getKnownPlants(channel);
 					let plantType = this.getPlantType(targetName, knownPlants);
-					if(plantType == -1) {
+					if(plantType == -1 && targetName) {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p).length;
