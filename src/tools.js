@@ -269,19 +269,19 @@ module.exports = {
 			if(p.name.length > headers[0]) headers[0] = p.name.length;
 			
 			let rank = '-';
-			if(p.glory > 1000) {
+			if(p.glory >= 1000) {
 				rank = 'U';
-			} else if(p.glory > 700) {
+			} else if(p.glory >= 700) {
 				rank = 'SSS';
-			} else if(p.glory > 400) {
+			} else if(p.glory >= 400) {
 				rank = 'SS';
-			} else if(p.glory > 250) {
+			} else if(p.glory >= 250) {
 				rank = 'S';
-			} else if(p.glory > 150) {
+			} else if(p.glory >= 150) {
 				rank = 'A';
-			} else if(p.glory > 100) {
+			} else if(p.glory >= 100) {
 				rank = 'B';
-			} else if(p.glory > 50) {
+			} else if(p.glory >= 50) {
 				rank = 'C';
 			}
 			row.push(rank);
@@ -793,7 +793,7 @@ module.exports = {
 		await sql.setHenchman(channel, player.id, true);
 
 		// If we just hit max henchmen, delete all outstanding recruitment offers
-		let maxHenchmen = Math.floor(world.maxPopulation / 5);
+		let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
 		if(henchmen.length + 1 >= maxHenchmen) {
 			await sql.deleteRecruitOffers(channel);
 		}
@@ -1102,7 +1102,7 @@ module.exports = {
 				if(oldProgress < 100) {
 					plant.startTime -= time;
 					let newProgress = ((now - plant.startTime) / duration) * 100;
-					let growth = Math.ceil(newProgress - oldProgress);
+					let growth = Math.ceil((newProgress - oldProgress) * 10) / 10;
 					output += `\n${plant.name} growth increases by ${growth}%.`;
 					if(newProgress >= 100) {
 						output += ` It's ready to be picked!`;
@@ -1895,12 +1895,17 @@ module.exports = {
 		await sql.setPlayer(player);
 		await sql.setPlayer(target);
 
-		return `${player.name} sends ${this.their(player.config.pronoun)} energy, ` +
+		return `${player.name} sends ${this.their(player.config.pronoun)} energy to ${target.name}, ` +
 			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
 	},
 	async graveyard(channel) {
 		let players = await sql.getPlayers(channel);
 		let deadPlayers = players.filter(p => p.status.find(s => s.type == 0));
+		deadPlayers.sort((a, b) => {
+			let aDeath = a.status.find(s => s.type == 0);
+			let bDeath = b.status.find(s => s.type == 0);
+			return aDeath.endTime - bDeath.endTime;
+		});
 		let now = new Date().getTime();
 		let output = '';
 

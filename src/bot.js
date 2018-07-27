@@ -91,7 +91,7 @@ async function handleMessage(message) {
 		cmd = cmd.substring(1);
 	}
 
-	if(cmd == 'as' && name == auth.admin) {
+	if(cmd == 'as' && name == auth.admin && debugmode) {
 		name = args[0];
 		cmd = args[1].toLowerCase();
 		args = args.splice(2);

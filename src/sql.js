@@ -287,7 +287,7 @@ module.exports = {
 		let statusRows = await sql.all(`SELECT ps.*, s.Ends, s.Priority, s.Name FROM PlayerStatus ps
 			LEFT JOIN Statuses s ON s.ID = ps.Status_Id
 			WHERE Player_ID = $id`, {$id: row.ID});
-		let itemRows = await sql.all(`SELECT hi.*, i.Type_Name FROM HeldItems hi
+		let itemRows = await sql.all(`SELECT DISTINCT hi.*, i.Type_Name FROM HeldItems hi
 			LEFT JOIN Items i ON hi.Item_ID = i.ID
 			WHERE hi.Player_ID = $id`, {$id: row.ID});
 		let nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
@@ -639,7 +639,7 @@ module.exports = {
 	},
 	// Get all Players in a channel.
 	async getPlayers(channel) {
-		let rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY Name`, {$channel: channel});
+		let rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY UPPER(Name)`, {$channel: channel});
 		let players = [];
 		for(let i in rows) {
 			let row = rows[i];

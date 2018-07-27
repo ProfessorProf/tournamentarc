@@ -338,6 +338,7 @@ module.exports = {
 						errors.push(`**${player.name}** must be at least Rank C to research new plants.`);
 					}
 				}
+				break;
 			case 'search':
 				// !search validation rules:
 				// - Must be registered
@@ -372,11 +373,15 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
-					if(glory < 50) {
-						errors.push(`**${player.name}** must be at least Rank C to send energy.`);
-					}
-					if(player.isHenchman && !target.isNemesis) {
-						errors.push('A henchman can only send energy to the Nemesis.');
+					if(target) {
+						if(glory < 50) {
+							errors.push(`**${player.name}** must be at least Rank C to send energy.`);
+						}
+						if(player.isHenchman && !target.isNemesis) {
+							errors.push('A henchman can only send energy to the Nemesis.');
+						}
+					} else {
+						errors.push('Must pick a valid target.');
 					}
 				}
 				break;
@@ -582,7 +587,7 @@ module.exports = {
 				if(target) {
 					let henchmen = await sql.getHenchmen(channel);
 					let world = await sql.getWorld(channel);
-					let maxHenchmen = Math.floor(world.maxPopulation / 5);
+					let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
 					if(henchmen.length >= maxHenchmen) {
 						errors.push("You can't recruit more henchmen.");
 					}
