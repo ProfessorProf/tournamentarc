@@ -75,7 +75,8 @@ INSERT OR REPLACE INTO Gardens (Channel) VALUES ($channel)`;
 
 let updatePlayerSql = `UPDATE Players SET
     Username = $username, 
-    Name = $name,
+	Name = $name,
+	User_ID = $userId,
     Channel = $channel,
     Power_Level = $powerLevel,
     Garden_Level = $gardenLevel,
@@ -210,7 +211,8 @@ module.exports = {
         // Update a player in the DB
         await sql.run(updatePlayerSql, {
             $id: player.id,
-            $username: player.username,
+			$username: player.username,
+			$userId: player.userId,
             $name: player.name,
             $channel: player.channel,
             $powerLevel: player.level,
