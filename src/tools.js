@@ -776,7 +776,7 @@ module.exports = {
 		
 		await sql.deleteStatus(channel, target.id, 0);
 		await sql.addStatus(channel, target.id, 5);
-		nemesis.reviveTime = now + hour * 12;
+		nemesis.reviveTime = now + hour * 24;
 		await sql.setNemesis(channel, nemesis);
 
 		return `**${nemesisPlayer.name}** breathes new life into **${target.name}**!`;
@@ -1274,10 +1274,12 @@ module.exports = {
 			} else {
 				// Discover a new plant species
 				let unknownPlants = await sql.getUnknownPlants(channel);
-				let newPlant = unknownPlants[Math.floor(Math.random() * unknownPlants.length)];
-				output += `\nResearch level increased! New plant "${newPlant.name}" can now be planted in the garden.`;
-				garden.growthLevel -= 3;
-				await sql.researchPlant(channel, newPlant.id);
+				if(unknownPlants.length > 0) {
+					let newPlant = unknownPlants[Math.floor(Math.random() * unknownPlants.length)];
+					output += `\nResearch level increased! New plant "${newPlant.name}" can now be planted in the garden.`;
+					garden.growthLevel -= 3;
+					await sql.researchPlant(channel, newPlant.id);
+				}
 			}
 		}
 		
@@ -1879,6 +1881,14 @@ module.exports = {
 
 		player.level -= transfer;
 		target.level += transfer;
+
+		if(!player.actionLevel) player.actionLevel = 0;
+		let oldActionLevel = Math.floor(player.actionLevel);
+		player.actionLevel += 1 / (1 + player.actionLevel);
+		let newActionLevel = Math.floor(player.actionLevel);
+		if(newActionLevel > oldActionLevel) {
+			output += '\nAction level increased!';
+		}
 
 		player.actionTime = now + hour;
 		await sql.setPlayer(player);
