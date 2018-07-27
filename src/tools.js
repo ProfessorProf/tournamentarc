@@ -25,6 +25,9 @@ module.exports = {
 			embed.setDescription('NEMESIS');
 		} else if(this.isFusion(player)) {
 			embed.setDescription(`Fusion between ${player.fusionNames[0]} and ${player.fusionNames[1]}`);
+		} else if(player.isHenchman) {
+			let energyPercent = Math.max(100 - 20 * player.henchmanDefeats, 0)
+			embed.setDescription(`HENCHMAN\nProtecting the Nemesis at ${energyPercent}% power`);
 		}
 		
 		// Display Glory/Rank
@@ -155,6 +158,16 @@ module.exports = {
 				switch(o.type) {
 					case 0:
 						offers.push(`${o.name} wants to \`!fight\` ${o.targetId ? 'you' : 'anyone'} (expires in ${this.getTimeString(o.expires - now)})`);
+						break;
+					case 1:
+						offers.push(`${o.name} wants to \`!fuse\` with you (expires in ${this.getTimeString(o.expires - now)})`);
+						break;
+					case 2:
+						if(o.targetId) {
+							offers.push(`${o.name} wants you to \`!join\` them (expires in ${this.getTimeString(o.expires - now)})`);
+						} else {
+							offers.push(`${o.name} wants someone to \`!join\` them (expires in ${this.getTimeString(o.expires - now)})`);
+						}
 						break;
 				}
 			}
@@ -288,6 +301,9 @@ module.exports = {
 			if(p.isNemesis) {
 				level += ' [NEMESIS]';
 			}
+			if(p.isHenchman) {
+				level += ' [HENCHMAN]';
+			}
 			if(this.isFusion(p)) {
 				level += ' [FUSION]';
 			}
@@ -352,11 +368,10 @@ module.exports = {
     async tryFight(channel, player, target) {
 		let player1 = await sql.getPlayerByUsername(channel, player);
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
 		
 		if(target) {
 			let player2 = await sql.getPlayer(channel, target);
-			if(!player1.offers.find(o => o.playerId == player2.id)) {
+			if(!player1.offers.find(o => o.playerId == player2.id) && !player2.isNemesis && !player2.isHenchman) {
 				// If they haven't offered, send a challenge
 				embed.setTitle('BATTLE CHALLENGE')
 					.setColor(0x00AE86)
@@ -407,9 +422,8 @@ module.exports = {
 	},
 	// Fight between two players.
     async fight(player1, player2, embed) {
-		let channel = player1.channel;
+		let channel = player1.channel;	
 		let world = await sql.getWorld(channel);
-		let now = new Date().getTime();
 
 		// Give the attacked player a ping if they want one
 		let ping = null;
@@ -429,6 +443,26 @@ module.exports = {
 		}
 		if(player2.status.find(s => s.type == 7)) {
 			level2 *= 1.12;
+		}
+
+		if(player2.isNemesis) {
+			// Someone attacked the Nemesis, summon henchmen!
+			let henchmenMessages = [];
+			let henchmen = await sql.getHenchmen(channel);
+			for(let i in henchmen) {
+				let h = await sql.getPlayerById(henchmen[i].id);
+				if(!h.status.find(s => s.type == 0) && h.id != player1.id) {
+					// Living henchman, send energy
+					let boost = this.getPowerLevel(h) * (1 - 0.2 * henchmen[i].defeats);
+					if(boost > 0) {
+						henchmenMessages.push(`${h.name} boosts ${player2.name}'s energy by ${numeral(boost.toPrecision(2)).format('0,0')}!`);
+					}
+					level2 += boost;
+				}
+			}
+			if(henchmenMessages.length > 0) {
+				embed.addField('The Nemesis summons henchmen!', henchmenMessages.join('\n'));
+			}
 		}
 		embed.addField('Power Levels', `${player1.name}: ${numeral(level1.toPrecision(2)).format('0,0')}\n${player2.name}: ${numeral(level2.toPrecision(2)).format('0,0')}`);
 		
@@ -520,27 +554,36 @@ module.exports = {
 		let hours = Math.ceil(difference * intensity * 3);
 		hours = Math.max(hours, Math.min(hours, 12), 1);
 		
+		let trueForm = false;
+		let winnerLevel = this.getPowerLevel(winner);
+		let loserLevel = this.getPowerLevel(loser);
 		if(nemesisHistory) {
 			// The Nemesis is dead!
-			let nemesis = await sql.getNemesis(channel);
+			let nemesis = await sql.getNemesis(winner.channel);
 			if(nemesis.type == 1) {
 				// Reveal true form
-				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.pronoun} revealed ${this.their(loser.config.pronoun)} true power!\n` +
-					`The real battle begins here!`;
+				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.pronoun} revealed ${this.their(loser.config.pronoun)} true form!\n` +
+					`The real battle begins here!\n`;
 				nemesis.type = 2;
-				nemesis.level *= Math.random() + 2.5;
+				loser.level = nemesis.basePower * (Math.random() + 2.5);
 				nemesis.attackTime = now;
 				nemesis.destroyTime = now;
 				nemesis.energizeTime = now;
 				nemesis.reviveTime = now;
 				hours = 0;
+				trueForm = true;
 			} else {
 				// End the nemesis
-				nemesis.playerId = null;
-				nemesis.nemesisCooldown = now + 24 * hour;
+				nemesis.id = null;
+				nemesis.cooldown = now + 24 * hour;
+				await sql.deleteHenchmen(nemesis.channel);
 				loser.level = this.newPowerLevel(data.heat * 0.8);
 				hours = 24;
-				output += `${winner.name} defeated the Nemesis! Everyone's sacrifices were not in vain!`;
+				output += `${winner.name} defeated the Nemesis!`
+				if(nemesisHistory.length > 1 && !winner.isHenchman) {
+					output +=  `Everyone's sacrifices were not in vain!`;
+				}
+				output += `\n`;
 
 				// Give 20 Glory for each failed fight against this Nemesis
 				let gloryGains = {};
@@ -559,21 +602,26 @@ module.exports = {
 				for(let key in gloryGains) {
 					let g = gloryGains[key];
 					let rankUp = this.rankUp(g.oldGlory, g.glory);
-					output += `\n${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}`;
+					output += `${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}\n`;
 					if(rankUp) {
-						output += `\n${g.name}'s Rank has increased!`;
+						output += `${g.name}'s Rank has increased!\n`;
 					}
 				}
 			}
 
-			await sql.setNemesis(channel, nemesis);
+			await sql.setNemesis(nemesis.channel, nemesis);
 		}
 		
 		// Award glory to the winner
-		let glory = Math.ceil(Math.min((this.getPowerLevel(loser) / this.getPowerLevel(winner)) * 10, 100));
+		let glory = Math.ceil(Math.min(loserLevel / this.getPowerLevelwinner * 10, 100));
+		if(loser.isNemesis) glory *= 3;
 		let rankUp = this.rankUp(winner.glory, glory);
 		winner.glory += glory;
-		output += `${winner.name} is the winner! +${glory} glory. Total glory: ${winner.glory}`;
+		if(trueForm) {
+			output += `${winner.name} gains ${glory} glory. Total glory: ${winner.glory}`;
+		} else {
+			output += `${winner.name} is the winner! +${glory} glory. Total glory: ${winner.glory}`;
+		}
 		if(rankUp) {
 			output += `\n${winner.name}'s Rank has increased!`;
 		}
@@ -588,25 +636,43 @@ module.exports = {
 		}
 		
 		// Orb transfers
-		let loserOrbs = loser.items.find(i => i.type == 0);
-		let winnerOrbs = winner.items.find(i => i.type == 0);
-		if(loserOrbs) {
-			output += `\n${winner.name} took ${loserOrbs.count} magic orbs from ${loser.name}!`;
-			await sql.addItems(winner.id, 0, loserOrbs.count);
-			await sql.addItems(loser.id, 0, -loserOrbs.count);
-			if(loserOrbs.count + (winnerOrbs ? winnerOrbs.count : 0) == 7) {
-				output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
+		if(!trueForm) {
+			let loserOrbs = loser.items.find(i => i.type == 0);
+			let winnerOrbs = winner.items.find(i => i.type == 0);
+			if(loserOrbs) {
+				output += `\n${winner.name} took ${loserOrbs.count} magic orbs from ${loser.name}!`;
+				await sql.addItems(winner.id, 0, loserOrbs.count);
+				await sql.addItems(loser.id, 0, -loserOrbs.count);
+				if(loserOrbs.count + (winnerOrbs ? winnerOrbs.count : 0) == 7) {
+					output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
+				}
+			}
+			// Overdrive penalty
+			if(loser.status.find(s => s.type == 4)) {
+				hours += 3;
+			}
+
+			// Immortality
+			if(loser.status.find(s => s.type == 11)) {
+				hours = 1;
 			}
 		}
 
-		// Overdrive penalty
-		if(loser.status.find(s => s.type == 4)) {
-			hours += 3;
+		// Log henchman defeats
+		if(loser.isHenchman) {
+			await sql.recordHenchmanDefeat(loser.channel, loser.id);
+			if(winner.isNemesis) {
+				output += `\n${loser.name} betrayed the Nemesis, and paid for it with exile!`;
+				await sql.setHenchman(loser.channel, loser.id, false);
+			}
 		}
 
-		// Immortality
-		if(loser.status.find(s => s.type == 11)) {
-			hours = 1;
+		// Nemesis hijack
+		if(winner.isHenchman && loser.isNemesis && !trueForm) {
+			output += `\n${winner.name} has betrayed ${this.their(winner.config.pronoun)} master and become the new Nemesis! The nightmare continues!`;
+			await sql.setPlayer(winner);
+			await this.setNemesis(winner.channel, winner.username);
+			winner = await sql.getPlayer(winner.channel, winner.username);
 		}
 		
 		// Death timer
@@ -645,36 +711,59 @@ module.exports = {
 			   (glory < 700 && glory + gloryIncrease >= 700) ||
 			   (glory < 1000 && glory + gloryIncrease >= 1000);
 	},
-	// Either fights a player or sends them a challenge, depending on whether or not they've issued a challenge.
-    async tryRecruit(channel, targetName) {
+	// Sends a player a recruitment offer to join the Nemesis.
+    async recruit(channel, targetName) {
 		let nemesis = await sql.getNemesis(channel);
-		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
-
+		let player = await sql.getPlayerById(nemesis.id);
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
 		
 		if(targetName) {
 			let target = await sql.getPlayer(channel, targetName);
-			if(!player.offers.find(o => o.playerId == target.id)) {
-				// If they haven't used !join, send an offer
-				embed.setTitle('HENCHMAN RECRUITMENT')
-					.setColor(0x00AE86)
-					.setDescription(`**${player1.name}** has issued a battle challenge to **${player2.name}**! ${player2.name}, enter \`!fight ${player1.name}\` to accept the challenge and begin the battle.`);
-				await sql.addOffer(player1, player2, 0);
-				return {embed: embed};
-			} else {
-				// FIGHT
-				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
-						.setColor(0x00AE86);
-				return this.fight(player1, player2, embed);
-			}
-		} else {
-			await sql.addOffer(player1, null, 0);
-			embed.setTitle('BATTLE CHALLENGE')
+			// Send an offer
+			embed.setTitle('HENCHMAN RECRUITMENT')
 				.setColor(0x00AE86)
-				.setDescription(`**${player1.name}** wants to fight anyone! The next person to enter \`!fight ${player1.name}\` will accept the challenge and begin the battle.`);
+				.setDescription(`**${player.name}** wishes for **${target.name}** to join ${this.their(player.config.pronoun)} army of evil! ` +
+				`If you join, you'll become more powerful, and your power will make the Nemesis stronger. ` +
+				`${target.name}, enter \`!join ${player.name}\` to accept the offer and serve the Nemesis in battle.`);
+			await sql.addOffer(player, target, 2);
+			return {embed: embed};
+		} else {
+			await sql.addOffer(player, null, 2);
+			embed.setTitle('HENCHMAN RECRUITMENT')
+				.setColor(0x00AE86)
+				.setDescription(`**${player.name}** wishes for anyone to join ${this.their(player.config.pronoun)} army of evil! ` +
+				`If you join, you'll become more powerful, and your power will make the Nemesis stronger. ` +
+				`the next person to enter \`!join ${player.name}\` will accept the offer and serve the Nemesis in battle.`);
 			return {embed: embed};
 		}
+	},
+	// Boot a player from the Henchmen list.
+    async exile(channel, targetName) {
+		let target = await sql.getPlayer(channel, targetName);
+		let nemesis = await sql.getNemesis(channel);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
+		
+		await sql.setHenchman(channel, target.id, false);
+
+		return `**${target.name}** is no longer ${nemesisPlayer.name}'s henchman!`;
+	},
+	// Sends a player a recruitment offer to join the Nemesis.
+    async joinNemesis(channel, name) {
+		let player = await sql.getPlayerByUsername(channel, name);
+		let nemesis = await sql.getNemesis(channel);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
+		let henchmen = await sql.getHenchmen(channel);
+		let world = await sql.getWorld(channel);
+		
+		await sql.setHenchman(channel, player.id, true);
+
+		// If we just hit max henchmen, delete all outstanding recruitment offers
+		let maxHenchmen = Math.floor(world.maxPopulation / 5);
+		if(henchmen.length + 1 >= maxHenchmen) {
+			await sql.deleteRecruitOffers(channel);
+		}
+		return `**${player.name}** has joined the Nemesis in ${this.their(nemesisPlayer.config.pronoun)} campaign of destruction!\n` +
+			`Your power level is increased, and you automatically boost the Nemesis's power when they come under attack. For more info, enter \`!help henchmen\`.`;
 	},
 	// Destroy command.
 	async destroy(channel) {
@@ -841,13 +930,23 @@ module.exports = {
 		this.addHeat(data, 100);
 		await sql.deleteStatus(channel, player.id, 5);
 		
-		if(!nemesis) {
+		if(nemesis) {
+			nemesis.id = player.id;
+			nemesis.startTime = now;
+			nemesis.attackTime = now;
+			nemesis.destroyTime = now;
+			nemesis.reviveTime = now;
+			nemesis.energizeTime = now;
+			nemesis.burnTime = now;
+		} else {
 			nemesis = {
 				id: player.id,
 				startTime: now,
 				attackTime: now,
 				destroyTime: now,
 				reviveTime: now,
+				burnTime: now,
+				energizeTime: now,
 				cooldown: now
 			};
 		}
@@ -862,11 +961,12 @@ module.exports = {
 			nemesis.type = 0;
 		}
 		player.level *= Math.max(10, data.maxPopulation) / 10;
+		nemesis.basePower = player.level;
 		
 		await sql.setHeat(channel, data.heat);
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
-		return `**${player.name}** has become a Nemesis, and is invading the whole galaxy! ` +
+		return `**${player.name}** has become a Nemesis, and has declared war on the whole galaxy! ` +
 			`Their rampage will continue until ${player.config.pronoun} are defeated in battle.\n` + 
 			`The Nemesis can no longer use most peaceful actions, but in exchange, ` +
 			`${player.config.pronoun} ${this.have(player.config.pronoun)} access to several powerful new abilities. ` + 
@@ -1268,91 +1368,93 @@ module.exports = {
 		let effectiveTime = Math.min(now - world.lastWish, hour * 72);
 		let searchModifier = effectiveTime / (hour * 72);
 		let searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
-		if (world.lostOrbs > 0) {
-			let roll = Math.random();
-			if(roll < searchChance) {
-				console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-				// They found an orb!
-				await sql.addItems(channel, player.id, 0, 1);
-				world.lostOrbs--;
-				output = `${player.name} searches the world, and finds a magic orb!`;
-				let existingOrbs = player.items.find(i => i.type == 0);
-				if(!existingOrbs) {
-					// Start the fight timer
-					player.lastFought = now;
+		if(player.isHenchman) searchChance *= 2;
+		if(world.lostOrbs == 0) searchChance = 0;
+		let roll = Math.random();
+		if(roll < searchChance) {
+			console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+			// They found an orb!
+			await sql.addItems(channel, player.id, 0, 1);
+			world.lostOrbs--;
+			output = `${player.name} searches the world, and finds a magic orb!`;
+			let existingOrbs = player.items.find(i => i.type == 0);
+			if(!existingOrbs) {
+				// Start the fight timer
+				player.lastFought = now;
+			}
+			if(existingOrbs && existingOrbs.count == 6) {
+				output += "\nYou've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.";
+			}
+		} else {
+			searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
+			if(Math.random() < 0.05) {
+				//They found a plant!
+				let plantType = Math.floor(Math.random() % 6) + 1;
+				let plantName;
+				switch(plantType) {
+					case 1:
+						plantName = 'flower';
+						break;
+					case 2:
+						plantName = 'rose';
+						break;
+					case 3:
+						plantName = 'carrot';
+						break;
+					case 4:
+						plantName = 'bean';
+						break;
+					case 5:
+						plantName = 'sedge';
+						break;
+					case 6:
+						plantName = 'fern';
+						break;
 				}
-				if(existingOrbs && existingOrbs.count == 6) {
-					output += "\nYou've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.";
+				console.log(`${player.name} found a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+				output = `${player.name} searches the world, and finds a ${plantName}!`;
+				let existingPlants = player.items.find(i => i.type == plantType);
+				if(existingPlants && existingPlants.count >= 3) {
+					output += ` But you can't carry any more.`;
+				} else {
+					await sql.addItems(channel, player.id, plantType, 1);
 				}
 			} else {
-				searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
-				if(Math.random() < 0.05) {
-					//They found a plant!
-					let plantType = Math.floor(Math.random() % 6) + 1;
-					let plantName;
-					switch(plantType) {
-						case 1:
-							plantName = 'flower';
-							break;
-						case 2:
-							plantName = 'rose';
-							break;
-						case 3:
-							plantName = 'carrot';
-							break;
-						case 4:
-							plantName = 'bean';
-							break;
-						case 5:
-							plantName = 'sedge';
-							break;
-						case 6:
-							plantName = 'fern';
-							break;
-					}
-					console.log(`${player.name} found a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-					output = `${player.name} searches the world, and finds a ${plantName}!`;
-					let existingPlants = player.items.find(i => i.type == plantType);
-					if(existingPlants && existingPlants.count >= 3) {
-						output += ` But you can't carry any more.`;
-					} else {
-						await sql.addItems(channel, player.id, plantType, 1);
-					}
+				if(Math.random() < 0.1) {
+					// They found some junk!
+					const junkItems = [
+						'a magic orb?! ...Nope, just a coconut.',
+						"a time machine... but it's broken.",
+						"a chaos emerald. Only hedgehogs can use it.",
+						"a power star. Someone find a plumber.",
+						"a Pokémon.",
+						"a missile capacity upgrade.",
+						"a heart piece.",
+						"a clow card.",
+						"a dojo sign.",
+						"a gym badge.",
+						"a golden banana.",
+						"a korok seed. Yahaha!",
+						"the Holy Grail... wait, it's a fake.",
+						"a limited edition magic orb model.",
+						"a hotspring! Sadly, it has no healing properties.",
+						"a dinosaur egg.",
+						"a single delicious muffin.",
+						"a giant catfish.",
+						"two huge snakes."
+					];
+					let junk = junkItems[Math.floor(Math.random() * junkItems.length)];
+					console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+					output = `${player.name} searches the world, and finds ${junk}`;
 				} else {
-					if(Math.random() < 0.1) {
-						// They found some junk!
-						const junkItems = [
-							'a magic orb?! ...Nope, just a coconut.',
-							"a time machine... but it's broken.",
-							"a chaos emerald. Only hedgehogs can use it.",
-							"a power star. Someone find a plumber.",
-							"a Pokémon.",
-							"a missile capacity upgrade.",
-							"a heart piece.",
-							"a clow card.",
-							"a dojo sign.",
-							"a gym badge.",
-							"a golden banana.",
-							"a korok seed. Yahaha!",
-							"the Holy Grail... wait, it's a fake.",
-							"a limited edition magic orb model.",
-							"a hotspring! Sadly, it has no healing properties.",
-							"a dinosaur egg.",
-							"a single delicious muffin.",
-							"a giant catfish.",
-							"two huge snakes."
-						];
-						let junk = junkItems[Math.floor(Math.random() * junkItems.length)];
-						console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-						output = `${player.name} searches the world, and finds ${junk}`;
+					console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+					if(world.lostOrbs == 0) {
+						output = `${player.name} searches the world, but there are no orbs left to find.`;
 					} else {
-						console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 						output = `${player.name} searches the world, but finds nothing of value.`;
 					}
 				}
-			} 
-		} else {
-			output += `${player.name} searches the world, but there are no orbs left to find.`;
+			}
 		}
 		
 		if(!player.actionLevel) player.actionLevel = 0;
@@ -1532,7 +1634,7 @@ module.exports = {
 			let embed = new Discord.RichEmbed();
 			embed.setTitle('Status Update')
 				.setColor(0x00AE86)
-				.setDescription(messages.join(','));
+				.setDescription(messages.join('\n'));
 	
 			return {embed: embed, abort: abort};
 		} else {
@@ -1599,6 +1701,10 @@ module.exports = {
 		if(player.status.find(s => s.type == 7)) {
 			level *= 1.12;
 		}
+		// Henchmen
+		if(player.isHenchman) {
+			level *= 1.2;
+		}
 		return level;
 	},
 	readConfigBoolean(value, oldValue) {
@@ -1618,6 +1724,16 @@ module.exports = {
 				return 'her';
 			default:
 				return 'their';
+		}
+	},
+	them(pronoun) {
+		switch(pronoun) {
+			case 'he':
+				return 'him';
+			case 'she':
+				return 'her';
+			default:
+				return 'them';
 		}
 	},
 	are(pronoun) {
