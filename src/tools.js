@@ -1726,7 +1726,7 @@ module.exports = {
 				return 'their';
 		}
 	},
-	the(pronoun) {
+	them(pronoun) {
 		switch(pronoun) {
 			case 'he':
 				return 'him';
