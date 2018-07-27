@@ -607,6 +607,26 @@ module.exports = {
 					errors.push('Must specify a valid target.');
 				}
 				break;
+			case 'energize':
+				// !energize validation
+				// - Must be registered
+				// - Must be the Nemesis
+				// - Target must exist
+				// - Target must be a henchman
+				this.validatePlayerRegistered(errors, player);
+				this.validateNemesis(errors, player);
+				if(target) {
+					if(target.id == player.id) {
+						errors.push(`You cannot energize yourself.`);
+					} else {
+						if(!target.isHenchman) {
+							errors.push(`${target.name} doesn't work for you.`);
+						}
+					}
+				} else {
+					errors.push('Must specify a valid target.');
+				}
+				break;
 		}
 
 		if(errors.length > 0) {

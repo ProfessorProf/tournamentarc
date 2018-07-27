@@ -29,6 +29,10 @@ client.on('ready', () => {
 				console.log(update.embed);
 				let channel = client.channels.find(x => x.id == c);
 				channel.send({embed: update.embed});
+				if(update.pings.length > 0) {
+					let pings = update.pings.map(ping => `<@${ping}>`);
+					channel.send(pings.join(', '));
+				}
 			} else {
 				console.log('Nothing to report');
 			}
@@ -153,7 +157,7 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.exile(channel, targetName));
 			break;
 		case 'energize':
-			// TODO
+			outputMessage.print.push(await tools.energize(channel, targetName));
 			break;
 		case 'revive':
 			// TODO

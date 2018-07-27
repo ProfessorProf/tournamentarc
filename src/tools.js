@@ -85,6 +85,9 @@ module.exports = {
 					case 2:
 						statuses.push(`Training (${this.getTimeString(now - s.startTime)} so far)`);
 						break;
+					case 3:
+						statuses.push(`Energized (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
 					case 4:
 						statuses.push(`Overdriving (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
@@ -576,6 +579,7 @@ module.exports = {
 				// End the nemesis
 				nemesis.id = null;
 				nemesis.cooldown = now + 24 * hour;
+				await sql.deleteRecruitOffers(channel);
 				await sql.deleteHenchmen(nemesis.channel);
 				loser.level = this.newPowerLevel(data.heat * 0.8);
 				hours = 24;
@@ -613,7 +617,7 @@ module.exports = {
 		}
 		
 		// Award glory to the winner
-		let glory = Math.ceil(Math.min(loserLevel / this.getPowerLevelwinner * 10, 100));
+		let glory = Math.ceil(Math.min(loserLevel / winnerLevel * 10, 100));
 		if(loser.isNemesis) glory *= 3;
 		let rankUp = this.rankUp(winner.glory, glory);
 		winner.glory += glory;
@@ -746,6 +750,21 @@ module.exports = {
 		await sql.setHenchman(channel, target.id, false);
 
 		return `**${target.name}** is no longer ${nemesisPlayer.name}'s henchman!`;
+	},
+	// Power up a henchman.
+    async energize(channel, targetName) {
+		let target = await sql.getPlayer(channel, targetName);
+		let nemesis = await sql.getNemesis(channel);
+		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
+		let now = new Date().getTime();
+		
+		let increase = this.getPowerLevel(target) * .3;
+		await sql.addStatus(channel, target.id, 3, now + hour * 3);
+		nemesis.energizeTime = now + hour * 3;
+		await sql.setNemesis(channel, nemesis);
+
+		return `**${nemesisPlayer.name}** grants **${target.name}** a fragment of their mighty power!\n` +
+			`${target.name}'s power level increases by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 	},
 	// Sends a player a recruitment offer to join the Nemesis.
     async joinNemesis(channel, name) {
@@ -1617,9 +1636,10 @@ module.exports = {
 		console.log(`Update for channel ${channel}`);
 		let world = await sql.getWorld(channel);
 		let messages = [];
+		let pings = [];
 		let abort = false;
 
-		messages = messages.concat(await sql.deleteExpired(channel));
+		messages = messages.concat(await sql.deleteExpired(channel, pings));
 		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate));
 		messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
 		let ruinStatus = await this.ruinAlert(channel);
@@ -1636,9 +1656,9 @@ module.exports = {
 				.setColor(0x00AE86)
 				.setDescription(messages.join('\n'));
 	
-			return {embed: embed, abort: abort};
+			return {embed: embed, abort: abort, pings: pings};
 		} else {
-			return {embed: null, abort: false};
+			return {embed: null, abort: false, pings: []};
 		}
 	},
 	async config(channel, name, configFlag, value) {
@@ -1700,6 +1720,10 @@ module.exports = {
 		// Bean
 		if(player.status.find(s => s.type == 7)) {
 			level *= 1.12;
+		}
+		// Energized
+		if(player.status.find(s => s.type == 3)) {
+			level *= 1.3;
 		}
 		// Henchmen
 		if(player.isHenchman) {
