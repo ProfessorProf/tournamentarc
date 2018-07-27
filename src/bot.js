@@ -6,6 +6,8 @@ const validation = require('./validation.js');
 const sql = require ('./sql.js');
 const help = require('./help.js');
 
+const debugmode = false;
+
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
 
@@ -14,7 +16,13 @@ client.on('ready', () => {
 			for(let i in channels) {
 				let c = channels[i];
 				let channel = client.channels.find(x => x.id == c);
-				channel.send(`Bot online! Greetings, ${channel.name}.`);
+				if(channel) {
+					if(debugmode) {
+						channel.send(`Bot in debug mode. Only the admin can use commands.`);
+					} else {
+						channel.send(`Bot online! Greetings, ${channel.name}.`);
+					}
+				}
 			}
 		}
 	});
@@ -60,6 +68,9 @@ client.on('message', message => {
 });
 
 async function handleMessage(message) {
+	if(debugmode && message.author.username != auth.admin) {
+		return;
+	}
 	let now = new Date().getTime();
 	let name = message.author.username;
 	let args = message.content.substring(1).split(' ');
@@ -80,7 +91,7 @@ async function handleMessage(message) {
 		cmd = cmd.substring(1);
 	}
 
-	if(cmd == 'as' && name == auth.admin) {
+	if(cmd == 'as' && name == auth.admin && debugmode) {
 		name = args[0];
 		cmd = args[1].toLowerCase();
 		args = args.splice(2);
@@ -95,6 +106,11 @@ async function handleMessage(message) {
 		let duration = (endTime - now) / 1000;
 		console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 		return;
+	}
+	if(cmd == 'import') {
+		message.channel.send(`Importing data...`);
+		await tools.import();
+		outputMessage.print.push(`Complete`);
 	}
 
 	let errors = await validation.validate(channel, name, cmd, args);
@@ -199,7 +215,7 @@ async function handleMessage(message) {
 		case 'roster':
 			const output = await tools.displayRoster(channel);
 			outputMessage.print.push(`\`\`\`\n${output}\`\`\``);;
-			output.informational = true;
+			outputMessage.informational = true;
 			break;
 		case 'fuse':
 			const fusionName = args.length > 1 ? args[1] : null;
@@ -250,14 +266,6 @@ async function handleMessage(message) {
 			break;
 		case 'debug':
 			await sql.execute(args[0], args.slice(1).join(' '));
-			break;
-		case 'clone':
-			// Delete this before S3 starts
-			await sql.clone(channel, name, targetName);
-			break;
-		case 'autofight':
-			// Delete this before S3 starts
-			await sql.autofight(channel, targetName);
 			break;
 	}
 

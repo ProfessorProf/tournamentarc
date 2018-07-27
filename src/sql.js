@@ -95,7 +95,7 @@ let updatePlayerSql = `UPDATE Players SET
     AlwaysPrivate_Flag = $alwaysPrivateFlag,
     Ping_Flag = $pingFlag,
     Pronoun = $pronoun
-WHERE ID = $id`;
+WHERE ID = $id AND Channel = $channel`;
 
 let insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
 	Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Last_Active, Last_Fought, Overdrive_Count,
@@ -129,7 +129,7 @@ module.exports = {
 		}
 
 		// Make one random plant known
-		var knownPlant = Math.floor(Math.random() * 5);
+		let knownPlant = Math.floor(Math.random() * 5);
 		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE ID = $id`, {$id: knownPlant});
 		console.log(`Channel ${channel} initialized`);
 	},
@@ -283,11 +283,11 @@ module.exports = {
     async getPlayerInternal(row) {
         let offerRows = await sql.all(`SELECT o.*, p.Name FROM Offers o 
 			LEFT JOIN Players p ON o.Player_ID = p.ID
-			WHERE o.Target_ID = $id OR o.Target_ID IS NULL AND o.Player_ID <> $id`, {$id: row.ID});
+			WHERE o.Target_ID = $id OR (o.Target_ID IS NULL AND o.Player_ID <> $id AND o.Channel = $channel)`, {$id: row.ID, $channel: row.Channel});
 		let statusRows = await sql.all(`SELECT ps.*, s.Ends, s.Priority, s.Name FROM PlayerStatus ps
 			LEFT JOIN Statuses s ON s.ID = ps.Status_Id
 			WHERE Player_ID = $id`, {$id: row.ID});
-		let itemRows = await sql.all(`SELECT hi.*, i.Type_Name FROM HeldItems hi
+		let itemRows = await sql.all(`SELECT DISTINCT hi.*, i.Type_Name FROM HeldItems hi
 			LEFT JOIN Items i ON hi.Item_ID = i.ID
 			WHERE hi.Player_ID = $id`, {$id: row.ID});
 		let nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
@@ -639,7 +639,7 @@ module.exports = {
 	},
 	// Get all Players in a channel.
 	async getPlayers(channel) {
-		let rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY Name`, {$channel: channel});
+		let rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY UPPER(Name)`, {$channel: channel});
 		let players = [];
 		for(let i in rows) {
 			let row = rows[i];

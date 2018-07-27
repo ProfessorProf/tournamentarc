@@ -1,6 +1,7 @@
 const numeral = require('numeral');
 const sql = require('./sql.js');
 const Discord = require("discord.js");
+const fs = require('fs');
 const hour = (60 * 60 * 1000);
 
 module.exports = {
@@ -12,7 +13,7 @@ module.exports = {
 		return this.generatePlayerDescription(await sql.getPlayerById(id));
 	},
 	async generatePlayerDescription(player) {
-		if(! player) {
+		if(!player) {
 			console.log('Player not found');
 			return null;
 		}
@@ -268,19 +269,19 @@ module.exports = {
 			if(p.name.length > headers[0]) headers[0] = p.name.length;
 			
 			let rank = '-';
-			if(p.glory > 1000) {
+			if(p.glory >= 1000) {
 				rank = 'U';
-			} else if(p.glory > 700) {
+			} else if(p.glory >= 700) {
 				rank = 'SSS';
-			} else if(p.glory > 400) {
+			} else if(p.glory >= 400) {
 				rank = 'SS';
-			} else if(p.glory > 250) {
+			} else if(p.glory >= 250) {
 				rank = 'S';
-			} else if(p.glory > 150) {
+			} else if(p.glory >= 150) {
 				rank = 'A';
-			} else if(p.glory > 100) {
+			} else if(p.glory >= 100) {
 				rank = 'B';
-			} else if(p.glory > 50) {
+			} else if(p.glory >= 50) {
 				rank = 'C';
 			}
 			row.push(rank);
@@ -645,8 +646,8 @@ module.exports = {
 			let winnerOrbs = winner.items.find(i => i.type == 0);
 			if(loserOrbs) {
 				output += `\n${winner.name} took ${loserOrbs.count} magic orbs from ${loser.name}!`;
-				await sql.addItems(winner.id, 0, loserOrbs.count);
-				await sql.addItems(loser.id, 0, -loserOrbs.count);
+				await sql.addItems(winner.channel, winner.id, 0, loserOrbs.count);
+				await sql.addItems(loser.channel, loser.id, 0, -loserOrbs.count);
 				if(loserOrbs.count + (winnerOrbs ? winnerOrbs.count : 0) == 7) {
 					output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 				}
@@ -792,7 +793,7 @@ module.exports = {
 		await sql.setHenchman(channel, player.id, true);
 
 		// If we just hit max henchmen, delete all outstanding recruitment offers
-		let maxHenchmen = Math.floor(world.maxPopulation / 5);
+		let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
 		if(henchmen.length + 1 >= maxHenchmen) {
 			await sql.deleteRecruitOffers(channel);
 		}
@@ -880,7 +881,7 @@ module.exports = {
 		const world = await sql.getWorld(channel);
 
 		// Check to see if we're accepting an offer
-		var fusionOffer = sourcePlayer.offers.find(o => o.type == 1 && o.playerId == targetPlayer.id && fusionName == o.extra);
+		let fusionOffer = sourcePlayer.offers.find(o => o.type == 1 && o.playerId == targetPlayer.id && fusionName == o.extra);
 		if(fusionOffer) {
 			await this.completeTraining(sourcePlayer);
 			await this.completeTraining(targetPlayer);
@@ -1101,7 +1102,7 @@ module.exports = {
 				if(oldProgress < 100) {
 					plant.startTime -= time;
 					let newProgress = ((now - plant.startTime) / duration) * 100;
-					let growth = Math.ceil(newProgress - oldProgress);
+					let growth = Math.ceil((newProgress - oldProgress) * 10) / 10;
 					output += `\n${plant.name} growth increases by ${growth}%.`;
 					if(newProgress >= 100) {
 						output += ` It's ready to be picked!`;
@@ -1262,7 +1263,7 @@ module.exports = {
 		console.log(`${player.name} advanced plant research by ${Math.floor(research * 100) / 100}`);
 		let percent = Math.floor(100 * research);
 		output += `**${player.name}** researches new kinds of plants, with a rating of ${percent}%.`;
-		var oldResearchLevel = garden.researchLevel;
+		let oldResearchLevel = garden.researchLevel;
 		garden.researchLevel += research;
 		
 		if(Math.floor(oldResearchLevel) < Math.floor(garden.researchLevel)) {
@@ -1844,7 +1845,7 @@ module.exports = {
 			}
 			embed.setDescription(description);
 			
-			var output = '';
+			let output = '';
 			if(history.length > 10) history = history.slice(0, 10);
 			for(let i in history) {
 				let h = history[i];
@@ -1894,12 +1895,17 @@ module.exports = {
 		await sql.setPlayer(player);
 		await sql.setPlayer(target);
 
-		return `${player.name} sends ${this.their(player.config.pronoun)} energy, ` +
+		return `${player.name} sends ${this.their(player.config.pronoun)} energy to ${target.name}, ` +
 			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
 	},
 	async graveyard(channel) {
 		let players = await sql.getPlayers(channel);
 		let deadPlayers = players.filter(p => p.status.find(s => s.type == 0));
+		deadPlayers.sort((a, b) => {
+			let aDeath = a.status.find(s => s.type == 0);
+			let bDeath = b.status.find(s => s.type == 0);
+			return aDeath.endTime - bDeath.endTime;
+		});
 		let now = new Date().getTime();
 		let output = '';
 
@@ -1957,5 +1963,48 @@ module.exports = {
 		await sql.setPlayer(player);
 
 		return `Character ${player.name} linked to user ${username}.`;
+	},
+	async import() {
+		let now = new Date().getTime();
+		await sql.initializeGame();
+
+		let files = fs.readdirSync('./data');
+		for(let i in files) {
+			let file = files[i];
+			let contents = fs.readFileSync(`./data/${file}`, 'utf8');
+			let channel = file.substring(0, file.length - 4);
+			console.log(`Importing channel ${channel}`);
+			await sql.initializeChannel(channel);
+			let data = JSON.parse(contents);
+			// Import players
+			for(let username in data.players) {
+				let playerData = data.players[username];
+				let player = {
+					name: playerData.name,
+					username: username,
+					userId: null,
+					channel: channel,
+					glory: Math.floor(playerData.wins * 2.5),
+					level: this.newPowerLevel(0),
+					lastActive: now,
+					lastFought: now,
+					gardenTime: now - hour,
+					gardenLevel: 0,
+					actionTime: now - hour,
+					actionLevel: 0,
+					fusionId: null,
+					nemesisFlag: false,
+					fusionFlag: false,
+					wishFlag: false,
+					config: {
+						alwaysPrivate: false,
+						ping: false,
+						pronoun: 'they'
+					}
+				};
+				await sql.addPlayer(player);
+				console.log(`Successfully imported player ${player.name}`);
+			}
+		}
 	}
 }

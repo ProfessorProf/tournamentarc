@@ -53,13 +53,13 @@ Rank ??? 1000 glory
                         .addField('!water', 'Water the garden, causing all plants to advance towards being ready. Effect increases based on your gardening level.')
                         .addField('!expand', 'Increase Garden Level, raising the rate that the garden grows plants. Effect increases based on your gardening level.')
                         .addField('!research', 'Requires Rank C. Study new kinds of plants that you can add to the garden! When research reaches 100% and Garden Level is at least 3, a new plant will be discovered and Garden Level will fall by 3.')
-                        .addField('!pick plantname', "Pick a plant from the garden. If you don't include a plant name, then you'll plant a flower.")
+                        .addField('!pick plantname', "Pick a plant from the garden. If you don't include a plant name, then you'll pick the one closest to the top of the list.")
                         .addField('!use plant name', 'Use a plant on a player. You must have one in your inventory.');
                     break;
                 case 'plants':
                     output.addField('Plants', 'Enter `!help garden` for more info on growing, using and discovering plants.');
                     let plants = await sql.getKnownPlants(channel);
-                    for(var i in plants) {
+                    for(let i in plants) {
                         let p = plants[i];
                         switch(p.id) {
                             case 1:

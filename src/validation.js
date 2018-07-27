@@ -17,8 +17,8 @@ module.exports = {
 		let target = await sql.getPlayer(channel, targetName);
 		let nemesis = await sql.getNemesis(channel)
 		let garden = await sql.getGarden(channel)
-		let glory = player.glory;
-		if(player.fusionNames.length == 2) {
+		let glory = player ? player.glory : 0;
+		if(player && player.fusionNames.length == 2) {
 			glory /= 2;
 		}
 		let errors = [];
@@ -43,6 +43,9 @@ module.exports = {
 						errors.push(`There is already a character named ${player.name}.`);
 					}
 				}
+				break;
+			case 'check':
+				this.validatePlayerRegistered(errors, player);
 				break;
 			case 'fight':
 				// !fight validation rules:
@@ -281,7 +284,7 @@ module.exports = {
 					this.validateGardenTime(errors, player);
 					let knownPlants = await sql.getKnownPlants(channel);
 					let plantType = this.getPlantType(targetName, knownPlants);
-					if(plantType == -1) {
+					if(plantType == -1 && targetName) {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p).length;
@@ -335,6 +338,7 @@ module.exports = {
 						errors.push(`**${player.name}** must be at least Rank C to research new plants.`);
 					}
 				}
+				break;
 			case 'search':
 				// !search validation rules:
 				// - Must be registered
@@ -369,11 +373,15 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
-					if(glory < 50) {
-						errors.push(`**${player.name}** must be at least Rank C to send energy.`);
-					}
-					if(player.isHenchman && !target.isNemesis) {
-						errors.push('A henchman can only send energy to the Nemesis.');
+					if(target) {
+						if(glory < 50) {
+							errors.push(`**${player.name}** must be at least Rank C to send energy.`);
+						}
+						if(player.isHenchman && !target.isNemesis) {
+							errors.push('A henchman can only send energy to the Nemesis.');
+						}
+					} else {
+						errors.push('Must pick a valid target.');
 					}
 				}
 				break;
@@ -579,7 +587,7 @@ module.exports = {
 				if(target) {
 					let henchmen = await sql.getHenchmen(channel);
 					let world = await sql.getWorld(channel);
-					let maxHenchmen = Math.floor(world.maxPopulation / 5);
+					let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
 					if(henchmen.length >= maxHenchmen) {
 						errors.push("You can't recruit more henchmen.");
 					}
