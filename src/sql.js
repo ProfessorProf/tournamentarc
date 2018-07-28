@@ -344,6 +344,7 @@ module.exports = {
 		for(let i in statusRows) {
 			let s = statusRows[i];
 			player.status.push({
+				id: s.ID,
 				type: s.Status_ID,
 				name: s.Name,
 				startTime: s.StartTime,
