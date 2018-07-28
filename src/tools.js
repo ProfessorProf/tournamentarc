@@ -207,9 +207,6 @@ module.exports = {
 			let seenLevel = this.getPowerLevel(player);
 			let level = numeral(seenLevel.toPrecision(2));
 			stats += level.format('0,0');
-			if(player.status.find(s => s.type == 2)) {
-				stats += '?';
-			}
 		}
 		let training = player.status.find(s => s.type == 2);
 		if(training) {
@@ -398,13 +395,14 @@ module.exports = {
 	},
 	// End training and power up a player. Will do nothing if player is not training.
 	async completeTraining(player) {
+		let world = await sql.getWorld(player.channel);
 		const now = new Date().getTime();
 		const trainingState = player.status.find(s => s.type == 2);
 		if (! trainingState) {
 			// Not training, so no need to do anything
 			return;
 		}
-		await sql.deleteStatus(player.id, 2);
+		await sql.deleteStatus(player.channel, player.id, 2);
 		const hours = (now - trainingState.startTime) / hour;
 		if (hours > 1000) {
 			hours = 1000;
@@ -1169,7 +1167,7 @@ module.exports = {
 						await sql.deleteStatus(channel, target.id, 0);
 						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					} else {
-						await sql.setStatus(defeated);
+						await sql.setStatus(defeatedState);
 						let duration = defeatedState.endTime - now;
 						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
@@ -1213,6 +1211,9 @@ module.exports = {
 				break;
 		}
 
+		if(target && target.config.ping) {
+			output += `\n<@${target.userId}>`;
+		}
 		await sql.addItems(channel, player.id, plantItem.type, -1);
 		return output;
 	},
@@ -1578,7 +1579,7 @@ module.exports = {
 		for(let i in garden.plants) {
 			let p = garden.plants[i];
 			if(p && p.endTime > lastUpdate && p.endTime <= now) {
-				messages.push(`A ${p.type} has finished growing in the garden!`);
+				messages.push(`A ${p.name} has finished growing in the garden!`);
 			}
 		}
 
