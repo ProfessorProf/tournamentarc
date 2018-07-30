@@ -1417,6 +1417,7 @@ module.exports = {
 
 		let effectiveTime = Math.min(now - world.lastWish, hour * 72);
 		let searchModifier = effectiveTime / (hour * 72);
+		searchModifier *= 10 / Math.max(world.maxPopulation, 10)
 		let searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
 		if(player.isHenchman) searchChance *= 2;
 		if(world.lostOrbs == 0) searchChance = 0;
@@ -1574,6 +1575,7 @@ module.exports = {
 		await sql.setPlayer(player);
 
 		world.lostOrbs = 7;
+		world.lastWish = now;
 		await sql.setWorld(world);
 		
 		return output;
