@@ -330,6 +330,7 @@ module.exports = {
 		// 0 = fight
 		// 1 = fusion
 		// 2 = henchman
+		// 3 = taunt
 		for(let i in offerRows) {
 			let o = offerRows[i];
 			player.offers.push({

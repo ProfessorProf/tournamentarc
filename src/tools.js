@@ -365,6 +365,9 @@ module.exports = {
 		await sql.unfightOffers(player.id);
 		return `${player.name} no longer wants to fight anyone.`;
 	},
+	async taunt(channel, player, target) {
+
+	},
 	// Either fights a player or sends them a challenge, depending on whether or not they've issued a challenge.
     async tryFight(channel, player, target) {
 		let player1 = await sql.getPlayerByUsername(channel, player);
@@ -1585,7 +1588,7 @@ module.exports = {
 
 		return messages;
 	},
-	async updatePlayerActivity(channel, lastUpdate) {
+	async updatePlayerActivity(channel, lastUpdate, pings) {
 		let world = await sql.getWorld(channel);
 		let players = await sql.getPlayers(channel);
 		let now = new Date().getTime();
@@ -1606,9 +1609,15 @@ module.exports = {
 						messages.push(`${p.name} has gone for too long without fighting; one of their orbs vanishes.`);
 					}
 					p.lastFought += 24 * hour;
-				} else if(p.lastFought + 23 * hour < now &&
+				} else if(p.lastFought + 23 * hour <= now &&
 						  p.lastFought + 23 * hour > lastUpdate) {
-					messages.push(`If ${p.name} must fight someone in the next hour or lose an orb.`);
+					let orbs = p.items.find(i => i.type == 0);
+					if(orbs) {
+						messages.push(`${p.name} must fight someone in the next hour or lose an orb.`);
+					}
+					if(p.config.ping) {
+						pings.push(p.userId);
+					}
 				}
 			} else if(p.lastActive + 24 * hour > lastUpdate) {
 				// Player has become inactive
@@ -1659,7 +1668,7 @@ module.exports = {
 		let abort = false;
 
 		messages = messages.concat(await sql.deleteExpired(channel, pings));
-		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate));
+		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate, pings));
 		messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
 		let ruinStatus = await this.ruinAlert(channel);
 		if(ruinStatus) {

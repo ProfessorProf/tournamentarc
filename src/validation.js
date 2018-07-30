@@ -692,6 +692,42 @@ module.exports = {
 					errors.push('Must specify a valid target.');
 				}
 				break;
+			case 'taunt':
+				// !taunt validation rules:
+				// - Target must exist if specified
+				// - Player and Target must be different people
+				// - Player and Target must both be alive
+				// - Target must not have a received taunt
+				// - Player must not have a sent taunt
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					let defeated = player.status.find(s => s.type == 0);
+					if(defeated) {
+						let timeString = tools.getTimeString(defeated.endTime - now);
+						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
+					}
+					if(target) {
+						if(player.name == target.name) {
+							errors.push('You cannot taunt yourself!');
+						}
+						let targetDefeated = target.status.find(s => s.type == 0);
+						if(targetDefeated) {
+							let timeString = tools.getTimeString(targetDefeated.endTime - now);
+							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
+						}
+						let playerTaunt = player.offers.find(o => o.type == 3);
+						let targetTaunt = target.offers.find(o => o.type == 3);
+						if(playerTaunt) {
+							errors.push('You have already taunted someone.');
+						}
+						if(targetTaunt) {
+							errors.push(`${target.name} has already been taunted.`);
+						}
+					} else {
+						errors.push('Must specify a valid target.');
+					}
+				}
+				break;
 		}
 
 		if(errors.length > 0) {
