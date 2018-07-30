@@ -277,7 +277,6 @@ module.exports = {
 				// !plant validation rules:
 				// - Must not have done any gardening in past hour
 				// - Must be room in the garden for a new plant
-				// - TODO: Must be a known plant
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
