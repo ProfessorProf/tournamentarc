@@ -1889,7 +1889,7 @@ module.exports = {
 			});
 
 			if(output.length > 0) output += '\n';
-			if(h.winnerLevel * h.winnerSkill > h.loserLevel * h.loserSkill * 1.30) {
+			if(h.winnerLevel * h.winnerSkill > h.loserLevel * h.loserSkill * 1.50) {
 				// Easy victory
 				output += `${battleTime}: ${h.winnerName} easily defeated ${h.loserName}.`;
 			} else if(h.winnerLevel * h.winnerSkill < h.loserLevel * h.loserSkill * 1.10) {
