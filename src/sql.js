@@ -835,11 +835,24 @@ module.exports = {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $id`, {$id: id});
 	},
 	async getHistory(player1Id, player2Id) {
-		let history = await sql.all(`SELECT * FROM History WHERE (Winner_ID = $player1Id AND Loser_ID = $player2Id) 
-		OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time DESC`, {
-			$player1Id: player1Id,
-			$player2Id: player2Id
-		});
+		let history = [];
+		if(player2Id && player1Id != player2Id) {
+			history = await sql.all(`SELECT h.*, wp.Name AS Winner_Name, lp.Name AS Loser_Name FROM History h 
+				LEFT JOIN Players wp ON h.Winner_ID = wp.ID
+				LEFT JOIN Players lp ON h.Loser_ID = lp.ID
+				WHERE (Winner_ID = $player1Id AND Loser_ID = $player2Id) 
+				OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time DESC`, {
+				$player1Id: player1Id,
+				$player2Id: player2Id
+			});
+		} else {
+			history = await sql.all(`SELECT h.*, wp.Name AS Winner_Name, lp.Name AS Loser_Name FROM History h 
+			LEFT JOIN Players wp ON h.Winner_ID = wp.ID
+			LEFT JOIN Players lp ON h.Loser_ID = lp.ID
+			WHERE Winner_ID = $player1Id OR Loser_ID = $player1Id`, {
+				$player1Id: player1Id
+			});
+		}
 
 		if(history) {
 			return history.map(h => { return {
@@ -847,9 +860,11 @@ module.exports = {
 				winnerId: h.Winner_ID,
 				winnerLevel: h.Winner_Level,
 				winnerSkill: h.Winner_Skill,
+				winnerName: h.Winner_Name,
 				loserId: h.Loser_ID,
 				loserLevel: h.Loser_Level,
-				loserSkill: h.Loser_Skill
+				loserSkill: h.Loser_Skill,
+				loserName: h.Loser_Name
 			}});
 		} else {
 			return [];
