@@ -29,21 +29,27 @@ client.on('ready', () => {
 	
     setInterval(async function() {
 		let channels = await sql.getChannels();
+		let updated = false;
 		for(let i in channels) {
 			let c = channels[i];
 			
 			let update = await tools.updateWorld(c);
 			if(update.embed) {
-				console.log(update.embed);
+				updated = true;
 				let channel = client.channels.find(x => x.id == c);
-				channel.send({embed: update.embed});
+				if(channel) {
+					channel.send({embed: update.embed});
+				} else {
+					console.log(`Unrecognized channel ${c}`);
+				}
 				if(update.pings.length > 0) {
 					let pings = update.pings.map(ping => `<@${ping}>`);
 					channel.send(pings.join(', '));
 				}
-			} else {
-				console.log('Nothing to report');
 			}
+		}
+		if(!updated) {
+			console.log('Nothing to report');
 		}
     }, 60000);
 });
@@ -113,6 +119,12 @@ async function handleMessage(message) {
 		outputMessage.print.push(`Complete`);
 	}
 
+	let update = await tools.updateWorld(channel);
+	if(update.embed) { 
+		message.channel.send({embed: update.embed});
+	}
+	if(update.abort) return;
+	
 	let errors = await validation.validate(channel, name, cmd, args);
 	if(errors) {
 		message.channel.send({embed: {
@@ -121,12 +133,6 @@ async function handleMessage(message) {
 		}});
 		return;
 	}
-	
-	let update = await tools.updateWorld(channel);
-	if(update.embed) { 
-		message.channel.send({embed: update.embed});
-	}
-	if(update.abort) return;
 	
 	let targetName = args[0];
 	switch(cmd) {
