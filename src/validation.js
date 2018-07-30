@@ -506,6 +506,9 @@ module.exports = {
 					if(player.wishFlag) {
 						errors.push("You can only wish upon the orbs once per season.");
 					}
+					if(player.fusionFlag) {
+						errors.push("Fusions can't wish.");
+					}
 					if(args.length > 0) {
 						let wish = args[0].toLowerCase();
 						switch(wish) {
