@@ -166,14 +166,21 @@ module.exports = {
 				break;
 			case 'reset':
 				// !reset validation rules:
-				// - Must be Prof
+				// - Must be admin
 				if(player.name != auth.admin) {
 					errors.push('Only the game master can reset the world.');
 				}
 				break;
 			case 'debug':
 				// !debug validation rules:
-				// - Must be Prof
+				// - Must be admin
+				if(name != auth.admin) {
+					errors.push('Only the game master can use debug commands.');
+				}
+				break;
+			case 'clone':
+				// !debug validation rules:
+				// - Must be admin
 				if(name != auth.admin) {
 					errors.push('Only the game master can use debug commands.');
 				}

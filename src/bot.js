@@ -273,6 +273,9 @@ async function handleMessage(message) {
 		case 'debug':
 			await sql.execute(args[0], args.slice(1).join(' '));
 			break;
+		case 'clone':
+			await sql.clone(channel, name, targetName);
+			break;
 	}
 
 	if(outputMessage.informational) {

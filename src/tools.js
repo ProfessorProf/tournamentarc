@@ -1902,6 +1902,9 @@ module.exports = {
 		player.level -= transfer;
 		target.level += transfer;
 
+		let output = `${player.name} sends ${this.their(player.config.pronoun)} energy to ${target.name}, ` +
+			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
+		
 		if(!player.actionLevel) player.actionLevel = 0;
 		let oldActionLevel = Math.floor(player.actionLevel);
 		player.actionLevel += 1 / (1 + player.actionLevel);
@@ -1914,8 +1917,7 @@ module.exports = {
 		await sql.setPlayer(player);
 		await sql.setPlayer(target);
 
-		return `${player.name} sends ${this.their(player.config.pronoun)} energy to ${target.name}, ` +
-			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
+		return output;
 	},
 	async graveyard(channel) {
 		let players = await sql.getPlayers(channel);
