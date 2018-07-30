@@ -16,7 +16,7 @@ client.on('ready', () => {
 			for(let i in channels) {
 				let c = channels[i];
 				let channel = client.channels.find(x => x.id == c);
-				if(channel) {
+				if(channel && channel.name == auth.channel) {
 					if(debugmode) {
 						channel.send(`Bot in debug mode. Only the admin can use commands.`);
 					} else {

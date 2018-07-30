@@ -2,8 +2,6 @@ const Discord = require("discord.js");
 const sql = require('./sql.js');
 
 // Logic for displaying help topics.
-// TODO: Add help data for plants, actions, fusion, nemesis, henchmen, wish, tournament
-// TODO: Update rank help for Glory mechanics
 module.exports = {
     async showHelp(channel, topic) {
         let output = new Discord.RichEmbed();

@@ -1204,8 +1204,17 @@ module.exports = {
 				break;
 			case 5:
 				// Sedge
-				output = await this.water(channel, null, 2.2 * hour);
-				// TODO: Increase garden level
+				output = await this.water(channel, null, 2.3 * hour);
+				let garden = await sql.getGarden(channel);
+				let expansion = (Math.random() * 15 + 15) * 10 / (100 * (3 + garden.growthLevel));
+				let percent = Math.floor(1000 * expansion) / 10;
+				console.log(`Sedge advanced garden level by ${percent}%`);
+				output += `\nThe garden's growth level increases with a rating of ${percent}%.`;
+				garden.growthLevel += expansion;
+				let gardenEfficiency = 1 + 0.1 * garden.growthLevel;
+				let rate = Math.floor(1000 / gardenEfficiency) / 10;
+				output += `\nYour plants now take ${rate}% the usual time to grow.`;
+				await sql.setGarden(garden);
 				break;
 			case 6:
 				// Fern
