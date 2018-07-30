@@ -179,7 +179,7 @@ module.exports = {
 				}
 				break;
 			case 'clone':
-				// !debug validation rules:
+				// !clone validation rules:
 				// - Must be admin
 				if(name != auth.admin) {
 					errors.push('Only the game master can use debug commands.');
@@ -571,14 +571,8 @@ module.exports = {
 				// - Must be registered
 				// - Must specify a valid target
 				this.validatePlayerRegistered(errors, player);
-				if(player) {
-					if(target) {
-						if(player.name == target.name) {
-							errors.push('When you fight yourself, you lose every time.');
-						}
-					} else {
-						errors.push('Must specify a valid target.');
-					}
+				if(player && targetName && !target) {
+					errors.push('Must specify a valid target.');
 				}
 				break;
 			case 'recruit':

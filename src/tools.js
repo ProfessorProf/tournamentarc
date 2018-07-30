@@ -1835,60 +1835,72 @@ module.exports = {
 	async history(channel, name1, name2) {
 		let player1 = await sql.getPlayerByUsername(channel, name1);
 		let player2 = await sql.getPlayer(channel, name2);
-		let history = await sql.getHistory(player1.id, player2.id);
+		let history = await sql.getHistory(player1.id, player2 ? player2.id : null);
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
+		let twoPlayers = player2 && player2.id != player1.id;
 
-		embed.setTitle(`${player1.name} VS ${player2.name} Battle History`)
-			.setColor(0x00AE86);
-		
-		if(history.length == 0) {
-			embed.setDescription(`${player1.name} and ${player2.name} have never fought.`);
+		if(twoPlayers) {
+			embed.setTitle(`${player1.name} VS ${player2.name} Battle History`);
 		} else {
-			let player1wins = history.filter(h => h.winnerId == player1.id).length;
-			let player2wins = history.filter(h => h.winnerId == player2.id).length;
-			let description = '';
-			if(player1wins > 1) {
-				description += `${player1.name} has beaten ${player2.name} ${player1wins} times.\n`;
-			} else if(player1wins == 1) {
-				description += `${player1.name} has beaten ${player2.name} once.\n`;
+			embed.setTitle(`${player1.name} Battle History`);
+		}
+		embed.setColor(0x00AE86);
+		
+		let description = '';
+		if(twoPlayers) {
+			if(history.length == 0) {
+				embed.setDescription(`${player1.name} and ${player2.name} have never fought.`);
 			} else {
-				description += `${player1.name} has never beaten ${player2.name}.\n`;
-			}
-			if(player2wins > 1) {
-				description += `${player2.name} has beaten ${player1.name} ${player2wins} times.`;
-			} else if(player2wins == 1) {
-				description += `${player2.name} has beaten ${player1.name} once.`;
-			} else {
-				description += `${player2.name} has never beaten ${player1.name}.`;
-			}
-			embed.setDescription(description);
-			
-			let output = '';
-			if(history.length > 10) history = history.slice(0, 10);
-			for(let i in history) {
-				let h = history[i];
-				let battleTime = new Date(h.battleTime).toDateString('en-US', {
-					month: 'numeric',
-					day: 'numeric'
-				});
-				let winnerName = player1.id == h.winnerId ? player1.name : player2.name;
-				let loserName = player1.id == h.loserId ? player1.name : player2.name;
-
-				if(output.length > 0) output += '\n';
-				if(h.winnerLevel * h.winnerSkill > h.loserLevel * h.loserSkill* 1.30) {
-					// Easy victory
-					output += `${battleTime}: ${winnerName} easily defeated ${loserName}.`;
-				} else if(h.winnerLevel * h.winnerSkill < h.loserLevel * h.loserSkill * 1.10) {
-					// Narrow victory
-					output += `${battleTime}: ${winnerName} narrowly defeated ${loserName}.`;
+				let player1wins = history.filter(h => h.winnerId == player1.id).length;
+				let player2wins = history.filter(h => h.winnerId == player2.id).length;
+				if(player1wins > 1) {
+					description += `${player1.name} has beaten ${player2.name} ${player1wins} times.\n`;
+				} else if(player1wins == 1) {
+					description += `${player1.name} has beaten ${player2.name} once.\n`;
 				} else {
-					// Normal fight
-					output += `${battleTime}: ${winnerName} defeated ${loserName}.`;
+					description += `${player1.name} has never beaten ${player2.name}.\n`;
+				}
+				if(player2wins > 1) {
+					description += `${player2.name} has beaten ${player1.name} ${player2wins} times.\n`;
+				} else if(player2wins == 1) {
+					description += `${player2.name} has beaten ${player1.name} once.\n`;
+				} else {
+					description += `${player2.name} has never beaten ${player1.name}.\n`;
 				}
 			}
-			embed.addField(`Last ${history.length} Fights`, output);
+		} else {
+			if(history.length == 0) {
+				embed.setDescription(`${player1.name} has never fought.`);
+			} else {
+				let player1wins = history.filter(h => h.winnerId == player1.id).length;
+				let player1losses = history.length - player1wins;
+				description += `${player1.name} has won ${player1wins} ${player1wins == 1 ? 'time' : 'times'} and lost ${player1losses} ${player1losses == 1 ? 'time' : 'times'}.\n`;
+			}
 		}
+		embed.setDescription(description);
+
+		let output = '';
+		if(history.length > 20) history = history.slice(0, 20);
+		for(let i in history) {
+			let h = history[i];
+			let battleTime = new Date(h.battleTime).toDateString('en-US', {
+				month: 'numeric',
+				day: 'numeric'
+			});
+
+			if(output.length > 0) output += '\n';
+			if(h.winnerLevel * h.winnerSkill > h.loserLevel * h.loserSkill * 1.30) {
+				// Easy victory
+				output += `${battleTime}: ${h.winnerName} easily defeated ${h.loserName}.`;
+			} else if(h.winnerLevel * h.winnerSkill < h.loserLevel * h.loserSkill * 1.10) {
+				// Narrow victory
+				output += `${battleTime}: ${h.winnerName} narrowly defeated ${h.loserName}.`;
+			} else {
+				// Normal fight
+				output += `${battleTime}: ${h.winnerName} defeated ${h.loserName}.`;
+			}
+		}
+		embed.addField(`Last ${history.length} ${history.length == 1 ? 'fight' : 'fights'}`, output);
 
 		return embed;
 	},
