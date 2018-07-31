@@ -1630,14 +1630,19 @@ module.exports = {
 						pings.push(p.userId);
 					}
 				}
+				if(p.lastActive + 23 * hour < now &&
+				   p.lastActive + 23 * hour > lastUpdate) {
+					messages.push(`${p.name} will idle out in 1 hour.`);
+				}
 			} else if(p.lastActive + 24 * hour > lastUpdate) {
 				// Player has become inactive
 				let orbs = p.items.find(i => i.type == 0);
 				if(orbs) {
+					console.log(`${p.name} logged idle; last activity recorded at ${new Date(p.lastActive).toLocaleString('en-US')}`);
 					await sql.addItems(channel, p.id, 0, -orbs.count);
 					world.lostOrbs += orbs.count;
 					messages.push(`${p.name} has been idle for too long; ` + 
-						`${this.their(p.config.pronoun)} ${orbs} ${orbs > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
+						`${this.their(p.config.pronoun)} ${orbs.count} ${orbs.count > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
 				}
 			}
 		}
@@ -1885,22 +1890,14 @@ module.exports = {
 		if(history.length > 20) history = history.slice(0, 20);
 		for(let i in history) {
 			let h = history[i];
-			let battleTime = new Date(h.battleTime).toDateString('en-US', {
-				month: 'numeric',
-				day: 'numeric'
-			});
+			let battleTime = new Date(h.battleTime).toLocaleString('en-US');
 
 			if(output.length > 0) output += '\n';
-			if(h.winnerLevel * h.winnerSkill > h.loserLevel * h.loserSkill * 1.50) {
-				// Easy victory
-				output += `${battleTime}: ${h.winnerName} easily defeated ${h.loserName}.`;
-			} else if(h.winnerLevel * h.winnerSkill < h.loserLevel * h.loserSkill * 1.10) {
-				// Narrow victory
-				output += `${battleTime}: ${h.winnerName} narrowly defeated ${h.loserName}.`;
-			} else {
-				// Normal fight
-				output += `${battleTime}: ${h.winnerName} defeated ${h.loserName}.`;
-			}
+
+			let loserRating = Math.sqrt(h.loserLevel * h.loserSkill);
+			let winnerRating = Math.sqrt(h.winnerLevel * h.winnerSkill);
+
+			output += `${battleTime}: ${h.winnerName} defeated ${h.loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
 		}
 		embed.addField(`Last ${history.length} ${history.length == 1 ? 'fight' : 'fights'}`, output);
 

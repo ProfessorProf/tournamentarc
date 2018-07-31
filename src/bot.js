@@ -6,8 +6,13 @@ const validation = require('./validation.js');
 const sql = require ('./sql.js');
 const help = require('./help.js');
 
-const debugmode = false;
-
+let debugmode = false;
+process.argv.forEach((val, index) => {
+	if(val == '--debug') {
+		debugmode = true;
+	}
+});
+  
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
 
@@ -52,6 +57,13 @@ client.on('ready', () => {
 			console.log('Nothing to report');
 		}
     }, 60000);
+});
+
+client.on('disconnect', function(msg, code) {
+	let now = new Date();
+	console.log(`Disconnected at ${now.toLocaleString("en-US")}`);
+	if (code === 0) return console.error(msg);
+	bot.connect();
 });
 
 client.on('error', (e) => {
@@ -106,11 +118,11 @@ async function handleMessage(message) {
 	if(cmd == 'init' ) {
 		message.channel.send('Beginning initialization...');
 		await sql.initializeGame()
-		await sql.initializeChannel(message.channel.id);
+		await sql.initializeChannel(channel);
 		message.channel.send('Initialization complete.');
 		let endTime = new Date().getTime();
 		let duration = (endTime - now) / 1000;
-		console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
+		console.log(`${channel}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 		return;
 	}
 	if(cmd == 'import') {
@@ -303,9 +315,9 @@ async function handleMessage(message) {
 		}
 	}
 	await sql.playerActivity(channel, name);
-	let endTime = new Date().getTime();
-	let duration = (endTime - now) / 1000;
-	console.log(`${message.channel.id}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
+	let endTime = new Date();
+	let duration = (endTime.getTime() - now) / 1000;
+	console.log(`(${channel}) ${endTime.toLocaleString("en-US")}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 }
 
 client.login(auth.token);
