@@ -1,3 +1,4 @@
+const enums = require('./enum.js');
 const numeral = require('numeral');
 const sql = require('./sql.js');
 const Discord = require("discord.js");
@@ -55,12 +56,12 @@ module.exports = {
 		
 		stats += 'Power Level: '
 		
-		if(player.status.find(s => s.type == 8)) {
+		if(player.status.find(s => s.type == enums.StatusTypes.Fern)) {
 			stats += 'Unknown';
 		} else {
 			let level = this.getPowerLevel(player);
 			stats += numeral(level.toPrecision(2)).format('0,0');
-			if(player.status.find(s => s.type == 2)) {
+			if(player.status.find(s => s.type == enums.StatusTypes.Training)) {
 				stats += '?';
 			}
 		}
@@ -160,18 +161,21 @@ module.exports = {
 			let o = player.offers[i];
 			if(o.expires > now) {
 				switch(o.type) {
-					case 0:
+					case enums.OfferTypes.Fight:
 						offers.push(`${o.name} wants to \`!fight\` ${o.targetId ? 'you' : 'anyone'} (expires in ${this.getTimeString(o.expires - now)})`);
 						break;
-					case 1:
+					case enums.OfferTypes.Fusion:
 						offers.push(`${o.name} wants to \`!fuse\` with you (expires in ${this.getTimeString(o.expires - now)})`);
 						break;
-					case 2:
+					case enums.OfferTypes.Recruit:
 						if(o.targetId) {
 							offers.push(`${o.name} wants you to \`!join\` them (expires in ${this.getTimeString(o.expires - now)})`);
 						} else {
 							offers.push(`${o.name} wants someone to \`!join\` them (expires in ${this.getTimeString(o.expires - now)})`);
 						}
+						break;
+					case enums.OfferTypes.Taunt:
+						offers.push(`${o.name} taunted you to \`!fight\` them (expires in ${this.getTimeString(o.expires - now)})`);
 						break;
 				}
 			}
@@ -201,18 +205,36 @@ module.exports = {
 		}
 		
 		stats = 'Power Level: '
-		if(player.status.find(s => s.type == 8)) {
+		let training = player.status.find(s => s.type == enums.StatusTypes.Training);
+		let trainingTime = now - (training ? training.startTime : 0);
+		if(player.status.find(s => s.type == enums.StatusTypes.Fern)) {
 			stats += 'Unknown';
 		} else {
 			let seenLevel = this.getPowerLevel(player);
+			if(training) {
+				// Estimate post-training power level
+				let world = await sql.getWorld(player.channel);
+				const hours = trainingTime / hour;
+				if (hours > 72) {
+					hours = 72;
+				}
+				const newPowerLevel = Math.pow(100, 1 + (world.heat + hours) / 1200);
+				if (this.isFusion(player)) {
+					newPowerLevel *= 1.3;
+				}
+				if (player.status.find(s => s.type == 10)) {
+					newPowerLevel *= 1.5;
+				}
+				if (hours <= 16) {
+					seenLevel += newPowerLevel * (hours / 16);
+				} else {
+					seenLevel += newPowerLevel * (1 + 0.01 * (hours / 16));
+				}
+			}
 			let level = numeral(seenLevel.toPrecision(2));
 			stats += level.format('0,0');
 		}
-		let training = player.status.find(s => s.type == 2);
 		if(training) {
-			stats += '?';
-
-			let trainingTime = now - training.startTime;
 			stats += `\nTraining for ${this.getTimeString(trainingTime)}`;
 		}
 		embed.addField('Stats', stats);
@@ -424,6 +446,8 @@ module.exports = {
 		} else {
 			player.level += newPowerLevel * (1 + 0.01 * (hours / 16));
 		}
+
+		await sql.setWorld(world);
 	},
 	// Fight between two players.
     async fight(player1, player2, embed) {
@@ -1046,27 +1070,8 @@ module.exports = {
 			plantName = 'flower';
 		}
 
-		let plantId = -1;
-		switch(plantName.toLowerCase()) {
-			case 'flower':
-				plantId = 1;
-				break;
-			case 'rose':
-				plantId = 2;
-				break;
-			case 'carrot':
-				plantId = 3;
-				break;
-			case 'bean':
-				plantId = 4;
-				break;
-			case 'sedge':
-				plantId = 5;
-				break;
-			case 'fern':
-				plantId = 6;
-				break;
-		}
+		let plantId = Object.values(enums.ItemTypes).find(t => enums.ItemTypes.Name[t] == plantName.toLowerCase());
+		if(!plantId) plantId = -1;
 		if(plantId == -1) {
 			return;
 		}
@@ -1161,7 +1166,7 @@ module.exports = {
 		let output = '';
 		let defeatedState;
 		switch(plantItem.type) {
-			case 1:
+			case enums.ItemTypes.Flower:
 				// Flower
 				defeatedState = target.status.find(s => s.type == 0);
 				if(defeatedState) {
@@ -1677,7 +1682,6 @@ module.exports = {
 	},
 	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
 	async updateWorld(channel) {
-		console.log(`Update for channel ${channel}`);
 		let world = await sql.getWorld(channel);
 		let messages = [];
 		let pings = [];
