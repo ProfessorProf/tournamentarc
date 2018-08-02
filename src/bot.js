@@ -16,7 +16,8 @@ process.argv.forEach((val, index) => {
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
 
-	sql.getChannels().then(channels => {;
+	sql.getChannels().then(async channels => {;
+		let now = new Date().getTime();
 		if(channels.length > 0) {
 			for(let i in channels) {
 				let c = channels[i];
@@ -27,6 +28,14 @@ client.on('ready', () => {
 					} else {
 						channel.send(`Bot online! Greetings, ${channel.name}.`);
 					}
+
+					let world = await sql.getWorld(c);
+					let downtime = now - world.lastUpdate
+					console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
+					if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
+						await sql.fastForward(c, downtime);
+						channel.send(`Bot was offline for about ${tools.getTimeString(downtime)}.`);
+					}
 				}
 			}
 		}
@@ -34,13 +43,13 @@ client.on('ready', () => {
 	
     setInterval(async function() {
 		let channels = await sql.getChannels();
-		let updated = false;
+		let updatedChannels = [];
 		for(let i in channels) {
 			let c = channels[i];
 			
 			let update = await tools.updateWorld(c);
 			if(update.embed) {
-				updated = true;
+				updatedChannels.push(c);
 				let channel = client.channels.find(x => x.id == c);
 				if(channel) {
 					channel.send({embed: update.embed});
@@ -53,8 +62,9 @@ client.on('ready', () => {
 				}
 			}
 		}
-		if(!updated) {
-			console.log('Nothing to report');
+		let now = new Date();
+		if(updatedChannels.length > 0) {
+			console.log(`${now.toLocaleString('en-US')}: Update completed for channels ${updatedChannels.join(', ')}`);
 		}
     }, 60000);
 });

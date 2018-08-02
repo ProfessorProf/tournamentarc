@@ -1,5 +1,5 @@
+const enums = require('./enum.js');
 const sql = require ('sqlite');
-const Discord = require('discord.js');
 const numeral = require('numeral');
 sql.open('./data.sqlite');
 
@@ -47,7 +47,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS Tournaments_Channel ON Tournaments(Channel);
 CREATE UNIQUE INDEX IF NOT EXISTS TournamentPlayers_ChannelPlayer ON TournamentPlayers(Channel, Player_ID)
 `
 
-let newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
+const newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
 DELETE FROM Gardens WHERE Channel = $channel;
 DELETE FROM Items WHERE Channel = $channel;
 INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish) VALUES ($channel, 0, 0, 0, 7, 0);
@@ -73,7 +73,7 @@ INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (11, "Immortal
 INSERT OR REPLACE INTO Statuses (ID, Name, Ends, Priority) VALUES (12, "Berserk", 1, 250);
 INSERT OR REPLACE INTO Gardens (Channel) VALUES ($channel)`;
 
-let updatePlayerSql = `UPDATE Players SET
+const updatePlayerSql = `UPDATE Players SET
     Username = $username, 
 	Name = $name,
 	User_ID = $userId,
@@ -97,13 +97,13 @@ let updatePlayerSql = `UPDATE Players SET
     Pronoun = $pronoun
 WHERE ID = $id AND Channel = $channel`;
 
-let insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
+const insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
 	Action_Level, Action_Time, Garden_Level, Garden_Time, Glory, Last_Active, Last_Fought, Overdrive_Count,
 	Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC_Flag, AlwaysPrivate_Flag, Ping_Flag, Pronoun) 
 VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $actionTime, $gardenLevel, $gardenTime, $glory, 
 	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npcFlag, $alwaysPrivate, $ping, $pronoun)`;
 
-let updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
+const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
 (Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Burn_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
 VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $burnTime, $ruinTime, $basePower, $cooldown)`;
 
@@ -669,7 +669,9 @@ module.exports = {
 	// Delete all expired offers and statuses, and message the channel accordingly.
 	async deleteExpired(channel, pings) {
 		let now = new Date().getTime();
-		let offerRows = await sql.all(`SELECT * FROM Offers WHERE Channel = $channel AND Expires < $now`, {$channel: channel, $now: now});
+		let offerRows = await sql.all(`SELECT o.*, p.Last_Active FROM Offers o
+			LEFT JOIN Players p ON p.ID = o.Player_ID
+			WHERE o.Channel = $channel AND Expires < $now`, {$channel: channel, $now: now});
 		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.User_ID, p.Ping_Flag, p.Power_Level FROM PlayerStatus ps
 			LEFT JOIN Players p ON p.ID = ps.Player_ID
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
@@ -766,15 +768,21 @@ module.exports = {
 					break;
 			}
 		}
+		let offerIds = []
 		for(let i in offerRows) {
-			// React to offers ending
+			let offer = offerRows[i];
+			if(offer.Last_Active + hour < now && offer.Last_Active + 24 * hour > now) {
+				// The player is idle, but not SUPER idle - stall their offer timers
+				await sql.run(`UPDATE Offers SET Expires = $now WHERE ID = $id`, {$now: now, $id: offer.ID});
+			} else {
+				offerIds.push(offer.ID);
+			}
 		}
 		
 		// Delete 'em
-		let offerIds = offerRows.map(row => row.ID).join(',');
-		let statusIds = statusRows.map(row => row.ID).join(',');
-		await sql.run(`DELETE FROM Offers WHERE ID IN (${offerIds})`);
-		await sql.run(`DELETE FROM PlayerStatus WHERE ID IN (${statusIds})`);
+		let statusIds = statusRows.map(row => row.ID);
+		await sql.run(`DELETE FROM Offers WHERE ID IN (${offerIds.join(',')})`);
+		await sql.run(`DELETE FROM PlayerStatus WHERE ID IN (${statusIds.join(',')})`);
 
 		return messages;
 	},
@@ -792,8 +800,7 @@ module.exports = {
 		});
 	},
 	async resetWorld(channel) {
-		let row = await sql.get(`SELECT Channel, Resets FROM Worlds WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = $resets WHERE Channel = $channel`, {$channel: channel, $resets: row.Resets + 1});
+		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = Resets + 1 WHERE Channel = $channel`, {$channel: channel, $resets: row.Resets + 1});
 		await sql.run(`UPDATE Gardens SET Plant1_ID = 0, Plant2_ID = 0, Plant3_ID = 0, Garden_Level = 0, Research_Level = 0 
 			WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM PlayerStatus WHERE Channel = $channel`, {$channel: channel});
@@ -804,6 +811,7 @@ module.exports = {
 		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournament_Players WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournament_Brackets WHERE Channel = $channel`, {$channel: channel});
+		// TODO: Reset known plants
 	},
 	async clone(channel, name, targetName) {
 		let player = await this.getPlayerByUsername(channel, name);
@@ -916,5 +924,26 @@ module.exports = {
 	},
 	async recordHenchmanDefeat(channel, playerId) {
 		return await sql.all(`UPDATE Henchmen SET Defeats = Defeats + 1 WHERE Channel = $channel AND Player_ID = $id`, {$channel: channel, $id: playerId});
+	},
+	async fastForward(channel, time) {
+		await sql.run(`UPDATE Worlds SET Last_Update = Last_Update + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
+		await sql.run(`UPDATE Players SET Action_Time = Action_Time + $time, Garden_Time = Garden_Time + $time,
+			Last_Active = Last_Active + $channel, Last_Fought = Last_Fought + $channel
+			WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
+		await sql.run(`UPDATE PlayerStatus SET StartTime = StartTime + $time, EndTime = EndTime + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
+		await sql.run(`UPDATE Offers SET Expires = Expires + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
+		await sql.run(`UPDATE Plants SET StartTime = StartTime + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
+		await sql.run(`UPDATE Nemesis SET Nemesis_Time = Nemesis_Time + $time, Attack_Time = Attack_Time + $time,
+			Destroy_Time = Destroy_Time + $time, Energize_Time = Energize_Time + $time, Revive_Time = Revive_Time + $time,
+			Burn_Time = Burn_Time + $time, Ruin_Time = Ruin_Time + $time, Nemesis_Cooldown = Nemesis_Cooldown + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
+		await sql.run(`UPDATE Tournaments SET Round_Time = Round_Time + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
 	}
+	
 }

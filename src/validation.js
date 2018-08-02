@@ -244,14 +244,14 @@ module.exports = {
 										case 1:
 										case 2:
 											if(!targetDefeated) {
-												errors.push('**' + target.name + '** is already healthy.');
+												errors.push(`**${target.name}** is already healthy.`);
 											}
 											break;
-										case 3:
 										case 4:
 										case 6:
 											if(targetDefeated) {
-												errors.push('**' + target.name + '** cannot eat that for another ' + timeString + '.');
+												let timeString = tools.getTimeString(targetDefeated.endTime - now);
+												errors.push(`**${target.name}** cannot eat that for another ${timeString}.`);
 											}
 											break;
 									}
