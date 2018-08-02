@@ -17,6 +17,7 @@ module.exports = {
                 .addField('!graveyard', "Displays all currently-defeated players.")
                 .addField('!history name', 'Displays your battle history with another player.')
                 .addField('!fight name', "Challenge someone else to a fight! If they fight you back, you will  clash in a battle of power levels. If you don't include a name, you will send an open challenge to the whole channel to fight.")
+                .addField('!taunt name', "Like `!fight`, but if they refuse to fight, they'll lose Glory. Be careful, though - if you lose, you'll lose Glory instead!")
                 .addField('!unfight', 'Cancel all your outgoing challenges.')
                 .addField('!train', "Begin training! You must lose a fight before you can train. The longer you train, the bigger the jump in power - but after a point, there will be diminishing returns, and after 48 hours, training doesn't help at all. Train hard, and you can always catch up with the strongest fighters!")
                 .addField('!help topic', 'Learn more about specific topics.')

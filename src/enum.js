@@ -42,5 +42,10 @@ module.exports = {
         PowerWish: 10,
         ImmortalityWish: 11,
         Berserk: 12
+    },
+    NemesisTypes: {
+        Basic: 0,
+        FirstForm: 1,
+        FinalForm: 2
     }
 }

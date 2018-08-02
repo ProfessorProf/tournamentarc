@@ -671,7 +671,7 @@ module.exports = {
 		let now = new Date().getTime();
 		let offerRows = await sql.all(`SELECT o.*, p.Last_Active FROM Offers o
 			LEFT JOIN Players p ON p.ID = o.Player_ID
-			WHERE o.Channel = $channel AND Expires < $now`, {$channel: channel, $now: now});
+			WHERE o.Channel = $channel AND Expires < $fivemins`, {$channel: channel, $fivemins: now - (5 * 60 * 1000)});
 		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.User_ID, p.Ping_Flag, p.Power_Level FROM PlayerStatus ps
 			LEFT JOIN Players p ON p.ID = ps.Player_ID
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
@@ -682,30 +682,30 @@ module.exports = {
 			let status = statusRows[i];
 			let decrease;
 			switch(status.Status_ID) {
-				case 0:
+				case enums.StatusTypes.Dead:
 				    // Death
 					messages.push(`**${status.Name}** is ready to fight.`);
-					await this.addStatus(channel, status.Player_ID, 5);
+					await this.addStatus(channel, status.Player_ID, enums.StatusTypes.Ready);
 					if(pings && status.Ping_Flag) pings.push(status.User_ID);
 					break;
-				case 3:
+				case enums.StatusTypes.Energized:
 					// Energize
 					decrease = status.Power_Level - status.Power_Level / 1.3;
 					messages.push(`**${status.Name}** is no longer energized; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
-				case 4: 
+				case enums.StatusTypes.Overdrive: 
 					// Overdrive - reduce power level
 					decrease = status.Power_Level * 0.1;
 					let powerLevel = status.Power_Level - decrease;
 					await sql.run(`UPDATE Players SET Power_Level = $level WHERE ID = $id`, {$id: status.Player_ID, $level: powerLevel});
 					messages.push(`**${status.Name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
-				case 7: 
+				case enums.StatusTypes.Bean: 
 					// Bean
 					decrease = status.Power_Level - status.Power_Level / 1.12;
 					messages.push(`**${status.Name}** is no longer bean boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
-				case 9:
+				case enums.StatusTypes.Fused:
 					// Fusion
 					const fusedCharacter = await this.getPlayerById(status.Player_ID);
 					const fusedPlayer1 = await this.getPlayerById(fusedCharacter.fusionIDs[0]);
@@ -761,8 +761,7 @@ module.exports = {
 						pings.push(fusedPlayer2.userId);
 					}
 					break;
-				
-				case 12:
+				case enums.StatusTypes.Berserk:
 				    // Berserk
 					messages.push(`**${status.Name}** calms down from their battle frenzy.`);
 					break;
@@ -774,7 +773,17 @@ module.exports = {
 			if(offer.Last_Active + hour < now && offer.Last_Active + 24 * hour > now) {
 				// The player is idle, but not SUPER idle - stall their offer timers
 				await sql.run(`UPDATE Offers SET Expires = $now WHERE ID = $id`, {$now: now, $id: offer.ID});
-			} else {
+			} else if(offer.Expires < now) {
+				switch(offer.Type) {
+					case enums.OfferTypes.Taunt:
+						// Failed taunt - reduce their Glory
+						let player = await this.getPlayerById(offer.Player_ID);
+						let target = await this.getPlayerById(offer.Target_ID);
+						let glory = Math.ceil(Math.min(Math.min(target.level / player.level * 5, 50)), target.glory);
+						target.glory -= glory;
+						messages.push(`**${target.name}** failed to respond to **${player.name}**; Glory -${glory}.`);
+						break;
+				}
 				offerIds.push(offer.ID);
 			}
 		}
@@ -821,7 +830,7 @@ module.exports = {
 	},
 	async autofight(channel, targetName) {
 		let player = await this.getPlayer(channel, targetName);
-		await this.addOffer(player, null, 0);
+		await this.addOffer(player, null, enums.OfferTypes.Fight);
 	},
 	async getChannels() {
 		let initialized = await sql.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Worlds'`);
@@ -945,5 +954,4 @@ module.exports = {
 		await sql.run(`UPDATE Tournaments SET Round_Time = Round_Time + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
 	}
-	
 }

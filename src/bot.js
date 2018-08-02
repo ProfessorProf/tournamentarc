@@ -279,7 +279,11 @@ async function handleMessage(message) {
 			outputMessage.informational = true;
 			break;
 		case 'taunt':
-			// TODO
+			const tauntResult = await tools.taunt(channel, name, targetName);
+			outputMessage.embed = tauntResult.embed;
+			if(tauntResult.ping) {
+				outputMessage.print.push(`<@${tauntResult.ping}>`);
+			}
 			break;
 		case 'config':
 			outputMessage.embed = await tools.config(channel, name, args[0], args[1]);
