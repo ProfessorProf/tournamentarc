@@ -84,6 +84,9 @@ module.exports = {
 					case enums.StatusTypes.Dead:
 						statuses.push(`Defeated (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
+					case enums.StatusTypes.Journey:
+						statuses.push(`On a journey (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
 					case enums.StatusTypes.Training:
 						statuses.push(`Training (${this.getTimeString(now - s.startTime)} so far)`);
 						break;
@@ -439,7 +442,7 @@ module.exports = {
 				// FIGHT
 				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
 						.setColor(0x00AE86);
-				return this.fight(player1, player2, offer.type == enums.OfferTypes.Taunt, embed);
+				return this.fight(player1, player2, offer ? offer.type == enums.OfferTypes.Taunt : false, embed);
 			}
 		} else {
 			await sql.addOffer(player1, null, enums.OfferTypes.Fight);
@@ -450,16 +453,19 @@ module.exports = {
 		}
 	},
 	// End training and power up a player. Will do nothing if player is not training.
-	async completeTraining(player) {
+	async completeTraining(player, forcedValue) {
 		let world = await sql.getWorld(player.channel);
 		const now = new Date().getTime();
 		const trainingState = player.status.find(s => s.type == 2);
-		if (! trainingState) {
+		if (!trainingState && !forcedValue) {
 			// Not training, so no need to do anything
 			return;
 		}
+		await sql.deleteStatus(player.channel, player.id, 1);
 		await sql.deleteStatus(player.channel, player.id, 2);
-		const hours = (now - trainingState.startTime) / hour;
+
+		let time = forcedValue ? forcedValue : (now - trainingState.startTime);
+		const hours = time / hour;
 		if (hours > 1000) {
 			hours = 1000;
 		}
@@ -854,6 +860,7 @@ module.exports = {
 		let world = await sql.getWorld(channel);
 		
 		await sql.setHenchman(channel, player.id, true);
+		await sql.deleteOffer(nemesis.id, player.id, enums.OfferTypes.Recruit);
 
 		// If we just hit max henchmen, delete all outstanding recruitment offers
 		let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
@@ -1465,7 +1472,7 @@ module.exports = {
 		if(roll < searchChance) {
 			console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 			// They found an orb!
-			await sql.addItems(channel, player.id, enums.StatusTypes.Orb, 1);
+			await sql.addItems(channel, player.id, enums.ItemTypes.Orb, 1);
 			world.lostOrbs--;
 			output = `${player.name} searches the world, and finds a magic orb!`;
 			let existingOrbs = player.items.find(i => i.type == enums.StatusTypes.Orb);
@@ -1627,6 +1634,22 @@ module.exports = {
 		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Training);
 	},
+	async startJourney(channel, name, hoursString) {
+		let now = new Date().getTime();
+		let player = await sql.getPlayerByUsername(channel, name);
+		let hours = parseInt(hoursString);
+		if(hours != hours) return;
+
+		let training = player.status.find(s => s.type == enums.StatusTypes.Training);
+		let trainingTime = training ? now - training.startTime : 0;
+
+		await sql.addStatus(channel, player.id, enums.StatusTypes.Journey, now + hours * hour, trainingTime);
+		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
+		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Training);
+
+		let pronoun = player.config.pronoun.charAt(0).toUpperCase() + player.config.pronoun.substring(1);
+		return `**${player.name}** sets off on a journey to become stronger! ${pronoun} won't return for another ${hours} hours.`;
+	},
 	async updateGarden(channel, lastUpdate) {
 		let garden = await sql.getGarden(channel);
 		let now = new Date().getTime();
@@ -1718,6 +1741,153 @@ module.exports = {
 		}
 		return null;
 	},
+	async deleteExpired(channel, pings) {
+		let expired = await sql.getExpired(channel);
+		let now = new Date().getTime();		
+		let messages = [];
+
+		// React to statuses ending
+		for(let i in expired.statuses) {
+			let status = expired.statuses[i];
+			let player = await sql.getPlayerById(status.playerId);
+			let decrease;
+			switch(status.type) {
+				case enums.StatusTypes.Dead:
+				    // Death
+					messages.push(`**${player.name}** is ready to fight.`);
+					await sql.addStatus(channel, player.id, enums.StatusTypes.Ready);
+					if(pings && player.config.ping) pings.push(player.userId);
+					break;
+				case enums.StatusTypes.Journey:
+					// Journey
+					let storedTrainingTime = status.rating;
+					let journeyTime = status.EndTime - status.StartTime;
+					let journeyEffect = Math.random() + 0.8;
+					let time = journeyTime * journeyEffect + storedTrainingTime;
+					this.completeTraining(player, time);
+					if(journeyEffect < 1) {
+						messages.push(`**${player.name}** returns from a rough training journey!`);
+					} else if(journeyEffect < 1.5) {
+						messages.push(`**${player.name}** returns from an ordinary training journey!`);
+					} else {
+						messages.push(`**${player.name}** returns from an amazing training journey!`);
+					}
+					await sql.setPlayer(player);
+					break;
+				case enums.StatusTypes.Energized:
+					// Energize
+					decrease = player.level - player.level / 1.3;
+					messages.push(`**${player.name}** is no longer energized; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
+					break;
+				case enums.StatusTypes.Overdrive: 
+					// Overdrive - reduce power level
+					decrease = player.level * 0.1;
+					player.level -= decrease;
+					await sql.setPlayer(player);
+					messages.push(`**${player.name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
+					break;
+				case enums.StatusTypes.Bean: 
+					// Bean
+					decrease = status.Power_Level - status.Power_Level / 1.12;
+					messages.push(`**${player.name}** is no longer bean-boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
+					break;
+				case enums.StatusTypes.Fused:
+					// Fusion
+					const fusedPlayer1 = await sql.getPlayerById(player.fusionIDs[0]);
+					const fusedPlayer2 = await sql.getPlayerById(player.fusionIDs[1]);
+
+					// Divvy up skill and glory gains
+					const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
+					const gardenDiff = (player.gardenLevel - preGarden) / 2;
+					fusedPlayer1.gardenLevel += gardenDiff;
+					fusedPlayer2.gardenLevel += gardenDiff;
+
+					const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
+					const actionDiff = (player.actionLevel - preAction) / 2;
+					fusedPlayer1.actionLevel += actionDiff;
+					fusedPlayer2.actionLevel += actionDiff;
+
+					const preLevel = fusedPlayer1.level + fusedPlayer2.level;
+					const levelDiff = (player.level - preLevel) / 2;
+					fusedPlayer1.level += levelDiff;
+					fusedPlayer2.level += levelDiff;
+
+					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
+					const gloryDiff = Math.floor((player.glory - preGlory) / 2);
+					fusedPlayer1.glory += gloryDiff;
+					fusedPlayer2.glory += gloryDiff;
+
+					await sql.setPlayer(fusedPlayer1);
+					await sql.setPlayer(fusedPlayer2);
+
+					// Roll for items like this is some kind of old-school MMO raid
+					for (const item of player.items) {
+						for (let i = 0; i < item.count; i++) {
+							if (Math.random() >= 0.5) {
+								await sql.addItems(channel, fusedPlayer1.id, item.type, 1);
+							} else {
+								await sql.addItems(channel, fusedPlayer2.id, item.type, 1);
+							}
+						}
+					}
+
+					// Unfuse
+					await sql.setFusionId(fusedPlayer1.id, 0);
+					await sql.setFusionId(fusedPlayer2.id, 0);
+
+					// Clean up the fusion player
+					await sql.deletePlayer(player.id);
+
+					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
+					if(pings && fusedPlayer1.config.ping) {
+						pings.push(fusedPlayer1.userId);
+					}
+					if(pings && fusedPlayer2.config.ping) {
+						pings.push(fusedPlayer2.userId);
+					}
+					break;
+				case enums.StatusTypes.Berserk:
+				    // Berserk
+					messages.push(`**${player.name}** calms down from ${this.their(player.config.pronoun)} battle frenzy.`);
+					break;
+			}
+		}
+
+		let offerIds = []
+		for(let i in expired.offers) {
+			let player = await sql.getPlayerById(status.playerId);
+			let offer = expired.offers[i];
+			if(player.lastActive + hour < now && player.lastActive + 24 * hour > now) {
+				// The player is idle, but not SUPER idle - stall the offer timer
+				await sql.delayOffer(channel, player.id, offer.targetId, offer.type);
+			} else if(offer.expires < now) {
+				// The offer has expired!
+				switch(offer.type) {
+					case enums.OfferTypes.Taunt:
+						// Failed taunt - reduce their Glory
+						let target = await sql.getPlayerById(offer.targetId);
+						let glory = Math.ceil(Math.min(Math.min(target.level / player.level * 5, 50)), target.glory);
+						target.glory -= glory;
+						await sql.setPlayer(target);
+						messages.push(`**${target.name}** failed to respond to **${player.name}**; Glory -${glory}.`);
+						break;
+				}
+				offerIds.push(offer.ID);
+			}
+		}
+
+		// Delete 'em
+		for(let i in expired.statuses) {
+			const status = expired.statuses[i];
+			await sql.deleteStatus(channel, status.playerId, status.type);
+		}
+		for(let i in offerIds) {
+			const offer = expired.offers[i];
+			await sql.deleteOffer(offer.playerId, offer.targetId, offer.type);
+		}
+
+		return messages;
+	},
 	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
 	async updateWorld(channel) {
 		let world = await sql.getWorld(channel);
@@ -1725,7 +1895,7 @@ module.exports = {
 		let pings = [];
 		let abort = false;
 
-		messages = messages.concat(await sql.deleteExpired(channel, pings));
+		messages = messages.concat(await this.deleteExpired(channel, pings));
 		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate, pings));
 		messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
 		let ruinStatus = await this.ruinAlert(channel);
@@ -1929,7 +2099,7 @@ module.exports = {
 		embed.setDescription(description);
 
 		let output = '';
-		if(history.length > 20) history = history.slice(0, 20);
+		if(history.length > 15) history = history.slice(0, 15);
 		for(let i in history) {
 			let h = history[i];
 			let battleTime = new Date(h.battleTime).toLocaleString('en-US');

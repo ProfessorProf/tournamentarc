@@ -285,6 +285,9 @@ async function handleMessage(message) {
 				outputMessage.print.push(`<@${tauntResult.ping}>`);
 			}
 			break;
+		case 'journey':
+			outputMessage.print.push(await tools.startJourney(channel, name, args[0]));
+			break;
 		case 'config':
 			outputMessage.embed = await tools.config(channel, name, args[0], args[1]);
 			outputMessage.informational = true;

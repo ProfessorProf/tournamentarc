@@ -545,6 +545,7 @@ module.exports = {
 			$attackTime: nemesis.attackTime,
 			$destroyTime: nemesis.destroyTime,
 			$reviveTime: nemesis.reviveTime,
+			$energizeTime: nemesis.energizeTime,
 			$burnTime: nemesis.burnTime,
 			$ruinTime: nemesis.ruinTime,
 			$cooldown: nemesis.cooldown,
@@ -666,134 +667,36 @@ module.exports = {
 			WHERE ps.Channel = $channel`, {$channel: channel});
 		return statuses;
 	},
-	// Delete all expired offers and statuses, and message the channel accordingly.
-	async deleteExpired(channel, pings) {
+	// Returns all expired statuses, expired offers, and offers that are within 5 minutes of expiring.
+	async getExpired(channel, pings) {
 		let now = new Date().getTime();
-		let offerRows = await sql.all(`SELECT o.*, p.Last_Active FROM Offers o
-			LEFT JOIN Players p ON p.ID = o.Player_ID
-			WHERE o.Channel = $channel AND Expires < $fivemins`, {$channel: channel, $fivemins: now - (5 * 60 * 1000)});
+		let offerRows = await sql.all(`SELECT * FROM Offers
+			WHERE Channel = $channel AND Expires < $fivemins`, {$channel: channel, $fivemins: now - (5 * 60 * 1000)});
 		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.User_ID, p.Ping_Flag, p.Power_Level FROM PlayerStatus ps
 			LEFT JOIN Players p ON p.ID = ps.Player_ID
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
 			WHERE ps.Channel = $channel AND s.Ends <> 0 AND ps.EndTime < $now`, {$channel: channel, $now: now});
-		let messages = [];
-		for(let i in statusRows) {
-			// React to statuses ending
-			let status = statusRows[i];
-			let decrease;
-			switch(status.Status_ID) {
-				case enums.StatusTypes.Dead:
-				    // Death
-					messages.push(`**${status.Name}** is ready to fight.`);
-					await this.addStatus(channel, status.Player_ID, enums.StatusTypes.Ready);
-					if(pings && status.Ping_Flag) pings.push(status.User_ID);
-					break;
-				case enums.StatusTypes.Energized:
-					// Energize
-					decrease = status.Power_Level - status.Power_Level / 1.3;
-					messages.push(`**${status.Name}** is no longer energized; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
-					break;
-				case enums.StatusTypes.Overdrive: 
-					// Overdrive - reduce power level
-					decrease = status.Power_Level * 0.1;
-					let powerLevel = status.Power_Level - decrease;
-					await sql.run(`UPDATE Players SET Power_Level = $level WHERE ID = $id`, {$id: status.Player_ID, $level: powerLevel});
-					messages.push(`**${status.Name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
-					break;
-				case enums.StatusTypes.Bean: 
-					// Bean
-					decrease = status.Power_Level - status.Power_Level / 1.12;
-					messages.push(`**${status.Name}** is no longer bean boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
-					break;
-				case enums.StatusTypes.Fused:
-					// Fusion
-					const fusedCharacter = await this.getPlayerById(status.Player_ID);
-					const fusedPlayer1 = await this.getPlayerById(fusedCharacter.fusionIDs[0]);
-					const fusedPlayer2 = await this.getPlayerById(fusedCharacter.fusionIDs[1]);
-
-					// Divvy up skill and glory gains
-					const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
-					const gardenDiff = (fusedCharacter.gardenLevel - preGarden) / 2;
-					fusedPlayer1.gardenLevel += gardenDiff;
-					fusedPlayer2.gardenLevel += gardenDiff;
-
-					const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
-					const actionDiff = (fusedCharacter.actionLevel - preAction) / 2;
-					fusedPlayer1.actionLevel += actionDiff;
-					fusedPlayer2.actionLevel += actionDiff;
-
-					const preLevel = fusedPlayer1.level + fusedPlayer2.level;
-					const levelDiff = (fusedCharacter.level - preLevel) / 2;
-					fusedPlayer1.level += levelDiff;
-					fusedPlayer2.level += levelDiff;
-
-					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
-					const gloryDiff = Math.floor((fusedCharacter.glory - preGlory) / 2);
-					fusedPlayer1.glory += gloryDiff;
-					fusedPlayer2.glory += gloryDiff;
-
-					await this.setPlayer(fusedPlayer1);
-					await this.setPlayer(fusedPlayer2);
-
-					// Roll for items like this is some kind of old-school MMO raid
-					for (const item of fusedCharacter.items) {
-						for (let i = 0; i < item.count; i++) {
-							if (Math.random() >= 0.5) {
-								await this.addItems(channel, fusedPlayer1.id, item.type, 1);
-							} else {
-								await this.addItems(channel, fusedPlayer2.id, item.type, 1);
-							}
-						}
-					}
-
-					// Unfuse
-					await this.setFusionId(fusedPlayer1.id, 0);
-					await this.setFusionId(fusedPlayer2.id, 0);
-
-					// Clean up the fusion player
-					await this.deletePlayer(fusedCharacter.id);
-
-					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
-					if(pings && fusedPlayer1.config.ping) {
-						pings.push(fusedPlayer1.userId);
-					}
-					if(pings && fusedPlayer2.config.ping) {
-						pings.push(fusedPlayer2.userId);
-					}
-					break;
-				case enums.StatusTypes.Berserk:
-				    // Berserk
-					messages.push(`**${status.Name}** calms down from their battle frenzy.`);
-					break;
-			}
-		}
-		let offerIds = []
-		for(let i in offerRows) {
-			let offer = offerRows[i];
-			if(offer.Last_Active + hour < now && offer.Last_Active + 24 * hour > now) {
-				// The player is idle, but not SUPER idle - stall their offer timers
-				await sql.run(`UPDATE Offers SET Expires = $now WHERE ID = $id`, {$now: now, $id: offer.ID});
-			} else if(offer.Expires < now) {
-				switch(offer.Type) {
-					case enums.OfferTypes.Taunt:
-						// Failed taunt - reduce their Glory
-						let player = await this.getPlayerById(offer.Player_ID);
-						let target = await this.getPlayerById(offer.Target_ID);
-						let glory = Math.ceil(Math.min(Math.min(target.level / player.level * 5, 50)), target.glory);
-						target.glory -= glory;
-						messages.push(`**${target.name}** failed to respond to **${player.name}**; Glory -${glory}.`);
-						break;
-				}
-				offerIds.push(offer.ID);
-			}
-		}
 		
-		// Delete 'em
-		let statusIds = statusRows.map(row => row.ID);
-		await sql.run(`DELETE FROM Offers WHERE ID IN (${offerIds.join(',')})`);
-		await sql.run(`DELETE FROM PlayerStatus WHERE ID IN (${statusIds.join(',')})`);
-
-		return messages;
+		return {
+			offers: offerRows.map(o => { return {
+				id: o.ID,
+				channel: o.Channel,
+				type: o.Type,
+				expires: o.Expires,
+				playerId: o.Player_ID,
+				targetId: o.Target_ID,
+				extra: o.Extra
+			}}),
+			statuses: statusRows.map(s => { return {
+				id: s.ID,
+				channel: s.Channel,
+				type: s.Status_ID,
+				playerId: s.Player_ID,
+				startTime: s.StartTime,
+				endTime: s.EndTime,
+				rating: s.Rating
+			}})
+		};
 	},
 	async addHistory(channel, winnerId, winnerLevel, winnerSkill, loserId, loserLevel, loserSkill) {
 		await sql.run(`INSERT INTO History (Channel, Battle_Time, Winner_Id, Loser_ID, Winner_Level, Loser_Level, Winner_Skill, Loser_Skill)
@@ -858,7 +761,7 @@ module.exports = {
 				LEFT JOIN Players wp ON h.Winner_ID = wp.ID
 				LEFT JOIN Players lp ON h.Loser_ID = lp.ID
 				WHERE (Winner_ID = $player1Id AND Loser_ID = $player2Id) 
-				OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time DESC`, {
+				OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time`, {
 				$player1Id: player1Id,
 				$player2Id: player2Id
 			});
@@ -953,5 +856,16 @@ module.exports = {
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE Tournaments SET Round_Time = Round_Time + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
+	},
+	async delayOffer(channel, playerId, targetId, type) {
+		const delayTime = new Date().getTime() + 5 * 60 * 1000;
+		await sql.run(`UPDATE Offers SET Expires = $time WHERE Channel = $channel AND Player_ID = $playerId AND Target_ID = $targetId AND Type = $type`,
+			{
+				$time: delayTime,
+				$channel: channel,
+				$playerId: playerId,
+				$targetId: targetId, 
+				$type: type
+			});
 	}
 }
