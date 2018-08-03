@@ -248,9 +248,11 @@ module.exports = {
 				} else {
 					// If there's no plant specified, then it defaults to picking the first thing in the garden
 					let plant = garden.plants.find(p => p && p.endTime < now);
-					let heldPlants = player.items.find(i => i.type == plant.type);
-					if(heldPlants && heldPlants.count >= 3) {
-						errors.push("You can't carry any more of that plant.");
+					if(plant) {
+						let heldPlants = player.items.find(i => i.type == plant.type);
+						if(heldPlants && heldPlants.count >= 3) {
+							errors.push("You can't carry any more of that plant.");
+						}
 					}
 					let plantCount = garden.plants.filter(p => p && p.endTime < now).length;
 					if(plantCount == 0) {
@@ -607,6 +609,7 @@ module.exports = {
 				// !give validation
 				// - Must be registered
 				// - Target must exist
+				// - Target must be alive
 				// - Target must not be you
 				// - Must have at least one orb
 				this.validatePlayerRegistered(errors, player);
@@ -619,6 +622,11 @@ module.exports = {
 						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push("You can't give yourself orbs!");
+						}
+						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+						if(targetDefeated) {
+							let timeString = tools.getTimeString(targetDefeated.endTime - now);
+							errors.push(`**${target.name}** cannot take orbs for another ${timeString}`);
 						}
 					} else {
 						errors.push('Must specify a valid target.');

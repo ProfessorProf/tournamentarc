@@ -461,8 +461,8 @@ module.exports = {
 			// Not training, so no need to do anything
 			return;
 		}
-		await sql.deleteStatus(player.channel, player.id, 1);
-		await sql.deleteStatus(player.channel, player.id, 2);
+		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Journey);
+		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Training);
 
 		let time = forcedValue ? forcedValue : (now - trainingState.startTime);
 		const hours = time / hour;
@@ -530,20 +530,36 @@ module.exports = {
 		let skill1 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
 		let skill2 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
 		
-		// TODO: Support Revenge bonuses via History table
-		if(player1.revenge && player1.revenge[player2.name]) {
-			console.log(`${player1.name} revenge bonus ${player1.revenge[player2.name]}`);
-			skill1 *= 1 + 0.1 * player1.revenge[player2.name];
+		const history = await sql.getHistory(player1.id, player2.id);
+		if(history) {
+			// Calculate revenge bonus from losing streak
+			const revengePlayerId = history[0].winnerId == player1.id ? player2.id : player1.id;
+			let battles = 0;
+			while(battles < history.length && history[battles].loserId == revengePlayerId) {
+				battles++;
+			}
+			if(player1.id == revengePlayerId) {
+				console.log(`${player1.name} skill +${battles}0% due to revenge bonus`);
+				skill1 *= 1 + 0.1 * battles;
+			}
+			if(player2.id == revengePlayerId) {
+				console.log(`${player2.name} skill +${battles}0% due to revenge bonus`);
+				skill2 *= 1 + 0.1 * battles;
+			}
 		}
-		if(player2.revenge && player2.revenge[player1.name]) {
-			console.log(`${player2.name} revenge bonus ${player2.revenge[player1.name]}`);
-			skill2 *= 1 + 0.1 * player2.revenge[player1.name];
-		}
+
 		if(player1.isNemesis) {
 			skill2 *= 1.15;
 		}
 		if(player2.isNemesis) {
 			skill1 *= 1.15;
+		}
+		
+		if(player1.isHenchman) {
+			skill2 *= 1.075;
+		}
+		if(player2.isNemesis) {
+			skill1 *= 1.075;
 		}
 		
 		console.log(`${player1.name}: PL ${Math.floor(level1 * 10) / 10}, Skill ${Math.floor(skill1 * 10) / 10}`);
@@ -698,7 +714,7 @@ module.exports = {
 		if(winner.isNemesis) {
 			// Longer KO, but the Nemesis is weakened
 			hours = 12;
-			let maxPowerLoss = (loserSkill < 0.8 ? 0.025 : (loserSkill > 1.2 ? 0.075 : 0.05)) * this.getPowerLevel(loser);
+			let maxPowerLoss = (loserSkill < 0.8 ? 0.025 : (loserSkill > 1.2 ? 0.075 : 0.05)) * this.getPowerLevel(winner);
 			let powerLoss = Math.min(maxPowerLoss, this.getPowerLevel(loser) * 0.5);
 			output += `\nThe Nemesis is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
 			winner.level -= powerLoss;
@@ -898,12 +914,20 @@ module.exports = {
 			await this.completeTraining(target);
 			
 			if(target.status.find(s => s.type == 11)) {
-				await sql.addStatus(target.channel, target.id, 0, now + hour * 1);
-				output += `${target.name} cannot fight for another 1 hour!\n`;
+				await sql.addStatus(target.channel, target.id, enums.StatusTypes.Dead, now + hour * 1);
+				output += `${target.name} cannot fight for another 1 hour!`;
 			} else {
-				await sql.addStatus(target.channel, target.id, 0, now + hour * 12);
-				output += `${target.name} cannot fight for another 12 hours!\n`;
+				await sql.addStatus(target.channel, target.id, enums.StatusTypes.Dead, now + hour * 12);
+				output += `${target.name} cannot fight for another 12 hours!`;
 			}
+
+			let orbs = target.items.find(i => i.type == enums.ItemTypes.Orb);
+			if(orbs && orbs.count > 0) {
+				// Their orbs are scattered
+				output += `${orbs.count} ${orbs.count == 1 ? 'orb is' : 'orbs are'} lost in the depths of space!`;
+				await sql.addItems(channel, target.id, enums.ItemTypes.Orb, -orbs.count);
+			}
+			output += '\n';
 			await sql.setPlayer(target);
 		}
 		
@@ -1761,10 +1785,10 @@ module.exports = {
 				case enums.StatusTypes.Journey:
 					// Journey
 					let storedTrainingTime = status.rating;
-					let journeyTime = status.EndTime - status.StartTime;
+					let journeyTime = status.endTime - status.startTime;
 					let journeyEffect = Math.random() + 0.8;
 					let time = journeyTime * journeyEffect + storedTrainingTime;
-					this.completeTraining(player, time);
+					await this.completeTraining(player, time);
 					if(journeyEffect < 1) {
 						messages.push(`**${player.name}** returns from a rough training journey!`);
 					} else if(journeyEffect < 1.5) {
@@ -1788,7 +1812,7 @@ module.exports = {
 					break;
 				case enums.StatusTypes.Bean: 
 					// Bean
-					decrease = status.Power_Level - status.Power_Level / 1.12;
+					decrease = player.level - player.level / 1.12;
 					messages.push(`**${player.name}** is no longer bean-boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case enums.StatusTypes.Fused:
@@ -1855,8 +1879,8 @@ module.exports = {
 
 		let offerIds = []
 		for(let i in expired.offers) {
-			let player = await sql.getPlayerById(status.playerId);
 			let offer = expired.offers[i];
+			let player = await sql.getPlayerById(offer.playerId); 	
 			if(player.lastActive + hour < now && player.lastActive + 24 * hour > now) {
 				// The player is idle, but not SUPER idle - stall the offer timer
 				await sql.delayOffer(channel, player.id, offer.targetId, offer.type);

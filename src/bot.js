@@ -87,11 +87,12 @@ client.on('message', message => {
 
     if (message.channel.name == auth.channel &&
         message.content.substring(0, 1) == '!') {
-		try {
-			handleMessage(message);
-		} catch (e) {
-			console.log(e);
-		}
+		handleMessage(message).then(() => {}, 
+			(err) => {
+				let errorMessage = `Error: ${err.message}`;
+				if(auth.adminId) errorMessage += ` <@${auth.adminId}>\n The admin has been notified. If possible, try not to touch this feature until they get here.`;
+				message.channel.send(errorMessage);
+			});
 	}
 });
 

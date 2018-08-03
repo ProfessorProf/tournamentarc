@@ -761,7 +761,7 @@ module.exports = {
 				LEFT JOIN Players wp ON h.Winner_ID = wp.ID
 				LEFT JOIN Players lp ON h.Loser_ID = lp.ID
 				WHERE (Winner_ID = $player1Id AND Loser_ID = $player2Id) 
-				OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time`, {
+				OR (Winner_ID = $player2Id AND Loser_ID = $player1Id) ORDER BY Battle_Time DESC`, {
 				$player1Id: player1Id,
 				$player2Id: player2Id
 			});
@@ -769,7 +769,7 @@ module.exports = {
 			history = await sql.all(`SELECT h.*, wp.Name AS Winner_Name, lp.Name AS Loser_Name FROM History h 
 			LEFT JOIN Players wp ON h.Winner_ID = wp.ID
 			LEFT JOIN Players lp ON h.Loser_ID = lp.ID
-			WHERE Winner_ID = $player1Id OR Loser_ID = $player1Id`, {
+			WHERE Winner_ID = $player1Id OR Loser_ID = $player1Id ORDER BY Battle_Time DESC`, {
 				$player1Id: player1Id
 			});
 		}
