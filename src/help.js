@@ -20,6 +20,7 @@ module.exports = {
                 .addField('!taunt name', "Like `!fight`, but if they refuse to fight, they'll lose Glory. Be careful, though - if you lose, you'll lose Glory instead!")
                 .addField('!unfight', 'Cancel all your outgoing challenges.')
                 .addField('!train', "Begin training! You must lose a fight before you can train. The longer you train, the bigger the jump in power - but after a point, there will be diminishing returns, and after 48 hours, training doesn't help at all. Train hard, and you can always catch up with the strongest fighters!")
+                .addField('!journey hours', "Go on a journey! You set the duration in advance, and can't take any actions until it ends. When you return, your power level might increase dramatically!")
                 .addField('!help topic', 'Learn more about specific topics.')
                 .addField('Private commands', 'For certain informational commands, you can start it with `!!` instead of `!` and it will send the information in a DM.')
                 .addField('Available Help Topics', 'config, rank, garden, plants, actions, fusion, nemesis, henchmen, wish');

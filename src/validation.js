@@ -1,6 +1,7 @@
 const tools = require('./tools.js');
 const sql = require('./sql.js');
 const auth = require('../auth.json');
+const enums = require('./enum.js');
 
 let hour = (60 * 60 * 1000);
 
@@ -54,16 +55,18 @@ module.exports = {
 				// - Player and Target must both be alive
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					let defeated = player.status.find(s => s.type == 0);
+					this.validateJourney(errors, player);
+					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
 					}
 					if(target) {
+						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push('You cannot fight yourself!');
 						}
-						let targetDefeated = target.status.find(s => s.type == 0);
+						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
@@ -91,10 +94,11 @@ module.exports = {
 							errors.push('**' + player.name + '** cannot attack indiscriminately for another ' + timeString + '.');
 						}
 						if(target) {
+							this.validateJourney(errors, target);
 							if(player.name == target.name) {
 								errors.push('You cannot attack yourself!');
 							}
-							let targetDefeated = target.status.find(s => s.type == 0);
+							let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
 							if(targetDefeated) {
 								let timeString = tools.getTimeString(targetDefeated.endTime - now);
 								errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
@@ -150,17 +154,51 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
-					let defeated = player.status.find(s => s.type == 0);
+					this.validateJourney(errors, player);
+					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot train for another ' + timeString + '.');
 					} else {
-						if(!player.status.find(s => s.type == 5)) {
+						if(!player.status.find(s => s.type == enums.StatusTypes.Ready)) {
 							errors.push('**' + player.name + '** must lose a fight before they can begin training.');
 						}
 					}
-					if(player.status.find(s => s.type == 2)) {
+					if(player.status.find(s => s.type == enums.StatusTypes.Training)) {
 						errors.push('**' + player.name + '** is already training.');
+					}
+				}
+				break;
+			case 'journey':
+				// !journey validation rules:
+				// - Must be alive
+				// - Must have lost a fight since they last stopped training
+				// - Must not be training
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateNotNemesis(errors, player);
+					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+					if(defeated) {
+						let timeString = tools.getTimeString(defeated.endTime - now);
+						errors.push(`**${player.name}** cannot train for another ${timeString}.`);
+					} else {
+						if(!player.status.find(s => s.type == enums.StatusTypes.Ready) &&
+						   !player.status.find(s => s.type == enums.StatusTypes.Training)) {
+							errors.push(`**${player.name}** must lose a fight before they can begin training.`);
+						}
+					}
+					if(player.status.find(s => s.type == enums.StatusTypes.Journey)) {
+						errors.push(`**${player.name}** is already on a journey.`);
+					}
+					const hours = parseInt(targetName);
+					if(!targetName || hours != hours) {
+						errors.push(`Must specify the number of hours.`);
+					} else {
+						if(hours < 2) {
+							errors.push(`Can't journey for less than 2 hours.`);
+						} else if(hours > 24) {
+							errors.push(`Can't journey for more than 24 hours.`);
+						}
 					}
 				}
 				break;
@@ -190,7 +228,10 @@ module.exports = {
 				// - Must be at least one plant in the garden
 				// - Must be carrying fewer than 3 of the plant in question
 				this.validatePlayerRegistered(errors, player);
-				if(player) this.validateNotNemesis(errors, player);
+				if(player) {
+					this.validateNotNemesis(errors, player);
+					this.validateJourney(errors, player);
+				}
 				if(targetName) {
 					let knownPlants = await sql.getKnownPlants(channel);
 					let plantType = this.getPlantType(targetName, knownPlants);
@@ -228,6 +269,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
+					this.validateJourney(errors, player);
 					let knownPlants = await sql.getKnownPlants(channel);
 					let plantType = this.getPlantType(args[0], knownPlants);
 					if(args.length > 1) {
@@ -236,19 +278,20 @@ module.exports = {
 						} else {
 							if(player.items.find(i => i.type == plantType)) {
 								if(target) {
+									this.validateJourney(errors, target);
 									if(target.name == player.name) {
 										errors.push("You can't use plants on yourself.");
 									}
-									let targetDefeated = target.status.find(s => s.type == 0);
+									let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
 									switch(plantType) {
-										case 1:
-										case 2:
+										case enums.ItemTypes.Flower:
+										case enums.ItemTypes.Rose:
 											if(!targetDefeated) {
 												errors.push(`**${target.name}** is already healthy.`);
 											}
 											break;
-										case 4:
-										case 6:
+										case enums.ItemTypes.Bean:
+										case enums.ItemTypes.Fern:
 											if(targetDefeated) {
 												let timeString = tools.getTimeString(targetDefeated.endTime - now);
 												errors.push(`**${target.name}** cannot eat that for another ${timeString}.`);
@@ -287,6 +330,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
+					this.validateJourney(errors, player);
 					this.validateGardenTime(errors, player);
 					let knownPlants = await sql.getKnownPlants(channel);
 					let plantType = this.getPlantType(targetName, knownPlants);
@@ -306,6 +350,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
+					this.validateJourney(errors, player);
 				}
 				break;
 			case 'water':
@@ -316,6 +361,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
+					this.validateJourney(errors, player);
 					let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
 					if(plantCount == 0) {
 						errors.push("There aren't any plants that need watering right now.");
@@ -332,6 +378,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
+					this.validateJourney(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known).length;
 					let unknownPlants = garden.plantTypes.filter(t => !t.known).length;
 					if(garden.researchLevel >= knownPlants - 1.01 && garden.growthLevel < 3) {
@@ -354,6 +401,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
+					this.validateJourney(errors, player);
 				}
 				break;
 			case 'overdrive':
@@ -365,6 +413,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
+					this.validateJourney(errors, player);
 					if(glory < 150) {
 						errors.push(`**${player.name}** must be at least Rank A to overdrive.`);
 					}
@@ -379,7 +428,9 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
+					this.validateJourney(errors, player);
 					if(target) {
+						this.validateJourney(errors, target);
 						if(glory < 50) {
 							errors.push(`**${player.name}** must be at least Rank C to send energy.`);
 						}
@@ -399,17 +450,18 @@ module.exports = {
 				// - Both must be Rank B+
 				// - Both must not be fusions
 				this.validatePlayerRegistered(errors, player);
-				if (! player) {
+				if (!player) {
 					break;
 				}
 				this.validateNotNemesis(errors, player);
+				this.validateJourney(errors, player);
 				if(args.length > 2) {
 					errors.push('Fusion Name must not contain spaces.');
 				}
 				if(player.fusionFlag) {
 					errors.push(`**${player.name} can't fuse again until the game resets.`);
 				}
-				let defeated = player.status.find(s => s.type == 0);
+				let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
 				if(defeated) {
 					let timeString = tools.getTimeString(defeated.endTime - now);
 					errors.push('**' + player.name + '** cannot fuse for another ' + timeString + '.');
@@ -418,13 +470,14 @@ module.exports = {
 					errors.push(`**${player.name}** must be at least Rank B to use Fusion.`);
 				}
 				if(target) {
+					this.validateJourney(errors, target);
 					if(target.fusionFlag) {
 						errors.push(`**${target.name} can't fuse again until the game resets.`);
 					}
 					if(player.name == target.name) {
 						errors.push("You can't fuse with yourself!");
 					} else {
-						let targetDefeated = target.status.find(s => s.type == 0);
+						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push('**' + target.name + '** cannot fuse for another ' + timeString + '.');
@@ -451,6 +504,7 @@ module.exports = {
 				// - 24 hours must have passed since the previous Nemesis died
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateJourney(errors, player);
 					if(nemesis && nemesis.cooldown > now) {
 						let timeString = tools.getTimeString(nemesis.cooldown - now);
 						errors.push(`A new nemesis won't rise for at least ${timeString}.`);
@@ -461,7 +515,7 @@ module.exports = {
 					if(player.nemesisFlag) {
 						errors.push(`**${player.name}** cannot become a nemesis again.`);
 					}
-					let defeated = player.status.find(s => s.type == 0);
+					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot become a nemesis for another ' + timeString + '.');
@@ -496,10 +550,11 @@ module.exports = {
 				// - Nemesis can only wish for ruin
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateJourney(errors, player);
 					if(args.length == 0) {
 						errors.push('Enter `!help wish` for more information.');
 					}
-					let orbs = player.items.find(i => i.type == 0);
+					let orbs = player.items.find(i => i.type == enums.ItemTypes.Orb);
 					if(!orbs || orbs.count < 7) {
 						errors.push('Insufficient orbs.');
 					}
@@ -544,7 +599,7 @@ module.exports = {
 				// - Must not be the Nemesis
 				// - Must not be Berserk
 				this.validatePlayerRegistered(errors, player);
-				if(player.isNemesis || player.status.find(s => s.type == 12)) {
+				if(player.isNemesis || player.status.find(s => s.type == enums.StatusTypes.Berserk)) {
 					errors.push("You can't stop fighting!");
 				}
 				break;
@@ -555,18 +610,22 @@ module.exports = {
 				// - Target must not be you
 				// - Must have at least one orb
 				this.validatePlayerRegistered(errors, player);
-				if(!player.items.find(i => i.type == 0)) {
-					errors.push("You don't have any orbs to give!");
-				}
-				if(target) {
-					if(player.name == target.name) {
-						errors.push("You can't give yourself orbs!");
+				if(player) {
+					this.validateJourney(errors, player);
+					if(!player.items.find(i => i.type == enums.ItemTypes.Orb)) {
+						errors.push("You don't have any orbs to give!");
 					}
-				} else {
-					errors.push('Must specify a valid target.');
-				}
-				if(player.isHenchman && !target.isNemesis) {
-					errors.push('A henchman can only give orbs to the Nemesis.');
+					if(target) {
+						this.validateJourney(errors, target);
+						if(player.name == target.name) {
+							errors.push("You can't give yourself orbs!");
+						}
+					} else {
+						errors.push('Must specify a valid target.');
+					}
+					if(player.isHenchman && !target.isNemesis) {
+						errors.push('A henchman can only give orbs to the Nemesis.');
+					}
 				}
 				break;
 			case 'history':
@@ -588,6 +647,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
 				if(target) {
+					this.validateJourney(errors, target);
 					let henchmen = await sql.getHenchmen(channel);
 					let world = await sql.getWorld(channel);
 					let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
@@ -610,17 +670,20 @@ module.exports = {
 				// - Offer must be presented
 				// - Must not be a Henchman
 				this.validatePlayerRegistered(errors, player);
-				if(player.isHenchman) {
-					errors.push("You already serve the Nemesis.");
-				} else {
-					if(!player.offers.find(o => o.type == 2)) {
-						errors.push("The Nemesis needs to \`!recruit\` you first.");
-					}
-					let henchmen = await sql.getHenchmen(channel);
-					let world = await sql.getWorld(channel);
-					let maxHenchmen = Math.floor(world.maxPopulation / 5);
-					if(henchmen.length >= maxHenchmen) {
-						errors.push("The Nemesis already has too many henchmen.");
+				if(player) {
+					this.validateJourney(errors, player);
+					if(player.isHenchman) {
+						errors.push("You already serve the Nemesis.");
+					} else {
+						if(!player.offers.find(o => o.type == enums.OfferTypes.Recruit)) {
+							errors.push("The Nemesis needs to \`!recruit\` you first.");
+						}
+						let henchmen = await sql.getHenchmen(channel);
+						let world = await sql.getWorld(channel);
+						let maxHenchmen = Math.floor(world.maxPopulation / 5);
+						if(henchmen.length >= maxHenchmen) {
+							errors.push("The Nemesis already has too many henchmen.");
+						}
 					}
 				}
 				break;
@@ -652,20 +715,24 @@ module.exports = {
 				// - Target must be a henchman
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
-				if(target) {
-					if(target.id == player.id) {
-						errors.push(`You cannot energize yourself.`);
-					} else {
-						if(!target.isHenchman) {
-							errors.push(`${target.name} doesn't work for you.`);
+				if(player) {
+					this.validateJourney(errors, player);
+					if(target) {
+						this.validateJourney(errors, target);
+						if(target.id == player.id) {
+							errors.push(`You cannot energize yourself.`);
+						} else {
+							if(!target.isHenchman) {
+								errors.push(`${target.name} doesn't work for you.`);
+							}
 						}
+						if(nemesis.energizeTime > now) {
+							let timeString = tools.getTimeString(nemesis.energizeTime - now);
+							errors.push('**' + player.name + '** cannot energize a henchman for another ' + timeString + '.');
+						}
+					} else {
+						errors.push('Must specify a valid target.');
 					}
-					if(nemesis.energizeTime > now) {
-						let timeString = tools.getTimeString(nemesis.energizeTime - now);
-						errors.push('**' + player.name + '** cannot energize a henchman for another ' + timeString + '.');
-					}
-				} else {
-					errors.push('Must specify a valid target.');
 				}
 				break;
 			case 'revive':
@@ -676,23 +743,26 @@ module.exports = {
 				// - Target must be a henchman
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
-				if(target) {
-					if(target.id == player.id) {
-						errors.push(`You cannot revive yourself.`);
-					} else {
-						if(!target.isHenchman) {
-							errors.push(`${target.name} doesn't work for you.`);
+				if(player) {
+					if(target) {
+						this.validateJourney(errors, target);
+						if(target.id == player.id) {
+							errors.push(`You cannot revive yourself.`);
+						} else {
+							if(!target.isHenchman) {
+								errors.push(`${target.name} doesn't work for you.`);
+							}
 						}
+						if(!target.status.find(s => s.type == enums.StatusTypes.Dead)) {
+							errors.push(`${target.name} doesn't need to be revived right now.`);
+						}
+						if(nemesis.reviveTime > now) {
+							let timeString = tools.getTimeString(nemesis.reviveTime - now);
+							errors.push('**' + player.name + '** cannot revive a henchman for another ' + timeString + '.');
+						}
+					} else {
+						errors.push('Must specify a valid target.');
 					}
-					if(!target.status.find(s => s.type == 0)) {
-						errors.push(`${target.name} doesn't need to be revived right now.`);
-					}
-					if(nemesis.reviveTime > now) {
-						let timeString = tools.getTimeString(nemesis.reviveTime - now);
-						errors.push('**' + player.name + '** cannot revive a henchman for another ' + timeString + '.');
-					}
-				} else {
-					errors.push('Must specify a valid target.');
 				}
 				break;
 			case 'taunt':
@@ -704,22 +774,24 @@ module.exports = {
 				// - Player must not have a sent taunt
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					let defeated = player.status.find(s => s.type == 0);
+					this.validateJourney(errors, player);
+					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
 					}
 					if(target) {
+						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push('You cannot taunt yourself!');
 						}
-						let targetDefeated = target.status.find(s => s.type == 0);
+						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
 						}
-						let playerTaunt = player.offers.find(o => o.type == 3);
-						let targetTaunt = target.offers.find(o => o.type == 3);
+						let playerTaunt = player.offers.find(o => o.type == enums.OfferTypes.Taunt);
+						let targetTaunt = target.offers.find(o => o.type == enums.OfferTypes.Taunt);
 						if(playerTaunt) {
 							errors.push('You have already taunted someone.');
 						}
@@ -752,6 +824,11 @@ module.exports = {
 	validateNotNemesis(errors, player) {
 		if(player.isNemesis) {
 			errors.push('The Nemesis knows only battle.');
+		}
+	},
+	validateJourney(errors, player) {
+		if(player.status.find(s => s.type == enums.StatusTypes.Journey)) {
+			errors.push(`**${player.name}** is away on a journey.`);
 		}
 	},
 	validateActionTime(errors, player) {
