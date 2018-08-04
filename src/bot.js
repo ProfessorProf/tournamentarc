@@ -73,7 +73,6 @@ client.on('disconnect', function(msg, code) {
 	let now = new Date();
 	console.log(`Disconnected at ${now.toLocaleString("en-US")}`);
 	if (code === 0) return console.error(msg);
-	bot.connect();
 });
 
 client.on('error', (e) => {
@@ -92,6 +91,7 @@ client.on('message', message => {
 				let errorMessage = `Error: ${err.message}`;
 				if(auth.adminId) errorMessage += ` <@${auth.adminId}>\n The admin has been notified. If possible, try not to touch this feature until they get here.`;
 				message.channel.send(errorMessage);
+				console.log(err);
 			});
 	}
 });
