@@ -829,7 +829,7 @@ module.exports = {
 	},
 	async deleteHenchmen(channel) {
 		await sql.run(`DELETE FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM PlayerStatus WHERE Channel = $channel AND Type = 3`, {$channel: channel});
+		await sql.run(`DELETE FROM PlayerStatus WHERE Channel = $channel AND Status_ID = 3`, {$channel: channel});
 	},
 	async deleteRecruitOffers(channel) {
 		await sql.run(`DELETE FROM Offers WHERE Channel = $channel AND Type = 2`, {$channel: channel});

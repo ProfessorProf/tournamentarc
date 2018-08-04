@@ -217,7 +217,7 @@ module.exports = {
 			if(training) {
 				// Estimate post-training power level
 				let world = await sql.getWorld(player.channel);
-				const hours = trainingTime / hour;
+				let hours = trainingTime / hour;
 				if (hours > 72) {
 					hours = 72;
 				}
@@ -531,7 +531,7 @@ module.exports = {
 		let skill2 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
 		
 		const history = await sql.getHistory(player1.id, player2.id);
-		if(history) {
+		if(history && history.length > 0) {
 			// Calculate revenge bonus from losing streak
 			const revengePlayerId = history[0].winnerId == player1.id ? player2.id : player1.id;
 			let battles = 0;
@@ -572,10 +572,10 @@ module.exports = {
 		let battleLog = '';
 		if(skill1 < 0.8) {
 			battleLog += `${player1.name} underestimates ${this.their(player1.config.pronoun)} foe!`;
-		} else if(skill1 > 1.2) {
-			battleLog += `${player1.name} surpasses ${this.their(player1.config.pronoun)} limits!`;
 		} else if(skill1 > 1.5) {
 			battleLog += `${player1.name} goes *even further beyond!*`;
+		} else if(skill1 > 1.2) {
+			battleLog += `${player1.name} surpasses ${this.their(player1.config.pronoun)} limits!`;
 		} else {
 			battleLog += `${player1.name} fights hard!`;
 		}
@@ -583,10 +583,10 @@ module.exports = {
 		
 		if(skill2 < 0.8) {
 			battleLog += `${player2.name} underestimates ${this.their(player2.config.pronoun)} foe!`;
-		} else if(skill2 > 1.2) {
-			battleLog += `${player2.name} surpasses ${this.their(player2.config.pronoun)} limits!`;
 		} else if(skill2 > 1.5) {
 			battleLog += `${player2.name} goes *even further beyond!*`;
+		} else if(skill2 > 1.2) {
+			battleLog += `${player2.name} surpasses ${this.their(player2.config.pronoun)} limits!`;
 		} else {
 			battleLog += `${player2.name} fights hard!`;
 		}
@@ -653,7 +653,7 @@ module.exports = {
 				// End the nemesis
 				nemesis.id = null;
 				nemesis.cooldown = now + 24 * hour;
-				await sql.deleteRecruitOffers(channel);
+				await sql.deleteRecruitOffers(nemesis.channel);
 				await sql.deleteHenchmen(nemesis.channel);
 				loser.level = this.newPowerLevel(data.heat * 0.8);
 				hours = 24;
@@ -1028,6 +1028,7 @@ module.exports = {
 		sql.addOffer(sourcePlayer, targetPlayer, enums.OfferTypes.Fusion, fusionName);
 		console.log(`'New fusion offer from ${sourcePlayerName} for player ${targetPlayerName} expires at ${new Date(expiration)}`);
 		
+		let embed = new Discord.RichEmbed();
 		embed.setTitle('FUSION OFFER')
 			.setColor(0x00AE86)
 			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter ${fuseCommand} to accept the offer and fuse.\n` +
@@ -1255,7 +1256,7 @@ module.exports = {
 						await sql.deleteStatus(channel, target.id, enums.StatusTypes.Dead);
 						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					} else {
-						await sql.setStatus(defeated);
+						await sql.setStatus(defeatedState);
 						let duration = defeatedState.endTime - now;
 						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
