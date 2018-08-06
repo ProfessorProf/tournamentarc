@@ -91,7 +91,7 @@ module.exports = {
 					if(nemesis) {
 						if(nemesis.attackTime > now) {
 							let timeString = tools.getTimeString(nemesis.attackTime - now);
-							errors.push('**' + player.name + '** cannot attack indiscriminately for another ' + timeString + '.');
+							errors.push(`**${player.name}** cannot attack indiscriminately for another ${timeString}.`);
 						}
 						if(target) {
 							this.validateJourney(errors, target);
@@ -101,7 +101,7 @@ module.exports = {
 							let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
 							if(targetDefeated) {
 								let timeString = tools.getTimeString(targetDefeated.endTime - now);
-								errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
+								errors.push(`**${target.name}** cannot fight for another ${timeString}.`);
 							}
 						} else {
 							errors.push('Must specify a valid target.');
@@ -473,6 +473,9 @@ module.exports = {
 				}
 				if(target) {
 					this.validateJourney(errors, target);
+					if(target.npcFlag) {
+						errors.push("You can't fuse with an NPC.");
+					}
 					if(target.fusionFlag) {
 						errors.push(`**${target.name} can't fuse again until the game resets.`);
 					}
@@ -612,6 +615,8 @@ module.exports = {
 				// - Target must be alive
 				// - Target must not be you
 				// - Must have at least one orb
+				errors.push("This command has been disabled.");
+				break;
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
@@ -667,6 +672,9 @@ module.exports = {
 					}
 					if(target.id == player.id) {
 						errors.push(`That's not what "be your own boss" means.`);
+					}
+					if(target.npcFlag) {
+						errors.push("You can't recruit NPCs.");
 					}
 				} else {
 					errors.push('Must specify a valid target.');

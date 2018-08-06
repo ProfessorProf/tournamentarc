@@ -108,6 +108,9 @@ module.exports = {
 					case enums.StatusTypes.Fern:
 						statuses.push(`Power level hidden (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
+					case enums.StatusTypes.Fused:
+						statuses.push(`Fused (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
 					case enums.StatusTypes.PowerWish:
 						statuses.push(`Blessed with power`);
 						break;
@@ -291,19 +294,21 @@ module.exports = {
 			if(p.name.length > headers[0]) headers[0] = p.name.length;
 			
 			let rank = '-';
-			if(p.glory >= 1000) {
+			let glory = p.glory;
+			if(this.isFusion(p)) glory /= 2;
+			if(glory >= 1000) {
 				rank = 'U';
-			} else if(p.glory >= 700) {
+			} else if(glory >= 700) {
 				rank = 'SSS';
-			} else if(p.glory >= 400) {
+			} else if(glory >= 400) {
 				rank = 'SS';
-			} else if(p.glory >= 250) {
+			} else if(glory >= 250) {
 				rank = 'S';
-			} else if(p.glory >= 150) {
+			} else if(glory >= 150) {
 				rank = 'A';
-			} else if(p.glory >= 100) {
+			} else if(glory >= 100) {
 				rank = 'B';
-			} else if(p.glory >= 50) {
+			} else if(glory >= 50) {
 				rank = 'C';
 			}
 			row.push(rank);
@@ -398,7 +403,7 @@ module.exports = {
 			let player2 = await sql.getPlayer(channel, target);
 			let offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
-			if(!offer && !player2.isNemesis && !player2.isHenchman) {
+			if(!offer && !player2.isNemesis && !player2.isHenchman && !player2.npcFlag) {
 				// If there isn't a challenge, send a taunt
 				let glory = Math.ceil(Math.min(player2.level / player1.level * 5, 50));
 				embed.setTitle('BATTLE CHALLENGE')
@@ -428,7 +433,7 @@ module.exports = {
 			let player2 = await sql.getPlayer(channel, target);
 			let offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
-			if(!offer && !player2.isNemesis && !player2.isHenchman) {
+			if(!offer && !player2.isNemesis && !player2.isHenchman && !player2.npcFlag) {
 				// If they haven't offered, send a challenge
 				embed.setTitle('BATTLE CHALLENGE')
 					.setColor(0x00AE86)
@@ -470,7 +475,7 @@ module.exports = {
 			hours = 1000;
 		}
 		this.addHeat(world, hours);
-		const newPowerLevel = this.newPowerLevel(world.heat);
+		let newPowerLevel = this.newPowerLevel(world.heat);
 		if (this.isFusion(player)) {
 			newPowerLevel *= 1.3;
 		}
@@ -659,7 +664,7 @@ module.exports = {
 				hours = 24;
 				output += `${winner.name} defeated the Nemesis!`
 				if(nemesisHistory.length > 1 && !winner.isHenchman) {
-					output +=  `Everyone's sacrifices were not in vain!`;
+					output +=  ` Everyone's sacrifices were not in vain!`;
 				}
 				output += `\n`;
 
@@ -672,6 +677,7 @@ module.exports = {
 					} else {
 						gloryGains[h.id] = {
 							name: h.name,
+							id: h.id,
 							oldGlory: h.glory,
 							glory: 20
 						};
@@ -684,6 +690,9 @@ module.exports = {
 					if(rankUp) {
 						output += `${g.name}'s Rank has increased!\n`;
 					}
+					const gloryPlayer = await sql.getPlayerById(g.id);
+					gloryPlayer.glory += g.glory;
+					await sql.setPlayer(gloryPlayer);
 				}
 			}
 
@@ -725,7 +734,7 @@ module.exports = {
 			let loserOrbs = loser.items.find(i => i.type == enums.ItemTypes.Orb);
 			let winnerOrbs = winner.items.find(i => i.type == enums.ItemTypes.Orb);
 			if(loserOrbs) {
-				output += `\n${winner.name} took ${loserOrbs.count} magic orbs from ${loser.name}!`;
+				output += `\n${winner.name} took ${loserOrbs.count} magic ${loserOrbs.count > 1 ? 'orbs' : 'orb'} from ${loser.name}!`;
 				await sql.addItems(winner.channel, winner.id, enums.ItemTypes.Orb, loserOrbs.count);
 				await sql.addItems(loser.channel, loser.id, enums.ItemTypes.Orb, -loserOrbs.count);
 				if(loserOrbs.count + (winnerOrbs ? winnerOrbs.count : 0) == 7) {
@@ -786,7 +795,11 @@ module.exports = {
 		winner.lastFought = now;
 
 		// Save changes
-		await sql.setPlayer(loser);
+		if(loser.npcFlag) {
+			await sql.deletePlayer(loser.id);
+		} else {
+			await sql.setPlayer(loser);
+		}
 		await sql.setPlayer(winner);
 		
 		return output;
@@ -987,6 +1000,7 @@ module.exports = {
 				powerWish: sourcePlayer.powerWish || targetPlayer.powerWish,
 				glory: sourcePlayer.glory + targetPlayer.glory,
 				lastActive: now,
+				lastFought: Math.max(sourcePlayer.lastFought, targetPlayer.lastFought),
 				trainingDate: now,
 				gardenTime: now,
 				actionTime: now,
@@ -1034,7 +1048,8 @@ module.exports = {
 			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter ${fuseCommand} to accept the offer and fuse.\n` +
 			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
 			'The offer will expire in six hours.');
-		return { embed: embed, message: null };
+		const message = targetPlayer.config.ping ? `<@${targetPlayer.userId}>` : null;
+		return { embed: embed, message: message };
 	},
 	// Establish a character as a new Nemesis.
     async setNemesis(channel, username) {
@@ -1621,7 +1636,7 @@ module.exports = {
 				}
 				break;
 			case 'immortality':
-				output += '\nNo matter how great of an injury, you suffer, you will always swiftly return!';
+				output += '\nNo matter how great of an injury you suffer, you will always swiftly return!';
 				let defeatedState = player.status.find(s => s.type == enums.StatusTypes.Dead);
 				if(defeatedState) {
 					await sql.deleteStatus(channel, player.id, enums.StatusTypes.Dead);
@@ -1801,19 +1816,19 @@ module.exports = {
 					break;
 				case enums.StatusTypes.Energized:
 					// Energize
-					decrease = player.level - player.level / 1.3;
+					decrease = this.getPowerLevel(player) - this.getPowerLevel(player) / 1.3;
 					messages.push(`**${player.name}** is no longer energized; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case enums.StatusTypes.Overdrive: 
 					// Overdrive - reduce power level
-					decrease = player.level * 0.1;
-					player.level -= decrease;
+					decrease = this.getPowerLevel(player) * 0.1;
+					player.level *= 0.9;
 					await sql.setPlayer(player);
 					messages.push(`**${player.name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case enums.StatusTypes.Bean: 
 					// Bean
-					decrease = player.level - player.level / 1.12;
+					decrease = this.getPowerLevel(player) - this.getPowerLevel(player) / 1.12;
 					messages.push(`**${player.name}** is no longer bean-boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
 				case enums.StatusTypes.Fused:
@@ -1863,7 +1878,7 @@ module.exports = {
 					// Clean up the fusion player
 					await sql.deletePlayer(player.id);
 
-					messages.push(`**${status.Name}** disappears in a flash of light, leaving two warriors behind.`);
+					messages.push(`**${player.name}** disappears in a flash of light, leaving two warriors behind.`);
 					if(pings && fusedPlayer1.config.ping) {
 						pings.push(fusedPlayer1.userId);
 					}
