@@ -478,7 +478,7 @@ module.exports = {
 			await this.addStatus(channel, playerId, 5);
 		}
 	},
-	// Delete a Status.
+	// Delete a Player and all associated items/statuses.
 	async deletePlayer(playerId) {
 		await sql.run(`DELETE FROM Players WHERE ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
@@ -520,7 +520,7 @@ module.exports = {
 		if(nemesis) {
 			let rows = await sql.all(`SELECT h.*, l.Name, l.Glory FROM History h
 			LEFT JOIN Players l ON l.ID = h.Loser_ID
-			WHERE h.Winner_ID = $nemesisId AND h.Battle_Time > $nemesisTime`, {$nemesisId: nemesis.ID, $nemesisTime: nemesis.Nemesis_Time});
+			WHERE h.Winner_ID = $nemesisId AND h.Battle_Time > $nemesisTime`, {$nemesisId: nemesis.Player_ID, $nemesisTime: nemesis.Nemesis_Time});
 			let history = rows.map(r => {
 				return {
 					name: r.Name,
