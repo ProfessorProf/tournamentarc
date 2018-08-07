@@ -17,11 +17,11 @@ client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
 
 	sql.getChannels().then(async channels => {;
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		if(channels.length > 0) {
-			for(let i in channels) {
-				let c = channels[i];
-				let channel = client.channels.find(x => x.id == c);
+			for(const i in channels) {
+				const c = channels[i];
+				const channel = client.channels.find(x => x.id == c);
 				if(channel && channel.name == auth.channel) {
 					if(debugmode) {
 						channel.send(`Bot in debug mode. Only the admin can use commands.`);
@@ -30,7 +30,7 @@ client.on('ready', () => {
 					}
 
 					let world = await sql.getWorld(c);
-					let downtime = now - world.lastUpdate
+					const downtime = now - world.lastUpdate
 					console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
 					if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
 						await sql.fastForward(c, downtime);
@@ -42,27 +42,27 @@ client.on('ready', () => {
 	});
 	
     setInterval(async function() {
-		let channels = await sql.getChannels();
+		const channels = await sql.getChannels();
 		let updatedChannels = [];
-		for(let i in channels) {
-			let c = channels[i];
+		for(const i in channels) {
+			const c = channels[i];
 			
-			let update = await tools.updateWorld(c);
+			const update = await tools.updateWorld(c);
 			if(update.embed) {
 				updatedChannels.push(c);
-				let channel = client.channels.find(x => x.id == c);
+				const channel = client.channels.find(x => x.id == c);
 				if(channel) {
 					channel.send({embed: update.embed});
 				} else {
 					console.log(`Unrecognized channel ${c}`);
 				}
 				if(update.pings.length > 0) {
-					let pings = update.pings.map(ping => `<@${ping}>`);
+					const pings = update.pings.map(ping => `<@${ping}>`);
 					channel.send(pings.join(', '));
 				}
 			}
 		}
-		let now = new Date();
+		const now = new Date();
 		if(updatedChannels.length > 0) {
 			console.log(`${now.toLocaleString('en-US')}: Update completed for channels ${updatedChannels.join(', ')}`);
 		}
@@ -70,7 +70,7 @@ client.on('ready', () => {
 });
 
 client.on('disconnect', function(msg, code) {
-	let now = new Date();
+	const now = new Date();
 	console.log(`Disconnected at ${now.toLocaleString("en-US")}`);
 	if (code === 0) return console.error(msg);
 });
@@ -92,7 +92,8 @@ client.on('message', message => {
 				if(auth.adminId) errorMessage += ` <@${auth.adminId}>\n The admin has been notified. If possible, try not to touch this feature until they get here.`;
 				message.channel.send(errorMessage);
 				console.log(err);
-			});
+			}
+		);
 	}
 });
 
@@ -100,13 +101,13 @@ async function handleMessage(message) {
 	if(debugmode && message.author.username != auth.admin) {
 		return;
 	}
-	let now = new Date().getTime();
+	const now = new Date().getTime();
 	let name = message.author.username;
 	let args = message.content.substring(1).split(' ');
 	let cmd = args[0].toLowerCase();
 	args = args.splice(1);
 
-	let channel = message.channel.id;
+	const channel = message.channel.id;
 
 	let outputMessage = {
 		print: [],
@@ -131,8 +132,8 @@ async function handleMessage(message) {
 		await sql.initializeGame()
 		await sql.initializeChannel(channel);
 		message.channel.send('Initialization complete.');
-		let endTime = new Date().getTime();
-		let duration = (endTime - now) / 1000;
+		const endTime = new Date().getTime();
+		const duration = (endTime - now) / 1000;
 		console.log(`${channel}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 		return;
 	}
@@ -142,13 +143,13 @@ async function handleMessage(message) {
 		outputMessage.print.push(`Complete`);
 	}
 
-	let update = await tools.updateWorld(channel);
+	const update = await tools.updateWorld(channel);
 	if(update.embed) { 
 		message.channel.send({embed: update.embed});
 	}
 	if(update.abort) return;
 	
-	let errors = await validation.validate(channel, name, cmd, args);
+	const errors = await validation.validate(channel, name, cmd, args);
 	if(errors) {
 		message.channel.send({embed: {
 			title: 'Error',
@@ -157,7 +158,7 @@ async function handleMessage(message) {
 		return;
 	}
 	
-	let targetName = args[0];
+	const targetName = args[0];
 	switch(cmd) {
 		case 'reg':
 			// Add a new player
@@ -279,6 +280,10 @@ async function handleMessage(message) {
 			outputMessage.embed = await tools.graveyard(channel);
 			outputMessage.informational = true;
 			break;
+		case 'world':
+			outputMessage.embed = await tools.worldInfo(channel);
+			outputMessage.informational = true;
+			break;
 		case 'taunt':
 			const tauntResult = await tools.taunt(channel, name, targetName);
 			outputMessage.embed = tauntResult.embed;
@@ -324,8 +329,8 @@ async function handleMessage(message) {
 		}
 	}
 
-	for(let i in outputMessage.print) {
-		let text = outputMessage.print[i];
+	for(const i in outputMessage.print) {
+		const text = outputMessage.print[i];
 		if(outputMessage.informational && outputMessage.private) {
 			message.author.sendMessage(text);
 		} else {
@@ -333,8 +338,8 @@ async function handleMessage(message) {
 		}
 	}
 	await sql.playerActivity(channel, name);
-	let endTime = new Date();
-	let duration = (endTime.getTime() - now) / 1000;
+	const endTime = new Date();
+	const duration = (endTime.getTime() - now) / 1000;
 	console.log(`(${channel}) ${endTime.toLocaleString("en-US")}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 }
 
