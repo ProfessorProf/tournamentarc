@@ -19,7 +19,7 @@ module.exports = {
 			return null;
 		}
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		embed.setTitle(player.name.toUpperCase())
 			.setColor(0x00AE86);
 
@@ -28,7 +28,7 @@ module.exports = {
 		} else if(this.isFusion(player)) {
 			embed.setDescription(`Fusion between ${player.fusionNames[0]} and ${player.fusionNames[1]}`);
 		} else if(player.isHenchman) {
-			let energyPercent = Math.max(100 - 20 * player.henchmanDefeats, 0)
+			const energyPercent = Math.max(100 - 20 * player.henchmanDefeats, 0)
 			embed.setDescription(`HENCHMAN\nProtecting the Nemesis at ${energyPercent}% power`);
 		}
 		
@@ -59,7 +59,7 @@ module.exports = {
 		if(player.status.find(s => s.type == enums.StatusTypes.Fern)) {
 			stats += 'Unknown';
 		} else {
-			let level = this.getPowerLevel(player);
+			const level = this.getPowerLevel(player);
 			stats += numeral(level.toPrecision(2)).format('0,0');
 			if(player.status.find(s => s.type == enums.StatusTypes.Training)) {
 				stats += '?';
@@ -77,8 +77,8 @@ module.exports = {
 
 		// Display Status
 		let statuses = [];
-		for(let i in player.status) {
-			let s = player.status[i];
+		for(const i in player.status) {
+			const s = player.status[i];
 			if(!s.ends || s.endTime > now) {
 				switch(s.type) {
 					case enums.StatusTypes.Dead:
@@ -130,7 +130,7 @@ module.exports = {
 			statuses.push(`Ready to act in ${this.getTimeString(player.actionTime - now)}`);
 		}
 		if(player.isNemesis) {
-			let nemesis = await sql.getNemesis(player.channel);
+			const nemesis = await sql.getNemesis(player.channel);
 			if(nemesis.attackTime > now) {
 				statuses.push(`Ready to attack in ${this.getTimeString(nemesis.attackTime - now)}`);
 			}
@@ -153,8 +153,8 @@ module.exports = {
 
 		// Display Inventory
 		let items = [];
-		for(let i in player.items) {
-			let item = player.items[i];
+		for(const i in player.items) {
+			const item = player.items[i];
 			items.push(`${item.name} (${item.count} held)`);
 		}
 		if(items.length > 0) {
@@ -163,8 +163,8 @@ module.exports = {
 
 		// Display Offers
 		let offers = [];
-		for(let i in player.offers) {
-			let o = player.offers[i];
+		for(const i in player.offers) {
+			const o = player.offers[i];
 			if(o.expires > now) {
 				switch(o.type) {
 					case enums.OfferTypes.Fight:
@@ -194,7 +194,7 @@ module.exports = {
 	},
 	// Scout a player's estimated power level and status.
     async scoutPlayer(channel, target) {
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let player = await sql.getPlayer(channel, target);
 		if(!player) {
 			console.log('Player not found');
@@ -211,8 +211,8 @@ module.exports = {
 		}
 		
 		stats = 'Power Level: '
-		let training = player.status.find(s => s.type == enums.StatusTypes.Training);
-		let trainingTime = now - (training ? training.startTime : 0);
+		const training = player.status.find(s => s.type == enums.StatusTypes.Training);
+		const trainingTime = now - (training ? training.startTime : 0);
 		if(player.status.find(s => s.type == enums.StatusTypes.Fern)) {
 			stats += 'Unknown';
 		} else {
@@ -237,7 +237,7 @@ module.exports = {
 					seenLevel += newPowerLevel * (1 + 0.01 * (hours / 16));
 				}
 			}
-			let level = numeral(seenLevel.toPrecision(2));
+			const level = numeral(seenLevel.toPrecision(2));
 			stats += level.format('0,0');
 		}
 		if(training) {
@@ -275,12 +275,12 @@ module.exports = {
 	// Creates a table displaying the name, rank, status and power level of all active players.
     async displayRoster(channel) {
 		let players = await sql.getPlayers(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		
 		// Build the table out in advance so we can get column widths
 		let headers = [4, 4, 6, 11];
 		let rows = [];
-		for(let i in players) {
+		for(const i in players) {
 			let p = players[i];
 			if (p.fusionId && p.fusionId != p.id) {
 				continue;
@@ -314,9 +314,9 @@ module.exports = {
 			row.push(rank);
 			
 			p.status.sort((a,b) => b.priority - a.priority);
-			let statuses = p.status.filter(s => s.priority > 0);
+			const statuses = p.status.filter(s => s.priority > 0);
 			
-			let status = statuses.length > 0 ? statuses[0].name : 'Normal';
+			const status = statuses.length > 0 ? statuses[0].name : 'Normal';
 			
 			row.push(status);
 			if(status.length > headers[2]) headers[2] = status.length;
@@ -324,9 +324,9 @@ module.exports = {
 			let seenLevel = this.getPowerLevel(p);
 			let level = numeral(seenLevel.toPrecision(2)).format('0,0');
 			
-			if(p.status.find(s => s.type == 8)) {
+			if(p.status.find(s => s.type == enums.StatusTypes.Carrot)) {
 				level = 'Unknown'
-			} else if(p.status.find(s => s.type == 2)) {
+			} else if(p.status.find(s => s.type == enums.StatusTypes.Training)) {
 				level += '?'
 			}
 			if(p.isNemesis) {
@@ -338,7 +338,7 @@ module.exports = {
 			if(this.isFusion(p)) {
 				level += ' [FUSION]';
 			}
-			let orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
+			const orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
 			if(orbs && orbs.count > 0) {
 				level += ` [${'*'.repeat(orbs.count)}]`;
 			}
@@ -362,7 +362,7 @@ module.exports = {
 		output += '-'.repeat(headers[3]) + ' ';
 		output += '\n';
 		
-		for(let i in rows) {
+		for(const i in rows) {
 			let row = rows[i];
 			output += row[0].padEnd(headers[0] + 1);
 			output += row[1].padEnd(headers[1] + 1);
@@ -379,7 +379,7 @@ module.exports = {
 		let player2 = await sql.getPlayer(channel, target);
 		let nemesis = await sql.getNemesis(channel);
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		
 		embed.setTitle(`NEMESIS INVASION`)
 			.setColor(0x00AE86);
@@ -401,11 +401,11 @@ module.exports = {
 		
 		if(target) {
 			let player2 = await sql.getPlayer(channel, target);
-			let offer = player1.offers.find(o => o.playerId == player2.id && 
+			const offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
 			if(!offer && !player2.isNemesis && !player2.isHenchman && !player2.npcFlag) {
 				// If there isn't a challenge, send a taunt
-				let glory = Math.ceil(Math.min(player2.level / player1.level * 5, 50));
+				const glory = Math.ceil(Math.min(player2.level / player1.level * 5, 50));
 				embed.setTitle('BATTLE CHALLENGE')
 					.setColor(0x00AE86)
 					.setDescription(`**${player1.name}** has issued a taunt to **${player2.name}**! ` +
@@ -420,7 +420,7 @@ module.exports = {
 				// There's already a challenge here - just FIGHT
 				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
 						.setColor(0x00AE86);
-				return this.fight(player1, player2, offer.type == enums.OfferTypes.Taunt, embed);
+				return this.fight(player1, player2, offer ? offer.type == enums.OfferTypes.Taunt : false, embed);
 			}
 		}
 	},
@@ -431,7 +431,7 @@ module.exports = {
 		
 		if(target) {
 			let player2 = await sql.getPlayer(channel, target);
-			let offer = player1.offers.find(o => o.playerId == player2.id && 
+			const offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
 			if(!offer && !player2.isNemesis && !player2.isHenchman && !player2.npcFlag) {
 				// If they haven't offered, send a challenge
@@ -469,10 +469,10 @@ module.exports = {
 		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Journey);
 		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Training);
 
-		let time = forcedValue ? forcedValue : (now - trainingState.startTime);
+		const time = forcedValue ? forcedValue : (now - trainingState.startTime);
 		const hours = time / hour;
-		if (hours > 1000) {
-			hours = 1000;
+		if (hours > 72) {
+			hours = 72;
 		}
 		this.addHeat(world, hours);
 		let newPowerLevel = this.newPowerLevel(world.heat);
@@ -497,28 +497,25 @@ module.exports = {
 		let world = await sql.getWorld(channel);
 
 		// Give the attacked player a ping if they want one
-		let ping = null;
-		if(player2.config.ping) {
-			ping = player2.userId;
-		}
+		const ping = player2.config.ping ? player2.userId : null;
 		
 		// If fighters are training - take them out of training and power them up
 		await this.completeTraining(player1);
 		await this.completeTraining(player2);
 
-		// Bean bonuses
+		// Get our power levels
 		let level1 = this.getPowerLevel(player1);
 		let level2 = this.getPowerLevel(player2);
 
 		if(player2.isNemesis) {
 			// Someone attacked the Nemesis, summon henchmen!
 			let henchmenMessages = [];
-			let henchmen = await sql.getHenchmen(channel);
-			for(let i in henchmen) {
-				let h = await sql.getPlayerById(henchmen[i].id);
+			const henchmen = await sql.getHenchmen(channel);
+			for(const i in henchmen) {
+				const h = await sql.getPlayerById(henchmen[i].id);
 				if(!h.status.find(s => s.type == 0) && h.id != player1.id) {
 					// Living henchman, send energy
-					let boost = this.getPowerLevel(h) * (1 - 0.2 * henchmen[i].defeats);
+					const boost = this.getPowerLevel(h) * (1 - 0.2 * henchmen[i].defeats);
 					if(boost > 0) {
 						henchmenMessages.push(`${h.name} boosts ${player2.name}'s energy by ${numeral(boost.toPrecision(2)).format('0,0')}!`);
 					}
@@ -529,7 +526,7 @@ module.exports = {
 				embed.addField('The Nemesis summons henchmen!', henchmenMessages.join('\n'));
 			}
 		}
-		embed.addField('Power Levels', `${player1.name}: ${numeral(level1.toPrecision(2)).format('0,0')}\n${player2.name}: ${numeral(level2.toPrecision(2)).format('0,0')}`);
+		embed.addField('Power Levels', `${player1.name}: ${numeral(level1.toPrecision(3)).format('0,0')}\n${player2.name}: ${numeral(level2.toPrecision(3)).format('0,0')}`);
 		
 		// Randomize, then adjust skill ratings
 		let skill1 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
@@ -571,8 +568,8 @@ module.exports = {
 		console.log(`${player2.name}: PL ${Math.floor(level2 * 10) / 10}, Skill ${Math.floor(skill2 * 10) / 10}`);
 		
 		// Final battle scores!
-		let score1 = Math.sqrt(level1 * skill1);
-		let score2 = Math.sqrt(level2 * skill2);
+		const score1 = Math.sqrt(level1 * skill1);
+		const score2 = Math.sqrt(level2 * skill2);
 		
 		let battleLog = '';
 		if(skill1 < 0.8) {
@@ -609,8 +606,8 @@ module.exports = {
 			skills = [skill2, skill1];
 		}
 		
-		let nemesisHistory = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
-		let output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], 
+		const nemesisHistory = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
+		const output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], 
 			taunted && players[1].id == player2.id, nemesisHistory);
 		embed.addField('Results', output);
 
@@ -621,7 +618,7 @@ module.exports = {
 	},
 	// Process updates based on who won and lost a fight.
 	async handleFightOutcome(data, winner, loser, winnerSkill, loserSkill, taunted, nemesisHistory) {
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let output = '';
 		
 		// Loser gains the Ready status, winner loses ready status if training
@@ -631,14 +628,14 @@ module.exports = {
 		await sql.deleteStatus(data.channel, loser.id, enums.StatusTypes.Berserk);
 		
 		// Determine length of KO
-		let difference = winnerSkill - loserSkill + 1; 	// Effective 0-2
-		let intensity = Math.max(winnerSkill, loserSkill); // Effective 0-2
-		let hours = Math.ceil(difference * intensity * 3);
-		hours = Math.max(hours, Math.min(hours, 12), 1);
+		const difference = winnerSkill - loserSkill + 1; 		// Effective 0-2 (barring skill modifiers)
+		const intensity = Math.max(winnerSkill, loserSkill);	// Effective 0-2
+		let hours = Math.ceil(difference * intensity * 3);		// Effective 0-12
+		hours = Math.max(Math.min(hours, 12), 1);				// Cap it at range 1-12 for now
 		
 		let trueForm = false;
-		let winnerLevel = this.getPowerLevel(winner);
-		let loserLevel = this.getPowerLevel(loser);
+		const winnerLevel = this.getPowerLevel(winner);
+		const loserLevel = this.getPowerLevel(loser);
 		if(nemesisHistory) {
 			// The Nemesis is dead!
 			let nemesis = await sql.getNemesis(winner.channel);
@@ -670,8 +667,8 @@ module.exports = {
 
 				// Give 20 Glory for each failed fight against this Nemesis
 				let gloryGains = {};
-				for(let i in nemesisHistory) {
-					let h = nemesisHistory[i];
+				for(const i in nemesisHistory) {
+					const h = nemesisHistory[i];
 					if(gloryGains[h.id]) {
 						gloryGains[h.id].glory += 20;
 					} else {
@@ -683,9 +680,9 @@ module.exports = {
 						};
 					}
 				}
-				for(let key in gloryGains) {
-					let g = gloryGains[key];
-					let rankUp = this.rankUp(g.oldGlory, g.glory);
+				for(const key in gloryGains) {
+					const g = gloryGains[key];
+					const rankUp = this.rankUp(g.oldGlory, g.glory);
 					output += `${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}\n`;
 					if(rankUp) {
 						output += `${g.name}'s Rank has increased!\n`;
@@ -702,7 +699,7 @@ module.exports = {
 		// Award glory to the winner
 		let glory = Math.ceil(Math.min(loserLevel / winnerLevel * 10, 100));
 		if(loser.isNemesis) glory *= 3;
-		let rankUp = this.rankUp(winner.glory, glory);
+		const rankUp = this.rankUp(winner.glory, glory);
 		winner.glory += glory;
 		if(trueForm) {
 			output += `${winner.name} gains ${glory} Glory. Total Glory: ${winner.glory}`;
@@ -715,7 +712,7 @@ module.exports = {
 
 		// If the fight is in response to a taunt, and the taunter lost, reduce their Glory
 		if(taunted) {
-			let gloryPenalty = Math.ceil(Math.min(glory / 2, loser.glory));
+			const gloryPenalty = Math.ceil(Math.min(glory / 2, loser.glory));
 			loser.glory -= gloryPenalty;
 			output += `\n${loser.name} loses ${gloryPenalty} Glory.`
 		}
@@ -723,16 +720,19 @@ module.exports = {
 		if(winner.isNemesis) {
 			// Longer KO, but the Nemesis is weakened
 			hours = 12;
-			let maxPowerLoss = (loserSkill < 0.8 ? 0.025 : (loserSkill > 1.2 ? 0.075 : 0.05)) * this.getPowerLevel(winner);
-			let powerLoss = Math.min(maxPowerLoss, this.getPowerLevel(loser) * 0.5);
+			let maxPowerLoss = 0.04;
+			if(loserSkill < 0.8) maxPowerLoss = 0.02;
+			else if(loserSkill > 1.5) maxPowerLoss = 0.08;
+			else if(loserSkill > 1.2) maxPowerLoss = 0.06;
+			const powerLoss = Math.min(maxPowerLoss, this.getPowerLevel(loser) * 0.5);
 			output += `\nThe Nemesis is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
 			winner.level -= powerLoss;
 		}
 		
 		// Orb transfers
 		if(!trueForm) {
-			let loserOrbs = loser.items.find(i => i.type == enums.ItemTypes.Orb);
-			let winnerOrbs = winner.items.find(i => i.type == enums.ItemTypes.Orb);
+			const loserOrbs = loser.items.find(i => i.type == enums.ItemTypes.Orb);
+			const winnerOrbs = winner.items.find(i => i.type == enums.ItemTypes.Orb);
 			if(loserOrbs) {
 				output += `\n${winner.name} took ${loserOrbs.count} magic ${loserOrbs.count > 1 ? 'orbs' : 'orb'} from ${loser.name}!`;
 				await sql.addItems(winner.channel, winner.id, enums.ItemTypes.Orb, loserOrbs.count);
@@ -856,9 +856,9 @@ module.exports = {
 		let target = await sql.getPlayer(channel, targetName);
 		let nemesis = await sql.getNemesis(channel);
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		
-		let increase = this.getPowerLevel(target) * .3;
+		const increase = this.getPowerLevel(target) * .3;
 		await sql.addStatus(channel, target.id, 3, now + hour * 3);
 		nemesis.energizeTime = now + hour * 3;
 		await sql.setNemesis(channel, nemesis);
@@ -871,7 +871,7 @@ module.exports = {
 		let target = await sql.getPlayer(channel, targetName);
 		let nemesis = await sql.getNemesis(channel);
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		
 		await sql.deleteStatus(channel, target.id, enums.StatusTypes.Dead);
 		await sql.addStatus(channel, target.id, enums.StatusTypes.Ready);
@@ -892,7 +892,7 @@ module.exports = {
 		await sql.deleteOffer(nemesis.id, player.id, enums.OfferTypes.Recruit);
 
 		// If we just hit max henchmen, delete all outstanding recruitment offers
-		let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
+		const maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
 		if(henchmen.length + 1 >= maxHenchmen) {
 			await sql.deleteRecruitOffers(channel);
 		}
@@ -904,7 +904,7 @@ module.exports = {
 		let players = await sql.getPlayers(channel);
 		let nemesis = await sql.getNemesis(channel);
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let embed = new Discord.RichEmbed();
 		
 		embed.setTitle('DESTRUCTION')
@@ -912,17 +912,17 @@ module.exports = {
 			.setColor(0x00AE86);
 		
 		let targetPlayers = [];
-		for(let i in players) {
+		for(const i in players) {
 			let p = players[i];
 			if(p && !p.isNemesis && !p.status.find(s => s.type == enums.StatusTypes.Dead)) {
 				targetPlayers.push(p);
 			}
 		}
-		let targets = Math.min(targetPlayers.length, 3);
-		let firstTarget = Math.floor(Math.random() * targetPlayers.length);
+		const targets = Math.min(targetPlayers.length, 3);
+		const firstTarget = Math.floor(Math.random() * targetPlayers.length);
 		
 		let output = '';
-		for(let i = 0; i < targets; i++) {
+		for(const i = 0; i < targets; i++) {
 			let target = targetPlayers[(firstTarget + i) % targetPlayers.length];
 			await this.completeTraining(target);
 			
@@ -941,7 +941,6 @@ module.exports = {
 				await sql.addItems(channel, target.id, enums.ItemTypes.Orb, -orbs.count);
 			}
 			output += '\n';
-			await sql.setPlayer(target);
 		}
 		
 		nemesis.destroyTime = now + 24 * hour;
@@ -957,12 +956,11 @@ module.exports = {
 	async burn(channel) {
 		let nemesis = await sql.getNemesis(channel);
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
-		let embed = new Discord.RichEmbed();
+		const now = new Date().getTime();
 
-		let firstPick = Math.floor(Math.random() * 3);
-		for(let i = 0; i < 3; i++) {
-			let index = (i + firstPick) % 3;
+		const firstPick = Math.floor(Math.random() * 3);
+		for(const i = 0; i < 3; i++) {
+			const index = (i + firstPick) % 3;
 			if(garden.plants[index]) {
 				// Found a plant, burn it
 				let plant = garden.plants[index];
@@ -1062,7 +1060,7 @@ module.exports = {
 		}
 		
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		embed.setTitle(player.name.toUpperCase())
 			.setColor(0x00AE86);
 		
@@ -1119,7 +1117,7 @@ module.exports = {
 	},
 	// Generates a new power level based on the current Heat.
     newPowerLevel(heat) {
-        let base = Math.ceil((1 + Math.random()) * 100);
+        const base = Math.ceil((1 + Math.random()) * 100);
         let level = Math.pow(base, 1 + heat / 1200);
         if(level > 1000000000000000000) level = 1000000000000000000; // JS craps out if we go higher than this
         return level;
@@ -1127,8 +1125,8 @@ module.exports = {
 	// Increase Heat, modified by reset count.
     addHeat(data, heat) {
 		if(!data) return;
-		let multiplier = 10 / Math.max(10, data.maxPopulation);
-        let addedHeat = heat * Math.pow(1.05, data.resets) * multiplier;
+		const multiplier = 10 / Math.max(10, data.maxPopulation);
+        const addedHeat = heat * Math.pow(1.05, data.resets) * multiplier;
         data.heat += addedHeat;
         console.log(`Heat increased by ${heat} to ${data.heat}`);
 	},
@@ -1136,7 +1134,7 @@ module.exports = {
 	async plant(channel, name, plantName) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
 		// Which spot is open?
 		let slot = 0;
@@ -1162,9 +1160,9 @@ module.exports = {
 		
 		// Update garden level
 		if(!player.gardenLevel) player.gardenLevel = 0;
-		let oldGardenLevel = Math.floor(player.gardenLevel);
+		const oldGardenLevel = Math.floor(player.gardenLevel);
 		player.gardenLevel += 1 / (1 + player.gardenLevel);
-		let newGardenLevel = Math.floor(player.gardenLevel);
+		const newGardenLevel = Math.floor(player.gardenLevel);
 		if(newGardenLevel > oldGardenLevel) {
 			output += '\nGardening level increased!';
 		}
@@ -1176,20 +1174,20 @@ module.exports = {
 	async water(channel, name, fixedTime) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
-		let time = player ? ((Math.random() * 20 + 5) * 60 * 1000) * (1 + 0.09 * player.gardenLevel)
+		const time = player ? ((Math.random() * 20 + 5) * 60 * 1000) * (1 + 0.09 * player.gardenLevel)
 			: fixedTime;
 		let output = player ? `${player.name} works on the garden.` : '';
-		for(let i in garden.plants) {
+		for(const i in garden.plants) {
 			let plant = garden.plants[i];
 			if(plant) {
-				let duration = plant.endTime - plant.startTime;
-				let oldProgress = ((now - plant.startTime) / duration) * 100;
+				const duration = plant.endTime - plant.startTime;
+				const oldProgress = ((now - plant.startTime) / duration) * 100;
 				if(oldProgress < 100) {
 					plant.startTime -= time;
-					let newProgress = ((now - plant.startTime) / duration) * 100;
-					let growth = Math.ceil((newProgress - oldProgress) * 10) / 10;
+					const newProgress = ((now - plant.startTime) / duration) * 100;
+					const growth = Math.ceil((newProgress - oldProgress) * 10) / 10;
 					output += `\n${plant.name} growth increases by ${growth}%.`;
 					if(newProgress >= 100) {
 						output += ` It's ready to be picked!`;
@@ -1202,9 +1200,9 @@ module.exports = {
 		// Update garden level
 		if(player) {
 			if(!player.gardenLevel) player.gardenLevel = 0;
-			let oldGardenLevel = Math.floor(player.gardenLevel);
+			const oldGardenLevel = Math.floor(player.gardenLevel);
 			player.gardenLevel += 1 / (1 + player.gardenLevel);
-			let newGardenLevel = Math.floor(player.gardenLevel);
+			const newGardenLevel = Math.floor(player.gardenLevel);
 			if(newGardenLevel > oldGardenLevel) {
 				output += '\nGardening level increased!';
 			}
@@ -1217,7 +1215,7 @@ module.exports = {
 	async pick(channel, name, plantType) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
 		// Find the plant
 		let plant = plantType ?
@@ -1235,7 +1233,7 @@ module.exports = {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let target = await sql.getPlayer(channel, targetName);
 		let plantItem = player.items.find(i => i.name.toLowerCase() == plantType.toLowerCase());
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
 		if(!target && plantItem.type != enums.ItemTypes.Sedge) {
 			return;
@@ -1257,7 +1255,7 @@ module.exports = {
 						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					} else {
 						await sql.setStatus(defeatedState);
-						let duration = defeatedState.endTime - now;
+						const duration = defeatedState.endTime - now;
 						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
 				}
@@ -1272,7 +1270,7 @@ module.exports = {
 						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					} else {
 						await sql.setStatus(defeatedState);
-						let duration = defeatedState.endTime - now;
+						const duration = defeatedState.endTime - now;
 						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
 				}
@@ -1285,20 +1283,20 @@ module.exports = {
 			case 4:
 				// Bean
 				await sql.addStatus(channel, target.id, enums.StatusTypes.Bean, now + hour);
-				let levelBoost = this.getPowerLevel(target) * .12;
+				const levelBoost = this.getPowerLevel(target) * .12;
 				output = `**${target.name}** eats the bean, and ${this.their(target.config.pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
 			case 5:
 				// Sedge
 				output = await this.water(channel, null, 2.3 * hour);
 				let garden = await sql.getGarden(channel);
-				let expansion = (Math.random() * 15 + 15) * 10 / (100 * (3 + garden.growthLevel));
-				let percent = Math.floor(1000 * expansion) / 10;
+				const expansion = (Math.random() * 15 + 15) * 10 / (100 * (3 + garden.growthLevel));
+				const percent = Math.floor(1000 * expansion) / 10;
 				console.log(`Sedge advanced garden level by ${percent}%`);
 				output += `\nThe garden's growth level increases with a rating of ${percent}%.`;
 				garden.growthLevel += expansion;
-				let gardenEfficiency = 1 + 0.1 * garden.growthLevel;
-				let rate = Math.floor(1000 / gardenEfficiency) / 10;
+				const gardenEfficiency = 1 + 0.1 * garden.growthLevel;
+				const rate = Math.floor(1000 / gardenEfficiency) / 10;
 				output += `\nYour plants now take ${rate}% the usual time to grow.`;
 				await sql.setGarden(garden);
 				break;
@@ -1319,26 +1317,26 @@ module.exports = {
 	async expand(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
 		let output = '';
 
-		let expansion = (Math.random() * 25 + 5) * (1 + 0.09 * player.gardenLevel) / (100 * (3 + garden.growthLevel));
+		const expansion = (Math.random() * 25 + 5) * (1 + 0.09 * player.gardenLevel) / (100 * (3 + garden.growthLevel));
 		console.log(`${player.name} advanced garden level by ${Math.floor(expansion * 100) / 100}`);
-		let percent = Math.floor(100 * expansion);
+		const percent = Math.floor(1000 * expansion) / 10;
 		output += `**${player.name}** works on the garden, with a gardening rating of ${percent}%.`;
 		garden.growthLevel += expansion;
 		
-		let gardenEfficiency = 1 + 0.1 * garden.growthLevel;
-		let rate = Math.floor(1000 / gardenEfficiency) / 10;
+		const gardenEfficiency = 1 + 0.1 * garden.growthLevel;
+		const rate = Math.floor(1000 / gardenEfficiency) / 10;
 		output += `\nYour plants now take ${rate}% the usual time to grow.`;
 		
 		// Update garden level
 		if(player) {
 			if(!player.gardenLevel) player.gardenLevel = 0;
-			let oldGardenLevel = Math.floor(player.gardenLevel);
+			const oldGardenLevel = Math.floor(player.gardenLevel);
 			player.gardenLevel += 1 / (1 + player.gardenLevel);
-			let newGardenLevel = Math.floor(player.gardenLevel);
+			const newGardenLevel = Math.floor(player.gardenLevel);
 			if(newGardenLevel > oldGardenLevel) {
 				output += '\nGardening level increased!';
 			}
@@ -1354,15 +1352,15 @@ module.exports = {
 	async research(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
 		let output = '';
 
-		let research = (Math.random() * 15 + 5) * (1 + 0.075 * player.gardenLevel) / (100 * (3 + garden.researchLevel));
+		const research = (Math.random() * 15 + 5) * (1 + 0.075 * player.gardenLevel) / (100 * (3 + garden.researchLevel));
 		console.log(`${player.name} advanced plant research by ${Math.floor(research * 100) / 100}`);
-		let percent = Math.floor(100 * research);
+		const percent = Math.floor(1000 * research) / 10;
 		output += `**${player.name}** researches new kinds of plants, with a rating of ${percent}%.`;
-		let oldResearchLevel = garden.researchLevel;
+		const oldResearchLevel = garden.researchLevel;
 		garden.researchLevel += research;
 		
 		if(Math.floor(oldResearchLevel) < Math.floor(garden.researchLevel)) {
@@ -1386,9 +1384,9 @@ module.exports = {
 		// Update garden level
 		if(player) {
 			if(!player.gardenLevel) player.gardenLevel = 0;
-			let oldGardenLevel = Math.floor(player.gardenLevel);
+			const oldGardenLevel = Math.floor(player.gardenLevel);
 			player.gardenLevel += 1 / (1 + player.gardenLevel);
-			let newGardenLevel = Math.floor(player.gardenLevel);
+			const newGardenLevel = Math.floor(player.gardenLevel);
 			if(newGardenLevel > oldGardenLevel) {
 				output += '\nGardening level increased!';
 			}
@@ -1404,7 +1402,7 @@ module.exports = {
 	async resetData(channel) {
 		await sql.resetWorld(channel);
 		let players = await sql.getPlayers(channel);
-		for(let i in players) {
+		for(const i in players) {
 			let player = players[i];
 			if(this.isFusion(player)) {
 				await sql.deletePlayer(player.id);
@@ -1426,7 +1424,7 @@ module.exports = {
 	// Register a new player.
 	async registerPlayer(channel, username, userId, name) {
 		let world = await sql.getWorld(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		this.addHeat(world, 10);
 		let player = {
 			name: name,
@@ -1464,14 +1462,14 @@ module.exports = {
 		
 		let plants = garden.plants.map(p => this.getPlantStatus(p));
 		let plantStatus = '';
-		for(let i = 0; i < 3; i++) {
-			plantStatus += `Plant #${i+1}: ${plants[i]}\n`
+		for(const i = 0; i < 3; i++) {
+			plantStatus += `Plant #${i+1}: ${plants[i]}\n`;
 		}
 
-		let growthLevel = Math.floor(garden.growthLevel);
-		let growthProgress = Math.floor((garden.growthLevel - Math.floor(growthLevel)) * 100);
-		let researchLevel = Math.floor(garden.researchLevel);
-		let researchProgress = Math.floor((garden.researchLevel - Math.floor(researchLevel)) * 100);
+		const growthLevel = Math.floor(garden.growthLevel);
+		const growthProgress = Math.floor((garden.growthLevel - Math.floor(growthLevel)) * 100);
+		const researchLevel = Math.floor(garden.researchLevel);
+		const researchProgress = Math.floor((garden.researchLevel - Math.floor(researchLevel)) * 100);
 
 		plantStatus += `\nGrowth Level: ${growthLevel} (${growthProgress}%)\nResearch Level: ${researchLevel} (${researchProgress}%)`
 		embed.setDescription(plantStatus);
@@ -1479,14 +1477,13 @@ module.exports = {
 		return embed;
 	},
 	getPlantStatus(plant) {
-		let now = new Date().getTime();
-		let output = '';
+		const now = new Date().getTime();
 		if(plant) {
-			let duration = plant.endTime - plant.startTime;
+			const duration = plant.endTime - plant.startTime;
 			if(now > plant.endTime) {
 				return `${plant.name} (ready to pick)`;
 			} else {
-				let progress = Math.floor(((now - plant.startTime) / duration) * 100 );
+				const progress = Math.floor(((now - plant.startTime) / duration) * 100 );
 				return `${plant.name} (${progress}% complete)`;
 			}
 		} else {
@@ -1496,12 +1493,11 @@ module.exports = {
 	// Search for orbs.
 	async search(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
-		let garden = await sql.getGarden(channel);
 		let world = await sql.getWorld(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let output = '';
 
-		let effectiveTime = Math.min(now - world.lastWish, hour * 72);
+		const effectiveTime = Math.min(now - world.lastWish, hour * 72);
 		let searchModifier = effectiveTime / (hour * 72);
 		searchModifier *= 10 / Math.max(world.maxPopulation, 10)
 		if(player.status.find(s => s.type == enums.StatusTypes.Carrot)) searchModifier *= 3;
@@ -1515,7 +1511,7 @@ module.exports = {
 			await sql.addItems(channel, player.id, enums.ItemTypes.Orb, 1);
 			world.lostOrbs--;
 			output = `${player.name} searches the world, and finds a magic orb!`;
-			let existingOrbs = player.items.find(i => i.type == enums.StatusTypes.Orb);
+			const existingOrbs = player.items.find(i => i.type == enums.StatusTypes.Orb);
 			if(!existingOrbs) {
 				// Start the fight timer
 				player.lastFought = now;
@@ -1528,31 +1524,31 @@ module.exports = {
 			roll = Math.random();
 			if(roll < searchChance) {
 				//They found a plant!
-				let plantType = Math.floor(Math.random() % 6) + 1;
+				const plantType = Math.floor(Math.random() % 6) + 1;
 				let plantName;
 				switch(plantType) {
-					case 1:
+					case enums.ItemTypes.Flower:
 						plantName = 'flower';
 						break;
-					case 2:
+					case enums.ItemTypes.Rose:
 						plantName = 'rose';
 						break;
-					case 3:
+					case enums.ItemTypes.Carrot:
 						plantName = 'carrot';
 						break;
-					case 4:
+					case enums.ItemTypes.Bean:
 						plantName = 'bean';
 						break;
-					case 5:
+					case enums.ItemTypes.Sedge:
 						plantName = 'sedge';
 						break;
-					case 6:
+					case enums.ItemTypes.Fern:
 						plantName = 'fern';
 						break;
 				}
 				console.log(`${player.name} found a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 				output = `${player.name} searches the world, and finds a ${plantName}!`;
-				let existingPlants = player.items.find(i => i.type == plantType);
+				const existingPlants = player.items.find(i => i.type == plantType);
 				if(existingPlants && existingPlants.count >= 3) {
 					output += ` But you can't carry any more.`;
 				} else {
@@ -1581,9 +1577,11 @@ module.exports = {
 						"a dinosaur egg.",
 						"a single delicious muffin.",
 						"a giant catfish.",
-						"two huge snakes."
+						"two huge snakes.",
+						"a grief seed.",
+						"a Zorb skeleton. Looks pretty fearsome..."
 					];
-					let junk = junkItems[Math.floor(Math.random() * junkItems.length)];
+					const junk = junkItems[Math.floor(Math.random() * junkItems.length)];
 					console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 					output = `${player.name} searches the world, and finds ${junk}`;
 				} else {
@@ -1598,9 +1596,9 @@ module.exports = {
 		}
 		
 		if(!player.actionLevel) player.actionLevel = 0;
-		let oldActionLevel = Math.floor(player.actionLevel);
+		const oldActionLevel = Math.floor(player.actionLevel);
 		player.actionLevel += 1 / (1 + player.actionLevel);
-		let newActionLevel = Math.floor(player.actionLevel);
+		const newActionLevel = Math.floor(player.actionLevel);
 		if(newActionLevel > oldActionLevel) {
 			output += '\nAction level increased!';
 		}
@@ -1613,7 +1611,7 @@ module.exports = {
 	async wish(channel, name, wish) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let world = await sql.getWorld(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let output = `**${player.name}** makes a wish, and the orbs shine with power...!`
 		
 		switch(wish.toLowerCase()) {
@@ -1624,9 +1622,9 @@ module.exports = {
 				break;
 			case 'resurrection':
 				let players = await sql.getPlayers(channel);
-				for(let i in players) {
-					let p = players[i];
-					let defeatedState = p.status.find(s => s.type == enums.StatusTypes.Dead);
+				for(const i in players) {
+					const p = players[i];
+					const defeatedState = p.status.find(s => s.type == enums.StatusTypes.Dead);
 					if(defeatedState) {
 						output += `\n${p.name} is revived!`;
 						await sql.deleteStatus(channel, p.id, enums.StatusTypes.Dead);
@@ -1637,7 +1635,7 @@ module.exports = {
 				break;
 			case 'immortality':
 				output += '\nNo matter how great of an injury you suffer, you will always swiftly return!';
-				let defeatedState = player.status.find(s => s.type == enums.StatusTypes.Dead);
+				const defeatedState = player.status.find(s => s.type == enums.StatusTypes.Dead);
 				if(defeatedState) {
 					await sql.deleteStatus(channel, player.id, enums.StatusTypes.Dead);
 				}
@@ -1675,28 +1673,28 @@ module.exports = {
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Training);
 	},
 	async startJourney(channel, name, hoursString) {
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let player = await sql.getPlayerByUsername(channel, name);
-		let hours = parseInt(hoursString);
+		const hours = parseInt(hoursString);
 		if(hours != hours) return;
 
-		let training = player.status.find(s => s.type == enums.StatusTypes.Training);
-		let trainingTime = training ? now - training.startTime : 0;
+		const training = player.status.find(s => s.type == enums.StatusTypes.Training);
+		const trainingTime = training ? now - training.startTime : 0;
 
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Journey, now + hours * hour, trainingTime);
 		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
 		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Training);
 
-		let pronoun = player.config.pronoun.charAt(0).toUpperCase() + player.config.pronoun.substring(1);
+		const pronoun = player.config.pronoun.charAt(0).toUpperCase() + player.config.pronoun.substring(1);
 		return `**${player.name}** sets off on a journey to become stronger! ${pronoun} won't return for another ${hours} hours.`;
 	},
 	async updateGarden(channel, lastUpdate) {
 		let garden = await sql.getGarden(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let messages = [];
 
-		for(let i in garden.plants) {
-			let p = garden.plants[i];
+		for(const i in garden.plants) {
+			const p = garden.plants[i];
 			if(p && p.endTime > lastUpdate && p.endTime <= now) {
 				messages.push(`A ${p.name} has finished growing in the garden!`);
 			}
@@ -1707,12 +1705,24 @@ module.exports = {
 	async updatePlayerActivity(channel, lastUpdate, pings) {
 		let world = await sql.getWorld(channel);
 		let players = await sql.getPlayers(channel);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let messages = [];
 
 		let activePlayers = 0;
-		for(let i in players) {
-			let p = players[i];
+		for(const i in players) {
+			const p = players[i];
+			if(p.lastActive > now) {
+				// Debug for that one glitch
+				console.log(`Detected future active date for ${p.name} in channel ${p.channel}`);
+				p.lastActive = now;
+				await sql.setPlayer(p);
+			}
+			if(p.lastFought > now) {
+				// Debug for that one glitch
+				console.log(`Detected future fight date for ${p.name} in channel ${p.channel}`);
+				p.lastFought = now;
+				await sql.setPlayer(p);
+			}
 			if(p.lastActive + 24 * hour > now) {
 				// Player is active
 				activePlayers++;
@@ -1730,9 +1740,9 @@ module.exports = {
 					let orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
 					if(orbs) {
 						messages.push(`${p.name} must fight someone in the next hour or lose an orb.`);
-					}
-					if(p.config.ping) {
-						pings.push(p.userId);
+						if(p.config.ping) {
+							pings.push(p.userId);
+						}
 					}
 				}
 				if(p.lastActive + 23 * hour < now &&
@@ -1741,9 +1751,9 @@ module.exports = {
 				}
 			} else if(p.lastActive + 24 * hour > lastUpdate) {
 				// Player has become inactive
-				let orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
+				const orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
+				console.log(`${p.name} logged idle; last activity recorded at ${new Date(p.lastActive).toLocaleString('en-US')}`);
 				if(orbs) {
-					console.log(`${p.name} logged idle; last activity recorded at ${new Date(p.lastActive).toLocaleString('en-US')}`);
 					await sql.addItems(channel, p.id, enums.ItemTypes.Orb, -orbs.count);
 					world.lostOrbs += orbs.count;
 					messages.push(`${p.name} has been idle for too long; ` + 
@@ -1763,13 +1773,13 @@ module.exports = {
 	async ruinAlert(channel, lastUpdate) {
 		let nemesis = await sql.getNemesis(channel);
 		if(nemesis && nemesis.ruinTime > 0) {
-			let now = new Date().getTime();
-			let nemesisStartTime = nemesis.ruinTime - 24 * hour;
-			let hours = Math.floor((lastUpdate - nemesisStartTime) / hour);
-			let nextUpdateTime = nemesisStartTime + (hours + 1) * hour;
+			const now = new Date().getTime();
+			const nemesisStartTime = nemesis.ruinTime - 24 * hour;
+			const hours = Math.floor((lastUpdate - nemesisStartTime) / hour);
+			const nextUpdateTime = nemesisStartTime + (hours + 1) * hour;
 			if(nextUpdateTime > lastUpdate && nextUpdateTime <= now) {
 				// Reminder the players about their impending doom
-				let hoursLeft = 24 - hours - 1;
+				const hoursLeft = 24 - hours - 1;
 				if(hoursLeft > 0) {
 					return { message: `${hoursLeft} hours until the galaxy is destroyed!`, abort: false };
 				} else {
@@ -1783,11 +1793,11 @@ module.exports = {
 	},
 	async deleteExpired(channel, pings) {
 		let expired = await sql.getExpired(channel);
-		let now = new Date().getTime();		
+		const now = new Date().getTime();		
 		let messages = [];
 
 		// React to statuses ending
-		for(let i in expired.statuses) {
+		for(const i in expired.statuses) {
 			let status = expired.statuses[i];
 			let player = await sql.getPlayerById(status.playerId);
 			let decrease;
@@ -1800,10 +1810,10 @@ module.exports = {
 					break;
 				case enums.StatusTypes.Journey:
 					// Journey
-					let storedTrainingTime = status.rating;
-					let journeyTime = status.endTime - status.startTime;
-					let journeyEffect = Math.random() + 0.8;
-					let time = journeyTime * journeyEffect + storedTrainingTime;
+					const storedTrainingTime = status.rating;
+					const journeyTime = status.endTime - status.startTime;
+					const journeyEffect = Math.random() + 0.8;
+					const time = journeyTime * journeyEffect + storedTrainingTime;
 					await this.completeTraining(player, time);
 					if(journeyEffect < 1) {
 						messages.push(`**${player.name}** returns from a rough training journey!`);
@@ -1894,8 +1904,8 @@ module.exports = {
 		}
 
 		let offerIds = []
-		for(let i in expired.offers) {
-			let offer = expired.offers[i];
+		for(const i in expired.offers) {
+			const offer = expired.offers[i];
 			let player = await sql.getPlayerById(offer.playerId); 	
 			if(player.lastActive + hour < now && player.lastActive + 24 * hour > now) {
 				// The player is idle, but not SUPER idle - stall the offer timer
@@ -1906,7 +1916,7 @@ module.exports = {
 					case enums.OfferTypes.Taunt:
 						// Failed taunt - reduce their Glory
 						let target = await sql.getPlayerById(offer.targetId);
-						let glory = Math.ceil(Math.min(Math.min(target.level / player.level * 5, 50)), target.glory);
+						const glory = Math.ceil(Math.min(Math.min(target.level / player.level * 5, 50)), target.glory);
 						target.glory -= glory;
 						await sql.setPlayer(target);
 						messages.push(`**${target.name}** failed to respond to **${player.name}**; Glory -${glory}.`);
@@ -1917,11 +1927,11 @@ module.exports = {
 		}
 
 		// Delete 'em
-		for(let i in expired.statuses) {
+		for(const i in expired.statuses) {
 			const status = expired.statuses[i];
 			await sql.deleteStatus(channel, status.playerId, status.type);
 		}
-		for(let i in offerIds) {
+		for(const i in offerIds) {
 			const offer = expired.offers[i];
 			await sql.deleteOffer(offer.playerId, offer.targetId, offer.type);
 		}
@@ -1938,7 +1948,7 @@ module.exports = {
 		messages = messages.concat(await this.deleteExpired(channel, pings));
 		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate, pings));
 		messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
-		let ruinStatus = await this.ruinAlert(channel);
+		const ruinStatus = await this.ruinAlert(channel);
 		if(ruinStatus) {
 			messages.push(ruinStatus.message);
 			abort = ruinStatus.abort;
@@ -1986,8 +1996,7 @@ module.exports = {
 	},
 	async displayConfig(player) {
 		let embed = new Discord.RichEmbed();
-		let now = new Date().getTime();
-		let config = player.config;
+		const config = player.config;
 		embed.setTitle(`${player.name} Config`)
 			.setColor(0x00AE86);
 		//
@@ -2001,7 +2010,7 @@ module.exports = {
 	getPowerLevel(player) {
 		let level = player.level;
 		// Overdrive
-		let overdrive = player.status.find(s => s.type == enums.StatusTypes.Overdrive);
+		const overdrive = player.status.find(s => s.type == enums.StatusTypes.Overdrive);
 		if(overdrive) {
 			level *= overdrive.rating;
 		}
@@ -2028,7 +2037,7 @@ module.exports = {
 		return level;
 	},
 	readConfigBoolean(value, oldValue) {
-		let v = value.toLowerCase();
+		const v = value.toLowerCase();
 		if(v == 'off' || v == '0' || v == 'false') {
 			return false;
 		} else if(v == 'on' || v == '1' || v == 'true') {
@@ -2084,7 +2093,7 @@ module.exports = {
 		await sql.addItems(channel, target.id, enums.ItemTypes.Orb, 1);
 
 		let output = `${player.name} gives a magic orb to ${target.name}.`;
-		let existingOrbs = target.items.find(i => i.type == enums.ItemTypes.Orb);
+		const existingOrbs = target.items.find(i => i.type == enums.ItemTypes.Orb);
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 		}
@@ -2096,7 +2105,7 @@ module.exports = {
 		let player2 = await sql.getPlayer(channel, name2);
 		let history = await sql.getHistory(player1.id, player2 ? player2.id : null);
 		let embed = new Discord.RichEmbed();
-		let twoPlayers = player2 && player2.id != player1.id;
+		const twoPlayers = player2 && player2.id != player1.id;
 
 		if(twoPlayers) {
 			embed.setTitle(`${player1.name} VS ${player2.name} Battle History`);
@@ -2110,8 +2119,8 @@ module.exports = {
 			if(history.length == 0) {
 				embed.setDescription(`${player1.name} and ${player2.name} have never fought.`);
 			} else {
-				let player1wins = history.filter(h => h.winnerId == player1.id).length;
-				let player2wins = history.filter(h => h.winnerId == player2.id).length;
+				const player1wins = history.filter(h => h.winnerId == player1.id).length;
+				const player2wins = history.filter(h => h.winnerId == player2.id).length;
 				if(player1wins > 1) {
 					description += `${player1.name} has beaten ${player2.name} ${player1wins} times.\n`;
 				} else if(player1wins == 1) {
@@ -2131,8 +2140,8 @@ module.exports = {
 			if(history.length == 0) {
 				embed.setDescription(`${player1.name} has never fought.`);
 			} else {
-				let player1wins = history.filter(h => h.winnerId == player1.id).length;
-				let player1losses = history.length - player1wins;
+				const player1wins = history.filter(h => h.winnerId == player1.id).length;
+				const player1losses = history.length - player1wins;
 				description += `${player1.name} has won ${player1wins} ${player1wins == 1 ? 'time' : 'times'} and lost ${player1losses} ${player1losses == 1 ? 'time' : 'times'}.\n`;
 			}
 		}
@@ -2140,14 +2149,14 @@ module.exports = {
 
 		let output = '';
 		if(history.length > 15) history = history.slice(0, 15);
-		for(let i in history) {
-			let h = history[i];
-			let battleTime = new Date(h.battleTime).toLocaleString('en-US');
+		for(const i in history) {
+			const h = history[i];
+			const battleTime = new Date(h.battleTime).toLocaleString('en-US');
 
 			if(output.length > 0) output += '\n';
 
-			let loserRating = Math.sqrt(h.loserLevel * h.loserSkill);
-			let winnerRating = Math.sqrt(h.winnerLevel * h.winnerSkill);
+			const loserRating = Math.sqrt(h.loserLevel * h.loserSkill);
+			const winnerRating = Math.sqrt(h.winnerLevel * h.winnerSkill);
 
 			output += `${battleTime}: ${h.winnerName} defeated ${h.loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
 		}
@@ -2158,9 +2167,9 @@ module.exports = {
 	async empower(channel, name, targetName) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let target = await sql.getPlayer(channel, targetName);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 
-		let transfer = Math.min(player.level * 0.1, target.level * 0.25);
+		const transfer = Math.min(player.level * 0.1, target.level * 0.25);
 
 		player.level -= transfer;
 		target.level += transfer;
@@ -2169,9 +2178,9 @@ module.exports = {
 			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
 		
 		if(!player.actionLevel) player.actionLevel = 0;
-		let oldActionLevel = Math.floor(player.actionLevel);
+		const oldActionLevel = Math.floor(player.actionLevel);
 		player.actionLevel += 1 / (1 + player.actionLevel);
-		let newActionLevel = Math.floor(player.actionLevel);
+		const newActionLevel = Math.floor(player.actionLevel);
 		if(newActionLevel > oldActionLevel) {
 			output += '\nAction level increased!';
 		}
@@ -2184,22 +2193,22 @@ module.exports = {
 	},
 	async graveyard(channel) {
 		let players = await sql.getPlayers(channel);
-		let deadPlayers = players.filter(p => p.status.find(s => s.type == enums.StatusTypes.Dead));
+		const deadPlayers = players.filter(p => p.status.find(s => s.type == enums.StatusTypes.Dead));
 		deadPlayers.sort((a, b) => {
-			let aDeath = a.status.find(s => s.type == enums.StatusTypes.Dead);
-			let bDeath = b.status.find(s => s.type == enums.StatusTypes.Dead);
+			const aDeath = a.status.find(s => s.type == enums.StatusTypes.Dead);
+			const bDeath = b.status.find(s => s.type == enums.StatusTypes.Dead);
 			return aDeath.endTime - bDeath.endTime;
 		});
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let output = '';
 
 		let embed = new Discord.RichEmbed();
 		embed.setTitle(`Defeated Players`)
 			.setColor(0x00AE86);
 		
-		for(let i in deadPlayers) {
-			let p = deadPlayers[i];
-			let s = p.status.find(s => s.type == enums.StatusTypes.Dead);
+		for(const i in deadPlayers) {
+			const p = deadPlayers[i];
+			const s = p.status.find(s => s.type == enums.StatusTypes.Dead);
 			
 			if(output.length > 0) output += '\n';
 			output += `${p.name} (Recovers in ${this.getTimeString(s.endTime - now)})`;
@@ -2213,25 +2222,66 @@ module.exports = {
 
 		return embed;
 	},
+	async worldInfo(channel) {
+		let world = await sql.getWorld(channel);
+		const now = new Date().getTime();
+		let embed = new Discord.RichEmbed();
+		let output = '';
+		let age = 'Age of Beginnings';
+		if(world.heat > 3600) age = 'Age of the Infinite';
+		else if(world.heat > 3000) age = 'Age of Gods';
+		else if(world.heat > 2400) age = 'Age of Myths';
+		else if(world.heat > 1800) age = 'Age of Legends';
+		else if(world.heat > 1200) age = 'Age of Heroes';
+		else if(world.heat > 600) age = 'Age of Warriors';
+
+		output += `This world is currently in the ${age}.`;
+		if(world.resets > 0) {
+			output += ` It has been reset ${world.resets} ${world.resets == 1 ? 'time' : 'times'}.`;
+		}
+		if(world.lostOrbs == 0) {
+			output += '\nThere are no magic orbs hidden in the wild.';
+		} else if(world.lostOrbs == 1) {
+			output += '\nThere is 1 magic orb hidden in the wild.';
+		} else {
+			output += `\nThere are ${world.lostOrbs} magic orbs hidden in the wild.`;
+		}
+		output += `\nThe most active players logged at one time is ${world.maxPopulation}.`;
+
+		const nemesis = await sql.getNemesis(channel);
+		if(nemesis) {
+			if(nemesis.cooldown > now) {
+				output += `\nA new Nemesis can't rise for another ${this.getTimeString(nemesis.cooldown - now)}.`;
+			}
+			if(nemesis.ruinTime > now) {
+				output += `\nUnless the Nemesis is defeated, the universe will end in ${this.getTimeString(nemesis.ruinTime - now)}!`;
+			}
+		}
+
+		embed.setTitle(`World Info`)
+			.setColor(0x00AE86)
+			.setDescription(output);
+		return embed;
+	},
 	async overdrive(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		let output = '';
-		let rating = 1 + ((Math.random() * 10 + 15) * (1 + 0.075 * player.actionLevel)) / 100;
-		let increase = this.getPowerLevel(player) * (rating - 1);
+		const rating = 1 + ((Math.random() * 10 + 15) * (1 + 0.075 * player.actionLevel)) / 100;
+		const increase = this.getPowerLevel(player) * (rating - 1);
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Overdrive, now + hour, rating);
 		output += `${player.name} pushes past ${this.their(player.config.pronoun)} limits, increasing ${this.their(player.config.pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 
 		if(Math.random() < player.overdriveCount / 100) {
-			output += `\nA mighty roar! The surge in power makes ${player.config.pronoun} go berserk!`;
+			output += `\nA mighty roar echoes across the planet! The surge in power makes ${player.config.pronoun} go berserk!`;
 			player.overdriveCount = 0;
 			await sql.addOffer(player, null, enums.OfferTypes.Fight);
 			await sql.addStatus(channel, player.id, enums.StatusTypes.Berserk, now + hour);
 		}
 		if(!player.actionLevel) player.actionLevel = 0;
-		let oldActionLevel = Math.floor(player.actionLevel);
+		const oldActionLevel = Math.floor(player.actionLevel);
 		player.actionLevel += 1 / (1 + player.actionLevel);
-		let newActionLevel = Math.floor(player.actionLevel);
+		const newActionLevel = Math.floor(player.actionLevel);
 		if(newActionLevel > oldActionLevel) {
 			output += '\nAction level increased!';
 		}
@@ -2247,48 +2297,5 @@ module.exports = {
 		await sql.setPlayer(player);
 
 		return `Character ${player.name} linked to user ${username}.`;
-	},
-	async import() {
-		let now = new Date().getTime();
-		await sql.initializeGame();
-
-		let files = fs.readdirSync('./data');
-		for(let i in files) {
-			let file = files[i];
-			let contents = fs.readFileSync(`./data/${file}`, 'utf8');
-			let channel = file.substring(0, file.length - 4);
-			console.log(`Importing channel ${channel}`);
-			await sql.initializeChannel(channel);
-			let data = JSON.parse(contents);
-			// Import players
-			for(let username in data.players) {
-				let playerData = data.players[username];
-				let player = {
-					name: playerData.name,
-					username: username,
-					userId: null,
-					channel: channel,
-					glory: Math.floor(playerData.wins * 2.5),
-					level: this.newPowerLevel(0),
-					lastActive: now,
-					lastFought: now,
-					gardenTime: now - hour,
-					gardenLevel: 0,
-					actionTime: now - hour,
-					actionLevel: 0,
-					fusionId: null,
-					nemesisFlag: false,
-					fusionFlag: false,
-					wishFlag: false,
-					config: {
-						alwaysPrivate: false,
-						ping: false,
-						pronoun: 'they'
-					}
-				};
-				await sql.addPlayer(player);
-				console.log(`Successfully imported player ${player.name}`);
-			}
-		}
 	}
 }

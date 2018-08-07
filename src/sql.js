@@ -111,7 +111,7 @@ module.exports = {
 	// Sets up tables and such for an empty DB.
     async initializeGame() {
 		let queries = initTablesSql.split(';');
-		for(let i in queries) {
+		for(const i in queries) {
 			let query = queries[i];
 			await sql.run(query);
 		}
@@ -119,7 +119,7 @@ module.exports = {
 	// Sets up basic Status/Item/Garden info for a new channel.
     async initializeChannel(channel) {
         let queries = newChannelSql.split(';');
-		for(let i in queries) {
+		for(const i in queries) {
 			let query = queries[i];
 			if(query.indexOf('$channel') > -1) {
 				await sql.run(query, {$channel: channel});
@@ -331,7 +331,7 @@ module.exports = {
 		// 1 = fusion
 		// 2 = henchman
 		// 3 = taunt
-		for(let i in offerRows) {
+		for(const i in offerRows) {
 			let o = offerRows[i];
 			player.offers.push({
 				playerId: o.Player_ID,
@@ -342,7 +342,7 @@ module.exports = {
 				extra: o.Extra
 			});
 		}
-		for(let i in statusRows) {
+		for(const i in statusRows) {
 			let s = statusRows[i];
 			player.status.push({
 				id: s.ID,
@@ -355,7 +355,7 @@ module.exports = {
 				rating: s.Rating
 			});
 		}
-		for(let i in itemRows) {
+		for(const i in itemRows) {
 			let item = itemRows[i];
 			player.items.push({
 				type: item.Item_ID,
@@ -611,7 +611,7 @@ module.exports = {
 					};
 				}
 			}
-			for(let i in itemRows) {
+			for(const i in itemRows) {
 				let plant = itemRows[i];
 				garden.plantTypes.push({
 					id: plant.ID,
@@ -644,7 +644,7 @@ module.exports = {
 	async getPlayers(channel) {
 		let rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY UPPER(Name)`, {$channel: channel});
 		let players = [];
-		for(let i in rows) {
+		for(const i in rows) {
 			let row = rows[i];
 			let player = await this.getPlayerById(row.ID);
 			players.push(player);
@@ -841,7 +841,7 @@ module.exports = {
 		await sql.run(`UPDATE Worlds SET Last_Update = Last_Update + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE Players SET Action_Time = Action_Time + $time, Garden_Time = Garden_Time + $time,
-			Last_Active = Last_Active + $channel, Last_Fought = Last_Fought + $channel
+			Last_Active = Last_Active + $time, Last_Fought = Last_Fought + $time
 			WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE PlayerStatus SET StartTime = StartTime + $time, EndTime = EndTime + $time WHERE Channel = $channel`,

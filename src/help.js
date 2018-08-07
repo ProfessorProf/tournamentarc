@@ -59,7 +59,7 @@ Rank ??? 1000 glory
                 case 'plants':
                     output.addField('Plants', 'Enter `!help garden` for more info on growing, using and discovering plants.');
                     let plants = await sql.getKnownPlants(channel);
-                    for(let i in plants) {
+                    for(const i in plants) {
                         let p = plants[i];
                         switch(p.id) {
                             case 1:
