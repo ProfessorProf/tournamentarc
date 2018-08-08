@@ -724,7 +724,7 @@ module.exports = {
 			if(loserSkill < 0.8) maxPowerLoss = 0.02;
 			else if(loserSkill > 1.5) maxPowerLoss = 0.08;
 			else if(loserSkill > 1.2) maxPowerLoss = 0.06;
-			const powerLoss = Math.min(maxPowerLoss, this.getPowerLevel(loser) * 0.5);
+			const powerLoss = Math.min(maxPowerLoss * winnerLevel, loserLevel * 0.5);
 			output += `\nThe Nemesis is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
 			winner.level -= powerLoss;
 		}
@@ -937,7 +937,7 @@ module.exports = {
 			let orbs = target.items.find(i => i.type == enums.ItemTypes.Orb);
 			if(orbs && orbs.count > 0) {
 				// Their orbs are scattered
-				output += `${orbs.count} ${orbs.count == 1 ? 'orb is' : 'orbs are'} lost in the depths of space!`;
+				output += ` ${orbs.count} ${orbs.count == 1 ? 'orb is' : 'orbs are'} lost in the depths of space!`;
 				await sql.addItems(channel, target.id, enums.ItemTypes.Orb, -orbs.count);
 			}
 			output += '\n';
