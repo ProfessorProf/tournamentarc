@@ -375,7 +375,7 @@ module.exports = {
 		const henchmen = henchmenRows.find(h => h.id == player.id);
 		if(henchmen) {
 			player.isHenchman = true;
-			player.henchmanDefeats = h.defeats;
+			player.henchmanDefeats = henchmen.defeats;
 		}
 		
 		return player;

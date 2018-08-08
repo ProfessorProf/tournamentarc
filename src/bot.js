@@ -27,14 +27,13 @@ client.on('ready', () => {
 						channel.send(`Bot in debug mode. Only the admin can use commands.`);
 					} else {
 						channel.send(`Bot online! Greetings, ${channel.name}.`);
-					}
-
-					let world = await sql.getWorld(c);
-					const downtime = now - world.lastUpdate
-					console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
-					if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
-						await sql.fastForward(c, downtime);
-						channel.send(`Bot was offline for about ${tools.getTimeString(downtime)}.`);
+						let world = await sql.getWorld(c);
+						const downtime = now - world.lastUpdate
+						console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
+						if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
+							await sql.fastForward(c, downtime);
+							channel.send(`Bot was offline for about ${tools.getTimeString(downtime)}.`);
+						}
 					}
 				}
 			}
