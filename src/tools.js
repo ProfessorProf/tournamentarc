@@ -2272,7 +2272,7 @@ module.exports = {
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Overdrive, now + hour, rating);
 		output += `${player.name} pushes past ${this.their(player.config.pronoun)} limits, increasing ${this.their(player.config.pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 
-		if(Math.random() < player.overdriveCount / 100) {
+		if(Math.random() < player.overdriveCount / 40) {
 			output += `\nA mighty roar echoes across the planet! The surge in power makes ${player.config.pronoun} go berserk!`;
 			player.overdriveCount = 0;
 			await sql.addOffer(player, null, enums.OfferTypes.Fight);
