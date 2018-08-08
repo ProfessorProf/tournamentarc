@@ -641,18 +641,18 @@ module.exports = {
 	},
 	// Get all Players in a channel.
 	async getPlayers(channel) {
-		let rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY UPPER(Name)`, {$channel: channel});
+		const rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY UPPER(Name)`, {$channel: channel});
 		let players = [];
 		for(const i in rows) {
-			let row = rows[i];
-			let player = await this.getPlayerById(row.ID);
+			const row = rows[i];
+			const player = await this.getPlayerById(row.ID);
 			players.push(player);
 		}
 		return players;
 	},
 	// Get all Offers in a channel.
 	async getOffers(channel) {
-		let offers = await sql.all(`SELECT o.*, p.Name AS PlayerName, t.Name AS TargetName FROM Offers o
+		const offers = await sql.all(`SELECT o.*, p.Name AS PlayerName, t.Name AS TargetName FROM Offers o
 			LEFT JOIN Players p ON o.Player_ID = p.ID
 			LEFT JOIN Players t ON o.Target_ID = t.ID
 			WHERE o.Channel = $channel`, {$channel: channel});
@@ -660,7 +660,7 @@ module.exports = {
 	},
 	// Get all player Statuses in a channel.
 	async getStatuses(channel) {
-		let statuses = await sql.all(`SELECT ps.*, p.Name, s.Ends FROM PlayerStatus ps
+		const statuses = await sql.all(`SELECT ps.*, p.Name, s.Ends FROM PlayerStatus ps
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
 			LEFT JOIN Players p ON ps.Player_ID = p.ID
 			WHERE ps.Channel = $channel`, {$channel: channel});
@@ -668,10 +668,10 @@ module.exports = {
 	},
 	// Returns all expired statuses, expired offers, and offers that are within 5 minutes of expiring.
 	async getExpired(channel, pings) {
-		let now = new Date().getTime();
-		let offerRows = await sql.all(`SELECT * FROM Offers
+		const now = new Date().getTime();
+		const offerRows = await sql.all(`SELECT * FROM Offers
 			WHERE Channel = $channel AND Expires < $fivemins`, {$channel: channel, $fivemins: now - (5 * 60 * 1000)});
-		let statusRows = await sql.all(`SELECT ps.*, p.Name, p.User_ID, p.Ping_Flag, p.Power_Level FROM PlayerStatus ps
+			const statusRows = await sql.all(`SELECT ps.*, p.Name, p.User_ID, p.Ping_Flag, p.Power_Level FROM PlayerStatus ps
 			LEFT JOIN Players p ON p.ID = ps.Player_ID
 			LEFT JOIN Statuses s ON s.ID = ps.Status_ID
 			WHERE ps.Channel = $channel AND s.Ends <> 0 AND ps.EndTime < $now`, {$channel: channel, $now: now});
@@ -731,23 +731,23 @@ module.exports = {
 		await this.addPlayer(player);
 	},
 	async autofight(channel, targetName) {
-		let player = await this.getPlayer(channel, targetName);
+		const player = await this.getPlayer(channel, targetName);
 		await this.addOffer(player, null, enums.OfferTypes.Fight);
 	},
 	async getChannels() {
-		let initialized = await sql.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Worlds'`);
+		const initialized = await sql.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Worlds'`);
 		if(!initialized) {
 			return [];
 		}
-		let worlds = await sql.all(`SELECT Channel FROM Worlds`);
+		const worlds = await sql.all(`SELECT Channel FROM Worlds`);
 		return worlds.map(w => w.Channel);
 	},
 	async setUpdateTime(channel) {
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		await sql.run(`UPDATE Worlds SET Last_Update = $now WHERE Channel = $channel`, {$now: now, $channel: channel});
 	},
 	async playerActivity(channel, username) {
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		await sql.run(`UPDATE Players SET Last_Active = $now WHERE Channel = $channel AND Username = $name`, {$now: now, $channel: channel, $name: username});
 	},
 	async unfightOffers(id) {
@@ -790,7 +790,7 @@ module.exports = {
 		}
 	},
 	async getKnownPlants(channel) {
-		let rows = await sql.all(`SELECT * FROM Items WHERE Plant_Flag <> 0 AND Known_Flag <> 0 AND Channel = $channel
+		const rows = await sql.all(`SELECT * FROM Items WHERE Plant_Flag <> 0 AND Known_Flag <> 0 AND Channel = $channel
 			ORDER BY ID`, {$channel: channel});
 		if(rows) {
 			return rows.map(r => { return {
@@ -802,7 +802,7 @@ module.exports = {
 		}
 	},
 	async getUnknownPlants(channel) {
-		let rows = await sql.all(`SELECT * FROM Items WHERE Plant_Flag <> 0 AND Known_Flag = 0 AND Channel = $channel
+		const rows = await sql.all(`SELECT * FROM Items WHERE Plant_Flag <> 0 AND Known_Flag = 0 AND Channel = $channel
 			ORDER BY ID`, {$channel: channel});
 		if(rows) {
 			return rows.map(r => { return {
