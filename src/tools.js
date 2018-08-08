@@ -939,6 +939,9 @@ module.exports = {
 				// Their orbs are scattered
 				output += ` ${orbs.count} ${orbs.count == 1 ? 'orb is' : 'orbs are'} lost in the depths of space!`;
 				await sql.addItems(channel, target.id, enums.ItemTypes.Orb, -orbs.count);
+				let world = await sql.getWorld(channel);
+				world.lostOrbs += orbs.count;
+				await sql.setWorld(world);
 			}
 			output += '\n';
 		}
