@@ -922,7 +922,7 @@ module.exports = {
 		const firstTarget = Math.floor(Math.random() * targetPlayers.length);
 		
 		let output = '';
-		for(const i = 0; i < targets; i++) {
+		for(let i = 0; i < targets; i++) {
 			let target = targetPlayers[(firstTarget + i) % targetPlayers.length];
 			await this.completeTraining(target);
 			
@@ -959,7 +959,7 @@ module.exports = {
 		const now = new Date().getTime();
 
 		const firstPick = Math.floor(Math.random() * 3);
-		for(const i = 0; i < 3; i++) {
+		for(let i = 0; i < 3; i++) {
 			const index = (i + firstPick) % 3;
 			if(garden.plants[index]) {
 				// Found a plant, burn it
@@ -1462,7 +1462,7 @@ module.exports = {
 		
 		let plants = garden.plants.map(p => this.getPlantStatus(p));
 		let plantStatus = '';
-		for(const i = 0; i < 3; i++) {
+		for(let i = 0; i < 3; i++) {
 			plantStatus += `Plant #${i+1}: ${plants[i]}\n`;
 		}
 
