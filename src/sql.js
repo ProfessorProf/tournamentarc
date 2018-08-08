@@ -110,17 +110,17 @@ VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $ener
 module.exports = {
 	// Sets up tables and such for an empty DB.
     async initializeGame() {
-		let queries = initTablesSql.split(';');
+		const queries = initTablesSql.split(';');
 		for(const i in queries) {
-			let query = queries[i];
+			const query = queries[i];
 			await sql.run(query);
 		}
 	},
 	// Sets up basic Status/Item/Garden info for a new channel.
     async initializeChannel(channel) {
-        let queries = newChannelSql.split(';');
+        const queries = newChannelSql.split(';');
 		for(const i in queries) {
-			let query = queries[i];
+			const query = queries[i];
 			if(query.indexOf('$channel') > -1) {
 				await sql.run(query, {$channel: channel});
 			} else {
@@ -129,7 +129,7 @@ module.exports = {
 		}
 
 		// Make one random plant known
-		let knownPlant = Math.floor(Math.random() * 5);
+		const knownPlant = Math.floor(Math.random() * 5);
 		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE ID = $id`, {$id: knownPlant});
 		console.log(`Channel ${channel} initialized`);
 	},
@@ -150,9 +150,9 @@ module.exports = {
 	},
 	// Fetches basic world data.
 	async getWorld(channel) {
-		let row = await sql.get(`SELECT * FROM Worlds WHERE Channel = $channel`, {$channel: channel});
+		const row = await sql.get(`SELECT * FROM Worlds WHERE Channel = $channel`, {$channel: channel});
 		if(row) {
-			let world = {
+			const world = {
 				channel: channel,
 				heat: row.Heat,
 				resets: row.Resets,
@@ -255,7 +255,7 @@ module.exports = {
 	// Fetches a player from the database by user name.
     async getPlayerByUsername(channel, name) {
         // Get a player by username
-        let row = await sql.get(`SELECT * FROM Players WHERE Channel = $channel AND username = $username`, {$channel: channel, $username: name});
+        const row = await sql.get(`SELECT * FROM Players WHERE Channel = $channel AND username = $username`, {$channel: channel, $username: name});
 		if(row) {
 			return await this.fusionCheck(row);
 		} else {
@@ -264,7 +264,7 @@ module.exports = {
     },
 	// Fetches a player from the database by player ID.
     async getPlayerById(id) {
-        let row = await sql.get(`SELECT * FROM Players p WHERE p.ID = $id`, {$id: id});
+        const row = await sql.get(`SELECT * FROM Players p WHERE p.ID = $id`, {$id: id});
 		if(row) {
 			return await this.getPlayerInternal(row);
 		} else {
@@ -281,18 +281,18 @@ module.exports = {
 	},
 	// Add Offers, Statuses and Items to a player and return it as a player object.
     async getPlayerInternal(row) {
-        let offerRows = await sql.all(`SELECT o.*, p.Name FROM Offers o 
+        const offerRows = await sql.all(`SELECT o.*, p.Name FROM Offers o 
 			LEFT JOIN Players p ON o.Player_ID = p.ID
 			WHERE o.Target_ID = $id OR (o.Target_ID IS NULL AND o.Player_ID <> $id AND o.Channel = $channel)`, {$id: row.ID, $channel: row.Channel});
-		let statusRows = await sql.all(`SELECT ps.*, s.Ends, s.Priority, s.Name FROM PlayerStatus ps
+		const statusRows = await sql.all(`SELECT ps.*, s.Ends, s.Priority, s.Name FROM PlayerStatus ps
 			LEFT JOIN Statuses s ON s.ID = ps.Status_Id
 			WHERE Player_ID = $id`, {$id: row.ID});
-		let itemRows = await sql.all(`SELECT DISTINCT hi.*, i.Type_Name FROM HeldItems hi
+		const itemRows = await sql.all(`SELECT DISTINCT hi.*, i.Type_Name FROM HeldItems hi
 			LEFT JOIN Items i ON hi.Item_ID = i.ID
 			WHERE hi.Player_ID = $id`, {$id: row.ID});
-		let nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
-		let fusionRows = await sql.all(`SELECT * FROM Players WHERE Fusion_ID = $id AND ID != $id`, {$id: row.ID});
-		let henchmenRows = await this.getHenchmen(row.Channel);
+		const nemesisRow = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: row.Channel});
+		const fusionRows = await sql.all(`SELECT * FROM Players WHERE Fusion_ID = $id AND ID != $id`, {$id: row.ID});
+		const henchmenRows = await this.getHenchmen(row.Channel);
 
 		let player = {
 			id: row.ID,
@@ -332,7 +332,7 @@ module.exports = {
 		// 2 = henchman
 		// 3 = taunt
 		for(const i in offerRows) {
-			let o = offerRows[i];
+			const o = offerRows[i];
 			player.offers.push({
 				playerId: o.Player_ID,
 				targetId: o.Target_ID,
@@ -343,7 +343,7 @@ module.exports = {
 			});
 		}
 		for(const i in statusRows) {
-			let s = statusRows[i];
+			const s = statusRows[i];
 			player.status.push({
 				id: s.ID,
 				type: s.Status_ID,
@@ -356,7 +356,7 @@ module.exports = {
 			});
 		}
 		for(const i in itemRows) {
-			let item = itemRows[i];
+			const item = itemRows[i];
 			player.items.push({
 				type: item.Item_ID,
 				name: item.Type_Name,
@@ -372,8 +372,8 @@ module.exports = {
 		}
 		
 		player.isNemesis = nemesisRow && nemesisRow.Player_ID == player.id;
-		let h = henchmenRows.find(h => h.id == player.id);
-		if(h) {
+		const henchmen = henchmenRows.find(h => h.id == player.id);
+		if(henchmen) {
 			player.isHenchman = true;
 			player.henchmanDefeats = h.defeats;
 		}
@@ -419,10 +419,10 @@ module.exports = {
 	},
 	// Start a new plant.
 	async addPlant(channel, plantType, slot) {
-		let now = new Date().getTime();
+		const now = new Date().getTime();
 		await sql.run(`INSERT INTO Plants (Channel, Plant_Type, StartTime) VALUES ($channel, $type, $startTime)`, 
 			{$channel: channel, $type: plantType, $startTime: now});
-		let plantId = await sql.get(`SELECT last_insert_rowid() as id`);
+		const plantId = await sql.get(`SELECT last_insert_rowid() as id`);
 		switch(slot) {
 			case 0:
 				await sql.run(`UPDATE Gardens SET Plant1_ID = $id WHERE Channel = $channel`, {$id: plantId.id, $channel: channel});
@@ -437,10 +437,10 @@ module.exports = {
 	},
 	// Gives a new item to a player
 	async addItems(channel, playerId, itemId, count) {
-		let existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
+		const existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
 			{$playerId: playerId, $itemId: itemId});
 		if(existingItem) {
-			let newCount = existingItem.Count + count;
+			const newCount = existingItem.Count + count;
 			if(newCount <= 0) {
 				await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
 					{$playerId: playerId, $itemId: itemId});
@@ -493,9 +493,9 @@ module.exports = {
 	},
 	// Get Nemesis info for a channel.
 	async getNemesis(channel) {
-		let row = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
+		const row = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
 		if(row) {
-			let nemesis = {
+			const nemesis = {
 				id: row.Player_ID,
 				channel: row.Channel,
 				type: row.Nemesis_Type,
@@ -516,12 +516,12 @@ module.exports = {
 	},
 	// Get the history of players who fought the Nemesis.
 	async getNemesisHistory(channel) {
-		let nemesis = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
+		const nemesis = await sql.get(`SELECT * FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
 		if(nemesis) {
-			let rows = await sql.all(`SELECT h.*, l.Name, l.Glory FROM History h
+			const rows = await sql.all(`SELECT h.*, l.Name, l.Glory FROM History h
 			LEFT JOIN Players l ON l.ID = h.Loser_ID
 			WHERE h.Winner_ID = $nemesisId AND h.Battle_Time > $nemesisTime`, {$nemesisId: nemesis.Player_ID, $nemesisTime: nemesis.Nemesis_Time});
-			let history = rows.map(r => {
+			const history = rows.map(r => {
 				return {
 					name: r.Name,
 					glory: r.Glory,
@@ -554,10 +554,9 @@ module.exports = {
 	},
 	// Get Garden info.
 	async getGarden(channel) {
-		let now = new Date().getTime();
-		let gardenRow = await sql.get(`SELECT * FROM Gardens WHERE Channel = $channel`, {$channel: channel});
-		let plantRows = await sql.all(`SELECT * FROM Plants WHERE Channel = $channel`, {$channel: channel});
-		let itemRows = await sql.all(`SELECT * FROM Items WHERE Channel = $channel AND Plant_Flag <> 0`, {$channel: channel});
+		const gardenRow = await sql.get(`SELECT * FROM Gardens WHERE Channel = $channel`, {$channel: channel});
+		const plantRows = await sql.all(`SELECT * FROM Plants WHERE Channel = $channel`, {$channel: channel});
+		const itemRows = await sql.all(`SELECT * FROM Items WHERE Channel = $channel AND Plant_Flag <> 0`, {$channel: channel});
 		if(gardenRow) {
 			let garden = {
 				channel: channel,
@@ -567,10 +566,10 @@ module.exports = {
 				researchLevel: gardenRow.Research_Level ? gardenRow.Research_Level : 0
 			};
 			if(gardenRow.Plant1_ID) {
-				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant1_ID);
-				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
+				const plantRow = plantRows.find(p => p.ID == gardenRow.Plant1_ID);
+				const plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
-					let growTime = plantInfo ? plantInfo.Grow_Time : 0;
+					const growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[0] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
@@ -582,10 +581,10 @@ module.exports = {
 				}
 			}
 			if(gardenRow.Plant2_ID) {
-				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant2_ID);
-				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
+				const plantRow = plantRows.find(p => p.ID == gardenRow.Plant2_ID);
+				const plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
-					let growTime = plantInfo ? plantInfo.Grow_Time : 0;
+					const growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[1] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
@@ -597,10 +596,10 @@ module.exports = {
 				}
 			}
 			if(gardenRow.Plant3_ID) {
-				let plantRow = plantRows.find(p => p.ID == gardenRow.Plant3_ID);
-				let plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
+				const plantRow = plantRows.find(p => p.ID == gardenRow.Plant3_ID);
+				const plantInfo = itemRows.find(i => i.ID == plantRow.Plant_Type);
 				if(plantRow) {
-					let growTime = plantInfo ? plantInfo.Grow_Time : 0;
+					const growTime = plantInfo ? plantInfo.Grow_Time : 0;
 					garden.plants[2] = {
 						id: plantRow.ID,
 						type: plantRow.Plant_Type,
@@ -612,7 +611,7 @@ module.exports = {
 				}
 			}
 			for(const i in itemRows) {
-				let plant = itemRows[i];
+				const plant = itemRows[i];
 				garden.plantTypes.push({
 					id: plant.ID,
 					known: plant.Known_Flag
