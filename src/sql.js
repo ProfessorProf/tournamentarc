@@ -912,7 +912,7 @@ module.exports = {
 			});
 	},
 	// Ends the universe.
-	async ruin(channel) {
+	async endWorld(channel) {
 		await sql.run(`UPDATE Worlds SET Start_Time = NULL WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE PlayerStatus SET EndTime = $now - 1 WHERE Channel = $channel`, {$channel: channel});

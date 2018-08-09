@@ -451,9 +451,13 @@ module.exports = {
 		
 		return await this.fight(player1, player2, false, embed);
 	},
-	async unfight(channel, username) {
+	async unfight(channel, username, userId) {
 		let player = await sql.getPlayerByUsername(channel, username);
 		await sql.unfightOffers(player.id);
+		if(!player.userId) {
+			player.userId = userId;
+			await sql.setPlayer(player);
+		}
 		return `${player.name} no longer wants to fight anyone.`;
 	},
 	async taunt(channel, player, target) {
@@ -1481,6 +1485,8 @@ module.exports = {
 				player.nemesisFlag = false;
 				player.fusionFlag = false;
 				player.wishFlag = false;
+				player.lastActive = now - 24 * hour;
+				player.lastFought = now - 24 * hour;
 				await sql.setPlayer(player);
 			}
 		}
@@ -1851,7 +1857,7 @@ module.exports = {
 			}
 			if(hoursLeft <= 0) {
 				let player = await sql.getPlayerById(nemesis.id);
-				await sql.ruin(channel);
+				await sql.endWorld(channel);
 				output.message = `It's too late! ${player.name} finishes charging, and destroys the universe.\nTo see the final standing, enter \`!scores\`.`;
 				output.abort = true;
 			}
@@ -2374,11 +2380,9 @@ module.exports = {
 
 		return output;
 	},
-	async link(channel, username, id) {
-		let player = await sql.getPlayerByUsername(channel, username);
-		player.userId = id;
-		await sql.setPlayer(player);
-
-		return `Character ${player.name} linked to user ${username}.`;
+	async ending(channel) {
+		await sql.endWorld(channel);
+		return 'This story has reached an ending, but there are more adventures on the horizon. Onwards, to a new universe...!\n' +
+			'To see the final standing, enter \`!scores\`.';
 	}
 }
