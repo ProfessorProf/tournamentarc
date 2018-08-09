@@ -174,7 +174,7 @@ async function handleMessage(message) {
 			}
 			break;
 		case 'unfight':
-			outputMessage.print.push(await tools.unfight(channel, name));
+			outputMessage.print.push(await tools.unfight(channel, name, message.author.id));
 			break;
 		case 'attack':
 			const attackResult = await tools.attack(channel, name, targetName);
@@ -312,6 +312,8 @@ async function handleMessage(message) {
 		case 'clone':
 			await sql.clone(channel, name, targetName);
 			break;
+		case 'ending':
+			await tools.ending(channel);
 		case 'import':
 			await sql.importChannel(channel, targetName);
 			break;

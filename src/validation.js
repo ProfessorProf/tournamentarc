@@ -203,7 +203,7 @@ module.exports = {
 						errors.push(`**${player.name}** is already on a journey.`);
 					}
 					const orbs = player.items.find(i => i.type == enums.ItemTypes.Orb);
-					if(orbs.count > 0) {
+					if(orbs && orbs.count > 0) {
 						errors.push("You can't take orbs with you on a journey.");
 					}
 					const hours = parseInt(targetName);
