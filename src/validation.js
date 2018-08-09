@@ -8,6 +8,7 @@ let hour = (60 * 60 * 1000);
 module.exports = {
     // Returns an error string if the command is illegal
     async validate(channel, name, cmd, args) {
+		let world = await sql.getWorld(channel);
 		let player = await sql.getPlayerByUsername(channel, name);
 		let targetName;
 		if(cmd == 'use') {
@@ -24,6 +25,15 @@ module.exports = {
 		}
 		let errors = [];
 		let now = new Date().getTime();
+		if(!world || !world.startTime &&
+			cmd != 'scores' && cmd != 'debug') {
+			errors.push(`A new universe is waiting to be born.`);
+		}
+		if(world.startTime > now &&
+			cmd != 'scores' && cmd != 'debug') {
+			let duration = world.startTime - now;
+			errors.push(`A new universe will be born in ${tools.getTimeString(duration)}.`);
+		}
 		
 		switch(cmd) {
 			case 'reg':
@@ -189,6 +199,10 @@ module.exports = {
 					}
 					if(player.status.find(s => s.type == enums.StatusTypes.Journey)) {
 						errors.push(`**${player.name}** is already on a journey.`);
+					}
+					const orbs = player.items.find(i => i.type == enums.ItemTypes.Orb);
+					if(orbs.count > 0) {
+						errors.push("You can't take orbs with you on a journey.");
 					}
 					const hours = parseInt(targetName);
 					if(!targetName || hours != hours) {
@@ -493,6 +507,9 @@ module.exports = {
 						if(tools.isFusion(target)) {
 							errors.push("Fused players can't fuse again.");
 						}
+						if(player.isHenchman || target.isHenchman) {
+							errors.push("Servants of the Nemesis cannot fuse.");
+						}
 					}
 				} else {
 					errors.push('Must specify a valid target.');
@@ -664,7 +681,6 @@ module.exports = {
 				if(target) {
 					this.validateJourney(errors, target);
 					let henchmen = await sql.getHenchmen(channel);
-					let world = await sql.getWorld(channel);
 					let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
 					if(henchmen.length >= maxHenchmen) {
 						errors.push("You can't recruit more henchmen.");
@@ -674,6 +690,9 @@ module.exports = {
 					}
 					if(target.id == player.id) {
 						errors.push(`That's not what "be your own boss" means.`);
+					}
+					if(target.fusionNames.length == 2) {
+						errors.push("You can't recruit a fusion.");
 					}
 					if(target.npcFlag) {
 						errors.push("You can't recruit NPCs.");
@@ -697,10 +716,12 @@ module.exports = {
 							errors.push("The Nemesis needs to \`!recruit\` you first.");
 						}
 						let henchmen = await sql.getHenchmen(channel);
-						let world = await sql.getWorld(channel);
 						let maxHenchmen = Math.floor(world.maxPopulation / 5);
 						if(henchmen.length >= maxHenchmen) {
 							errors.push("The Nemesis already has too many henchmen.");
+						}
+						if(player.fusionNames.length == 2) {
+							errors.push("A Fusion can't join the Nemesis.");
 						}
 					}
 				}
@@ -821,6 +842,12 @@ module.exports = {
 					}
 				}
 				break;
+			case 'scores':
+				// !scores validation rules:
+				// World must have ended
+				if(world.startTime && world.startTime < now) {
+					errors.push('Scores are only available after the season ends.');
+				}
 		}
 
 		if(errors.length > 0) {
