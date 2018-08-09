@@ -107,7 +107,7 @@ const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis
 (Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Burn_Time, 
 	Ruin_Time, Last_Ruin_Update, Base_Power, Nemesis_Cooldown)
 VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $burnTime, 
-	$ruinTime, Last_Ruin_Update, $basePower, $cooldown)`;
+	$ruinTime, $lastRuinUpdate, $basePower, $cooldown)`;
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
