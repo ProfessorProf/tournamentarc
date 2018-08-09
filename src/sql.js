@@ -747,6 +747,31 @@ module.exports = {
 		player.username = targetName;
 		await this.addPlayer(player);
 	},
+	// THIS IS HIGHLY DESTRUCTIVE. ONLY RUN WITH BACKUP DATA YOU ARE PREPARED TO LOSE.
+	async importChannel(channel, importChannel) {
+		await sql.run(`DELETE FROM Worlds WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Players WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Items WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM PlayerStatus WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Gardens WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Henchmen WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM History WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`UPDATE Worlds SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Players SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Items SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE HeldItems SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Offers SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE PlayerStatus SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Gardens SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Plants SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Nemesis SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE Henchmen SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+		await sql.run(`UPDATE History SET Channel = $channel WHERE Channel = $importChannel`, {$channel: channel, $importChannel: importChannel});
+	},
 	async autofight(channel, targetName) {
 		const player = await this.getPlayer(channel, targetName);
 		await this.addOffer(player, null, enums.OfferTypes.Fight);
