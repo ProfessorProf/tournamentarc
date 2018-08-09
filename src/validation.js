@@ -615,8 +615,7 @@ module.exports = {
 				// - Target must be alive
 				// - Target must not be you
 				// - Must have at least one orb
-				errors.push("This command has been disabled.");
-				break;
+				// TEMP: !give is in, but only for henchmen
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
@@ -633,11 +632,14 @@ module.exports = {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push(`**${target.name}** cannot take orbs for another ${timeString}`);
 						}
+						if(!player.isHenchman) {
+							errors.push('Only henchmen can use this command.');
+						}
+						if(player.isHenchman && !target.isNemesis) {
+							errors.push('A henchman can only give orbs to the Nemesis.');
+						}
 					} else {
 						errors.push('Must specify a valid target.');
-					}
-					if(player.isHenchman && !target.isNemesis) {
-						errors.push('A henchman can only give orbs to the Nemesis.');
 					}
 				}
 				break;
