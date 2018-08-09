@@ -7,7 +7,7 @@ const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
-	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER);
+	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
     Last_Active INTEGER, Last_Fought INTEGER, Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Plant1_ID INTEGER, Plant2_ID I
     Growth_Level REAL, Research_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Nemesis_Type INTEGER, Nemesis_Time INTEGER, Attack_Time INTEGER, 
-    Destroy_Time INTEGER, Energize_Time INTEGER, Revive_Time INTEGER, Burn_Time INTEGER, Ruin_Time INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
+    Destroy_Time INTEGER, Energize_Time INTEGER, Revive_Time INTEGER, Burn_Time INTEGER, Ruin_Time INTEGER, Last_Ruin_Update INTEGER, Base_Power REAL, Nemesis_Cooldown INTEGER);
 CREATE TABLE IF NOT EXISTS Henchmen (Channel TEXT, Player_ID INTEGER, Defeats INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Level REAL, Loser_Level REAL,
@@ -50,7 +50,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS TournamentPlayers_ChannelPlayer ON TournamentP
 const newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
 DELETE FROM Gardens WHERE Channel = $channel;
 DELETE FROM Items WHERE Channel = $channel;
-INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish) VALUES ($channel, 0, 0, 0, 7, 0);
+INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish, Start_Time) VALUES ($channel, 0, 0, 0, 7, 0, $now);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (0, $channel, "Orb", 0, 0, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (1, $channel, "Flower", 18, 1, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Type_Name, Grow_Time, Known_Flag, Plant_Flag) VALUES (2, $channel, "Rose", 24, 0, 1);
@@ -104,8 +104,10 @@ VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $actionT
 	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npcFlag, $alwaysPrivate, $ping, $pronoun)`;
 
 const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
-(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Burn_Time, Ruin_Time, Base_Power, Nemesis_Cooldown)
-VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $burnTime, $ruinTime, $basePower, $cooldown)`;
+(Channel, Player_ID, Nemesis_Type, Nemesis_Time, Attack_Time, Destroy_Time, Energize_Time, Revive_Time, Burn_Time, 
+	Ruin_Time, Last_Ruin_Update, Base_Power, Nemesis_Cooldown)
+VALUES ($channel, $playerId, $type, $startTime, $attackTime, $destroyTime, $energizeTime, $reviveTime, $burnTime, 
+	$ruinTime, Last_Ruin_Update, $basePower, $cooldown)`;
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
@@ -118,19 +120,23 @@ module.exports = {
 	},
 	// Sets up basic Status/Item/Garden info for a new channel.
     async initializeChannel(channel) {
+		const now = new Date().getTime();
         const queries = newChannelSql.split(';');
 		for(const i in queries) {
 			const query = queries[i];
+			let params = {};
 			if(query.indexOf('$channel') > -1) {
-				await sql.run(query, {$channel: channel});
-			} else {
-				await sql.run(query);
+				params['$channel'] = channel;
 			}
+			if(query.indexOf('$now') > -1) {
+				params['$now'] = now;
+			}
+			await sql.run(query, params);
 		}
 
 		// Make one random plant known
 		const knownPlant = Math.floor(Math.random() * 5);
-		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE ID = $id`, {$id: knownPlant});
+		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
 		console.log(`Channel ${channel} initialized`);
 	},
 	// Debug commands to run arbitrary SQL. Be careful, admin.
@@ -159,7 +165,8 @@ module.exports = {
 				maxPopulation: row.Max_Population,
 				lostOrbs: row.Lost_Orbs,
 				lastWish: row.Last_Wish,
-				lastUpdate: row.Last_Update
+				lastUpdate: row.Last_Update,
+				startTime: row.Start_Time
 			};
 			
 			return world;
@@ -169,14 +176,15 @@ module.exports = {
 	},
 	async setWorld(world) {
 		await sql.run(`UPDATE Worlds SET Heat = $heat, Resets = $resets, Max_Population = $maxPopulation, 
-			Lost_Orbs = $lostOrbs, Last_Wish = $lastWish WHERE Channel = $channel`,
+			Lost_Orbs = $lostOrbs, Last_Wish = $lastWish, Start_Time = $startTime WHERE Channel = $channel`,
 		{
 			$heat: world.heat,
 			$resets: world.resets,
 			$maxPopulation: world.maxPopulation,
 			$lostOrbs: world.lostOrbs,
 			$lastWish: world.lastWish,
-			$channel: world.channel
+			$channel: world.channel,
+			$startTime: world.startTime
 		});
 	},
 	// Creates a new player in the DB.
@@ -506,6 +514,7 @@ module.exports = {
 				reviveTime: row.Revive_Time,
 				burnTime: row.Burn_Time,
 				ruinTime: row.Ruin_Time,
+				lastRuinUpdate: row.Last_Ruin_Update,
 				basePower: row.Base_Power,
 				cooldown: row.Nemesis_Cooldown
 			};
@@ -548,6 +557,7 @@ module.exports = {
 			$energizeTime: nemesis.energizeTime,
 			$burnTime: nemesis.burnTime,
 			$ruinTime: nemesis.ruinTime,
+			$lastRuinUpdate: nemesis.lastRuinUpdate,
 			$cooldown: nemesis.cooldown,
 			$basePower: nemesis.basePower
         });
@@ -711,7 +721,9 @@ module.exports = {
 		});
 	},
 	async resetWorld(channel) {
-		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = Resets + 1 WHERE Channel = $channel`, {$channel: channel, $resets: row.Resets + 1});
+		const now = new Date().getTime();
+		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = Resets + 1, Start_Time = $now WHERE Channel = $channel`,
+			{$channel: channel, $now: now});
 		await sql.run(`UPDATE Gardens SET Plant1_ID = 0, Plant2_ID = 0, Plant3_ID = 0, Garden_Level = 0, Research_Level = 0 
 			WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM PlayerStatus WHERE Channel = $channel`, {$channel: channel});
@@ -722,7 +734,12 @@ module.exports = {
 		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournament_Players WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournament_Brackets WHERE Channel = $channel`, {$channel: channel});
-		// TODO: Reset known plants
+		await sql.run(`UPDATE Items SET Known_Flag = 0 WHERE Plant_Flag <> 0 AND Channel = $channel`, {$channel: channel});
+
+		// Make one random plant known
+		const knownPlant = Math.floor(Math.random() * 5);
+		await sql.run(`UPDATE Items SET Known_Flag = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
+		console.log(`Channel ${channel} initialized`);
 	},
 	async clone(channel, name, targetName) {
 		let player = await this.getPlayerByUsername(channel, name);
@@ -866,5 +883,12 @@ module.exports = {
 				$targetId: targetId, 
 				$type: type
 			});
+	},
+	// Ends the universe.
+	async ruin(channel) {
+		await sql.run(`UPDATE Worlds SET Start_Time = NULL WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`UPDATE PlayerStatus SET EndTime = $now - 1 WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`UPDATE Nemesis SET Ruin_Time = NULL WHERE CHannel = $channel`, {$channel: channel});
 	}
 }

@@ -51,7 +51,9 @@ client.on('ready', () => {
 				updatedChannels.push(c);
 				const channel = client.channels.find(x => x.id == c);
 				if(channel) {
-					channel.send({embed: update.embed});
+					if(channel.name == auth.channel) {
+						channel.send({embed: update.embed});
+					}
 				} else {
 					console.log(`Unrecognized channel ${c}`);
 				}
@@ -242,8 +244,13 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.search(channel, name));
 			break;
 		case 'roster':
-			const output = await tools.displayRoster(channel);
-			outputMessage.print.push(`\`\`\`\n${output}\`\`\``);;
+			const rosterOutput = await tools.displayRoster(channel);
+			outputMessage.print.push(`\`\`\`\n${rosterOutput}\`\`\``);
+			outputMessage.informational = true;
+			break;
+		case 'scores':
+			const scoresOutput = await tools.displayScores(channel);
+			outputMessage.print.push(`\`\`\`\n${scoresOutput}\`\`\``);
 			outputMessage.informational = true;
 			break;
 		case 'fuse':

@@ -77,6 +77,7 @@ module.exports = {
 
 		// Display Status
 		let statuses = [];
+		let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
 		for(const i in player.status) {
 			const s = player.status[i];
 			if(!s.ends || s.endTime > now) {
@@ -97,7 +98,8 @@ module.exports = {
 						statuses.push(`Overdriving (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
 					case enums.StatusTypes.Ready:
-						statuses.push(`Ready to train`);
+						if(!defeated)
+							statuses.push(`Ready to train`);
 						break;
 					case enums.StatusTypes.Carrot:
 						statuses.push(`Enhanced senses (${this.getTimeString(s.endTime - now)} remaining)`);
@@ -254,9 +256,17 @@ module.exports = {
         seconds -= minutes * 60;
         let hours = Math.floor(minutes / 60);
         minutes -= hours * 60;
+        let days = Math.floor(hours / 24);
+        hours -= days * 24;
         
         let output = '';
+        if(days) {
+            output += days + (days > 1 ? ' days' : ' day');
+        }
         if(hours) {
+            if(output) {
+                output += ((seconds || minutes) ? ', ' : ' and ');
+            }
             output += hours + (hours > 1 ? ' hours' : ' hour');
         }
         if(minutes) {
@@ -368,6 +378,57 @@ module.exports = {
 			output += row[1].padEnd(headers[1] + 1);
 			output += row[2].padEnd(headers[2] + 1);
 			output += row[3].padEnd(headers[3] + 1);
+			output += '\n';
+		}
+		
+		return output;
+	},
+	// Creates a table displaying the high scores at the end of a game.
+    async displayScores(channel) {
+		let players = await sql.getPlayers(channel);
+		const now = new Date().getTime();
+		
+		// Build the table out in advance so we can get column widths
+		let headers = [5, 4, 5];
+		let place = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+		let rows = [];
+		players.sort((a,b) => b.glory - a.glory);
+		if(players.length > 10) {
+			players = players.slice(0, 10);
+		}
+		for(const i in players) {
+			let p = players[i];
+			if (p.fusionId && p.fusionId == p.id) {
+				continue;
+			}
+
+			let row = [];
+			row.push(place[i]);
+			row.push(p.name);
+			let glory = p.glory.toString();
+			row.push(glory);
+			if(p.name.length > headers[1]) headers[1] = p.name.length;
+			if(glory.length > headers[2]) headers[2] = glory.length;
+
+			rows.push(row);
+		}
+		
+		// Print out the table
+		let output = '';
+		output += 'PLACE' + ' '.repeat(headers[0] - 3);
+		output += 'NAME' + ' '.repeat(headers[1] - 3);
+		output += 'GLORY' + ' '.repeat(headers[2] - 5);
+		output += '\n';
+		output += '-'.repeat(headers[0]) + ' ';
+		output += '-'.repeat(headers[1]) + ' ';
+		output += '-'.repeat(headers[2]) + ' ';
+		output += '\n';
+		
+		for(const i in rows) {
+			let row = rows[i];
+			output += row[0].padEnd(headers[0] + 1);
+			output += row[1].padEnd(headers[1] + 1);
+			output += row[2].padEnd(headers[2] + 1);
 			output += '\n';
 		}
 		
@@ -574,7 +635,7 @@ module.exports = {
 		let battleLog = '';
 		if(skill1 < 0.8) {
 			battleLog += `${player1.name} underestimates ${this.their(player1.config.pronoun)} foe!`;
-		} else if(skill1 > 1.5) {
+		} else if(skill1 > 1.6) {
 			battleLog += `${player1.name} goes *even further beyond!*`;
 		} else if(skill1 > 1.2) {
 			battleLog += `${player1.name} surpasses ${this.their(player1.config.pronoun)} limits!`;
@@ -585,7 +646,7 @@ module.exports = {
 		
 		if(skill2 < 0.8) {
 			battleLog += `${player2.name} underestimates ${this.their(player2.config.pronoun)} foe!`;
-		} else if(skill2 > 1.5) {
+		} else if(skill2 > 1.6) {
 			battleLog += `${player2.name} goes *even further beyond!*`;
 		} else if(skill2 > 1.2) {
 			battleLog += `${player2.name} surpasses ${this.their(player2.config.pronoun)} limits!`;
@@ -722,7 +783,7 @@ module.exports = {
 			hours = 12;
 			let maxPowerLoss = 0.04;
 			if(loserSkill < 0.8) maxPowerLoss = 0.02;
-			else if(loserSkill > 1.5) maxPowerLoss = 0.08;
+			else if(loserSkill > 1.6) maxPowerLoss = 0.08;
 			else if(loserSkill > 1.2) maxPowerLoss = 0.06;
 			const powerLoss = Math.min(maxPowerLoss * winnerLevel, loserLevel * 0.5);
 			output += `\nThe Nemesis is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
@@ -1650,7 +1711,7 @@ module.exports = {
 				await sql.setPlayer(player);
 				break;
 			case 'ruin':
-				output += '**The countdown to the destruction of the galaxy has begun!**\n'
+				output += '\n**The countdown to the destruction of the universe has begun!**\n'
 					+ 'You have 24 hours to defeat the Nemesis! If the Nemesis is still alive when time runs out, everything will be destroyed.';
 				let nemesis = await sql.getNemesis(channel);
 				nemesis.ruinTime = now + 24 * hour;
@@ -1773,24 +1834,25 @@ module.exports = {
 
 		return messages;
 	},
-	async ruinAlert(channel, lastUpdate) {
+	async ruinAlert(channel) {
 		let nemesis = await sql.getNemesis(channel);
-		if(nemesis && nemesis.ruinTime > 0) {
+		if(nemesis && nemesis.ruinTime) {
 			const now = new Date().getTime();
-			const nemesisStartTime = nemesis.ruinTime - 24 * hour;
-			const hours = Math.floor((lastUpdate - nemesisStartTime) / hour);
-			const nextUpdateTime = nemesisStartTime + (hours + 1) * hour;
-			if(nextUpdateTime > lastUpdate && nextUpdateTime <= now) {
+			const hoursLeft = Math.ceil((nemesis.ruinTime - now) / hour);
+			const lastHoursLeft = Math.ceil((nemesis.lastRuinUpdate - now) / hour);
+			if(hoursLeft != lastHoursLeft) {
 				// Reminder the players about their impending doom
-				const hoursLeft = 24 - hours - 1;
 				if(hoursLeft > 0) {
-					return { message: `${hoursLeft} hours until the galaxy is destroyed!`, abort: false };
-				} else {
-					let player = await sql.getPlayerById(nemesis.playerId);
-					await sql.resetWorld(channel);
-					return { message: `It's too late! ${player.name} finishes charging, and destroys the universe.`, abort: true };
+					return { message: `${hoursLeft} hours until the universe is destroyed!`, abort: false };
 				}
 			}
+			if(hoursLeft <= 0) {
+				let player = await sql.getPlayerById(nemesis.id);
+				await sql.ruin(channel);
+				return { message: `It's too late! ${player.name} finishes charging, and destroys the universe.\nTo see the final standing, enter \`!scores\`.`, abort: true };
+			}
+			nemesis.lastRuinUpdate = now;
+			await sql.setNemesis();
 		}
 		return null;
 	},
@@ -1943,18 +2005,25 @@ module.exports = {
 	},
 	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
 	async updateWorld(channel) {
+		const now = new Date().getTime();
 		let world = await sql.getWorld(channel);
+		if(!world) {
+			return {embed: null, abort: false, pings: []};
+		}
+
 		let messages = [];
 		let pings = [];
 		let abort = false;
 
-		messages = messages.concat(await this.deleteExpired(channel, pings));
-		messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate, pings));
-		messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
-		const ruinStatus = await this.ruinAlert(channel);
-		if(ruinStatus) {
-			messages.push(ruinStatus.message);
-			abort = ruinStatus.abort;
+		if(world.startTime && world.startTime < now) {
+			messages = messages.concat(await this.deleteExpired(channel, pings));
+			messages = messages.concat(await this.updatePlayerActivity(channel, world.lastUpdate, pings));
+			messages = messages.concat(await this.updateGarden(channel, world.lastUpdate));
+			const ruinStatus = await this.ruinAlert(channel);
+			if(ruinStatus) {
+				messages.push(ruinStatus.message);
+				abort = ruinStatus.abort;
+			}
 		}
 
 		await sql.setUpdateTime(channel);
@@ -2229,7 +2298,8 @@ module.exports = {
 		let world = await sql.getWorld(channel);
 		const now = new Date().getTime();
 		let embed = new Discord.RichEmbed();
-		let output = '';
+		let output = `This world has existed for ${this.getTimeString(now - world.startTime)},`;
+
 		let age = 'Age of Beginnings';
 		if(world.heat > 3600) age = 'Age of the Infinite';
 		else if(world.heat > 3000) age = 'Age of Gods';
@@ -2238,7 +2308,7 @@ module.exports = {
 		else if(world.heat > 1200) age = 'Age of Heroes';
 		else if(world.heat > 600) age = 'Age of Warriors';
 
-		output += `This world is currently in the ${age}.`;
+		output += ` and is currently in the ${age}.`;
 		if(world.resets > 0) {
 			output += ` It has been reset ${world.resets} ${world.resets == 1 ? 'time' : 'times'}.`;
 		}
