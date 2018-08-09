@@ -138,11 +138,6 @@ async function handleMessage(message) {
 		console.log(`${channel}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
 		return;
 	}
-	if(cmd == 'import') {
-		message.channel.send(`Importing data...`);
-		await tools.import();
-		outputMessage.print.push(`Complete`);
-	}
 
 	const update = await tools.updateWorld(channel);
 	if(update.embed) { 
@@ -316,6 +311,9 @@ async function handleMessage(message) {
 			break;
 		case 'clone':
 			await sql.clone(channel, name, targetName);
+			break;
+		case 'import':
+			await sql.importChannel(channel, targetName);
 			break;
 	}
 

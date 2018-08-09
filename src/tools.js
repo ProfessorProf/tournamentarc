@@ -1836,23 +1836,25 @@ module.exports = {
 	},
 	async ruinAlert(channel) {
 		let nemesis = await sql.getNemesis(channel);
+		let output = { message: null, abort: false };
 		if(nemesis && nemesis.ruinTime) {
 			const now = new Date().getTime();
 			const hoursLeft = Math.ceil((nemesis.ruinTime - now) / hour);
-			const lastHoursLeft = Math.ceil((nemesis.lastRuinUpdate - now) / hour);
+			const lastHoursLeft = Math.ceil((nemesis.ruinTime - nemesis.lastRuinUpdate) / hour);
 			if(hoursLeft != lastHoursLeft) {
 				// Reminder the players about their impending doom
 				if(hoursLeft > 0) {
-					return { message: `${hoursLeft} hours until the universe is destroyed!`, abort: false };
+					output.message = `${hoursLeft} hours until the universe is destroyed!`;
 				}
 			}
 			if(hoursLeft <= 0) {
 				let player = await sql.getPlayerById(nemesis.id);
 				await sql.ruin(channel);
-				return { message: `It's too late! ${player.name} finishes charging, and destroys the universe.\nTo see the final standing, enter \`!scores\`.`, abort: true };
+				output.message = `It's too late! ${player.name} finishes charging, and destroys the universe.\nTo see the final standing, enter \`!scores\`.`;
+				output.abort = true;
 			}
 			nemesis.lastRuinUpdate = now;
-			await sql.setNemesis();
+			await sql.setNemesis(channel, nemesis);
 		}
 		return null;
 	},
