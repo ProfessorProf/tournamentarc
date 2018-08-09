@@ -790,7 +790,9 @@ module.exports = {
 	},
 	async playerActivity(channel, username) {
 		const now = new Date().getTime();
-		await sql.run(`UPDATE Players SET Last_Active = $now WHERE Channel = $channel AND Username = $name`, {$now: now, $channel: channel, $name: username});
+		const player = await this.getPlayerByUsername(channel, username);
+		player.lastActive = now;
+		await this.setPlayer(player);
 	},
 	async unfightOffers(id) {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $id`, {$id: id});

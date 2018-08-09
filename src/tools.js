@@ -1775,6 +1775,8 @@ module.exports = {
 		let activePlayers = 0;
 		for(const i in players) {
 			const p = players[i];
+			if(p.fusionNames && p.fusionNames.length == 1) continue;
+			
 			if(p.lastActive > now) {
 				// Debug for that one glitch
 				console.log(`Detected future active date for ${p.name} in channel ${p.channel}`);
@@ -1951,6 +1953,12 @@ module.exports = {
 					// Unfuse
 					await sql.setFusionId(fusedPlayer1.id, 0);
 					await sql.setFusionId(fusedPlayer2.id, 0);
+
+					// Update last active values for the players
+					fusedPlayer1.lastActive = player.lastActive;
+					fusedPlayer2.lastActive = player.lastActive;
+					fusedPlayer1.lastFought = player.lastFought;
+					fusedPlayer2.lastFought = player.lastFought;
 
 					// Clean up the fusion player
 					await sql.deletePlayer(player.id);
