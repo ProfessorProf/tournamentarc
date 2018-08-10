@@ -1745,6 +1745,8 @@ module.exports = {
 		let player = await sql.getPlayerByUsername(channel, name);
 		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Training);
+
+		return `**{$player.name}** has begun training.`;
 	},
 	async startJourney(channel, name, hoursString) {
 		const now = new Date().getTime();

@@ -205,8 +205,7 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.revive(channel, targetName));
 			break;
 		case 'train':
-			await tools.train(channel, name);
-			outputMessage.print.push(`**${name}** has begun training.`);
+			outputMessage.print.push(await tools.train(channel, name));
 			break;
 		case 'scan':
 			outputMessage.embed = await tools.scoutPlayer(channel, targetName);
