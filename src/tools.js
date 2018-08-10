@@ -334,7 +334,7 @@ module.exports = {
 			let seenLevel = this.getPowerLevel(p);
 			let level = numeral(seenLevel.toPrecision(2)).format('0,0');
 			
-			if(p.status.find(s => s.type == enums.StatusTypes.Carrot)) {
+			if(p.status.find(s => s.type == enums.StatusTypes.Fern)) {
 				level = 'Unknown'
 			} else if(p.status.find(s => s.type == enums.StatusTypes.Training)) {
 				level += '?'
@@ -1746,7 +1746,7 @@ module.exports = {
 		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
 		await sql.addStatus(channel, player.id, enums.StatusTypes.Training);
 
-		return `**{$player.name}** has begun training.`;
+		return `**${player.name}** has begun training.`;
 	},
 	async startJourney(channel, name, hoursString) {
 		const now = new Date().getTime();
