@@ -2,6 +2,7 @@ const enums = require('./enum.js');
 const numeral = require('numeral');
 const sql = require('./sql.js');
 const Discord = require("discord.js");
+const moment = require("moment");
 const fs = require('fs');
 const hour = (60 * 60 * 1000);
 
@@ -46,7 +47,7 @@ module.exports = {
 			stats += 'Rank A Warrior\n';
 		} else if(glory < 400) {
 			stats += 'Rank S Warrior\n';
-		} else if(glory < 600) {
+		} else if(glory < 700) {
 			stats += 'Rank SS Warrior\n';
 		} else if(glory < 1000) {
 			stats += 'Rank SSS Warrior\n';
@@ -1115,11 +1116,75 @@ module.exports = {
 		let embed = new Discord.RichEmbed();
 		embed.setTitle('FUSION OFFER')
 			.setColor(0x00AE86)
-			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter ${fuseCommand} to accept the offer and fuse.\n` +
+			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter \`${fuseCommand}\` to accept the offer and fuse.\n` +
 			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
 			'The offer will expire in six hours.');
 		const message = targetPlayer.config.ping ? `<@${targetPlayer.userId}>` : null;
 		return { embed: embed, message: message };
+	},
+	async breakFusion(channel, fusionId, playerId1, playerId2, pings, messages) {
+		const fusionPlayer = await sql.getPlayerById(fusionId);
+		const fusedPlayer1 = await sql.getPlayerById(playerId1);
+		const fusedPlayer2 = await sql.getPlayerById(playerId2);
+
+		// Divvy up skill and glory gains
+		const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
+		const gardenDiff = (fusionPlayer.gardenLevel - preGarden) / 2;
+		fusedPlayer1.gardenLevel += gardenDiff;
+		fusedPlayer2.gardenLevel += gardenDiff;
+
+		const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
+		const actionDiff = (fusionPlayer.actionLevel - preAction) / 2;
+		fusedPlayer1.actionLevel += actionDiff;
+		fusedPlayer2.actionLevel += actionDiff;
+
+		const preLevel = fusedPlayer1.level + fusedPlayer2.level;
+		const levelDiff = (fusionPlayer.level - preLevel) / 2;
+		fusedPlayer1.level += levelDiff;
+		fusedPlayer2.level += levelDiff;
+
+		const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
+		const gloryDiff = Math.floor((fusionPlayer.glory - preGlory) / 2);
+		fusedPlayer1.glory += gloryDiff;
+		fusedPlayer2.glory += gloryDiff;
+
+		await sql.setPlayer(fusedPlayer1);
+		await sql.setPlayer(fusedPlayer2);
+
+		// Roll for items like this is some kind of old-school MMO raid
+		for (const item of fusionPlayer.items) {
+			for (let i = 0; i < item.count; i++) {
+				if (Math.random() >= 0.5) {
+					await sql.addItems(channel, fusedPlayer1.id, item.type, 1);
+				} else {
+					await sql.addItems(channel, fusedPlayer2.id, item.type, 1);
+				}
+			}
+		}
+
+		// Unfuse
+		await sql.setFusionId(fusedPlayer1.id, 0);
+		await sql.setFusionId(fusedPlayer2.id, 0);
+
+		// Update last active values for the players
+		fusedPlayer1.lastActive = fusionPlayer.lastActive;
+		fusedPlayer2.lastActive = fusionPlayer.lastActive;
+		fusedPlayer1.lastFought = fusionPlayer.lastFought;
+		fusedPlayer2.lastFought = fusionPlayer.lastFought;
+
+		// Clean up the fusion player
+		await sql.deletePlayer(fusionPlayer.id);
+
+		if(messages) {
+			messages.push(`**${fusionPlayer.name}** disappears in a flash of light, leaving two warriors behind.`);
+		}
+
+		if(pings && fusedPlayer1.config.ping) {
+			pings.push(fusedPlayer1.userId);
+		}
+		if(pings && fusedPlayer2.config.ping) {
+			pings.push(fusedPlayer2.userId);
+		}
 	},
 	// Establish a character as a new Nemesis.
     async setNemesis(channel, username) {
@@ -1863,7 +1928,7 @@ module.exports = {
 			}
 			if(hoursLeft <= 0) {
 				let player = await sql.getPlayerById(nemesis.id);
-				await sql.endWorld(channel);
+				await this.endWorld(channel);
 				output.message = `It's too late! ${player.name} finishes charging, and destroys the universe.\nTo see the final standing, enter \`!scores\`.`;
 				output.abort = true;
 			}
@@ -1871,6 +1936,16 @@ module.exports = {
 			await sql.setNemesis(channel, nemesis);
 		}
 		return null;
+	},
+	async endWorld(channel) {
+		const players = await sql.getPlayers(channel);
+		for(const i in players) {
+			let p = players[i];
+			if(this.isFusion(p)) {
+				this.breakFusion(channel, p.id, p.fusionIDs[0], p.fusionIDs[1]);
+			}
+		}
+		await sql.endWorld(channel);
 	},
 	async deleteExpired(channel, pings) {
 		let expired = await sql.getExpired(channel);
@@ -1924,64 +1999,7 @@ module.exports = {
 					break;
 				case enums.StatusTypes.Fused:
 					// Fusion
-					const fusedPlayer1 = await sql.getPlayerById(player.fusionIDs[0]);
-					const fusedPlayer2 = await sql.getPlayerById(player.fusionIDs[1]);
-
-					// Divvy up skill and glory gains
-					const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
-					const gardenDiff = (player.gardenLevel - preGarden) / 2;
-					fusedPlayer1.gardenLevel += gardenDiff;
-					fusedPlayer2.gardenLevel += gardenDiff;
-
-					const preAction = fusedPlayer1.actionLevel + fusedPlayer2.actionLevel;
-					const actionDiff = (player.actionLevel - preAction) / 2;
-					fusedPlayer1.actionLevel += actionDiff;
-					fusedPlayer2.actionLevel += actionDiff;
-
-					const preLevel = fusedPlayer1.level + fusedPlayer2.level;
-					const levelDiff = (player.level - preLevel) / 2;
-					fusedPlayer1.level += levelDiff;
-					fusedPlayer2.level += levelDiff;
-
-					const preGlory = fusedPlayer1.glory + fusedPlayer2.glory;
-					const gloryDiff = Math.floor((player.glory - preGlory) / 2);
-					fusedPlayer1.glory += gloryDiff;
-					fusedPlayer2.glory += gloryDiff;
-
-					await sql.setPlayer(fusedPlayer1);
-					await sql.setPlayer(fusedPlayer2);
-
-					// Roll for items like this is some kind of old-school MMO raid
-					for (const item of player.items) {
-						for (let i = 0; i < item.count; i++) {
-							if (Math.random() >= 0.5) {
-								await sql.addItems(channel, fusedPlayer1.id, item.type, 1);
-							} else {
-								await sql.addItems(channel, fusedPlayer2.id, item.type, 1);
-							}
-						}
-					}
-
-					// Unfuse
-					await sql.setFusionId(fusedPlayer1.id, 0);
-					await sql.setFusionId(fusedPlayer2.id, 0);
-
-					// Update last active values for the players
-					fusedPlayer1.lastActive = player.lastActive;
-					fusedPlayer2.lastActive = player.lastActive;
-					fusedPlayer1.lastFought = player.lastFought;
-					fusedPlayer2.lastFought = player.lastFought;
-
-					// Clean up the fusion player
-					await sql.deletePlayer(player.id);
-
-					messages.push(`**${player.name}** disappears in a flash of light, leaving two warriors behind.`);
-					if(pings && fusedPlayer1.config.ping) {
-						pings.push(fusedPlayer1.userId);
-					}
-					if(pings && fusedPlayer2.config.ping) {
-						pings.push(fusedPlayer2.userId);
-					}
+					await this.breakFusion(channel, player.id, player.fusionIDs[0], player.fusionIDs[1], pings, messages);
 					break;
 				case enums.StatusTypes.Berserk:
 				    // Berserk
@@ -2242,17 +2260,18 @@ module.exports = {
 		embed.setDescription(description);
 
 		let output = '';
-		if(history.length > 15) history = history.slice(0, 15);
+		if(history.length > 10) history = history.slice(0, 10);
 		for(const i in history) {
 			const h = history[i];
-			const battleTime = new Date(h.battleTime).toLocaleString('en-US');
+			const battleTime = moment(h.battleTime).format('MMM Do');
 
 			if(output.length > 0) output += '\n';
 
 			const loserRating = Math.sqrt(h.loserLevel * h.loserSkill);
 			const winnerRating = Math.sqrt(h.winnerLevel * h.winnerSkill);
-
-			output += `${battleTime}: ${h.winnerName} defeated ${h.loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
+			const winnerName = h.winnerName ? h.winnerName : 'Someone';
+			const loserName = h.loserName ? h.loserName : 'Someone';
+			output += `${battleTime}: ${winnerName} defeated ${loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
 		}
 		embed.addField(`Last ${history.length} ${history.length == 1 ? 'fight' : 'fights'}`, output);
 
