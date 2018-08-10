@@ -41,11 +41,36 @@ module.exports = {
         Fused: 9,
         PowerWish: 10,
         ImmortalityWish: 11,
-        Berserk: 12
+        Berserk: 12,
+        Cooldown: 13,
+        DestroyCooldown: 14,
+        EnergizeCooldown: 15,
+        ReviveCooldown: 16,
+        BurnCooldown: 17,
+        NpcCooldown: 18
     },
     NemesisTypes: {
         Basic: 0,
         FirstForm: 1,
         FinalForm: 2
+    },
+    NpcTypes: {
+        Zorb: 0,
+        Zorbmaster: 1,
+        Zlower: 2,
+        Zarrot: 3,
+        Zedge: 4
+    },
+    Cooldowns: {
+        Action: 0,
+        Garden: 1,
+        Attack: 2,
+        Destroy: 3,
+        Energize: 4,
+        Revive: 5,
+        Burn: 6,
+        Search: 7, // For Zarrots
+        Empower: 8, // For Zowers
+        Unwater: 9 // For Zedge
     }
 }

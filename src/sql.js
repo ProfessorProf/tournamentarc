@@ -1,13 +1,12 @@
 const enums = require('./enum.js');
 const sql = require ('sqlite');
-const numeral = require('numeral');
 sql.open('./data.sqlite');
 
 const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
-	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER);
+	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, End_Time INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Action_Time INTEGER, Garden_Level REAL, Garden_Time INTEGER, Glory INTEGER,
     Last_Active INTEGER, Last_Fought INTEGER, Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 

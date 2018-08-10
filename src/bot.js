@@ -54,12 +54,12 @@ client.on('ready', () => {
 					if(channel.name == auth.channel) {
 						channel.send({embed: update.embed});
 					}
+					if(update.pings.length > 0) {
+						const pings = update.pings.map(ping => `<@${ping}>`);
+						channel.send(pings.join(', '));
+					}
 				} else {
 					console.log(`Unrecognized channel ${c}`);
-				}
-				if(update.pings.length > 0) {
-					const pings = update.pings.map(ping => `<@${ping}>`);
-					channel.send(pings.join(', '));
 				}
 			}
 		}
