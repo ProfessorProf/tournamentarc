@@ -578,7 +578,8 @@ module.exports = {
 			const henchmen = await sql.getHenchmen(channel);
 			for(const i in henchmen) {
 				const h = await sql.getPlayerById(henchmen[i].id);
-				if(!h.status.find(s => s.type == 0) && h.id != player1.id) {
+				if(!h.status.find(s => s.type == enums.StatusTypes.Dead) && h.id != player1.id && 
+					!h.status.find(s => s.type == enums.StatusTypes.Journey)) {
 					// Living henchman, send energy
 					const boost = this.getPowerLevel(h) * (1 - 0.2 * henchmen[i].defeats);
 					if(boost > 0) {
@@ -836,7 +837,7 @@ module.exports = {
 			output += `\n${winner.name} has betrayed ${this.their(winner.config.pronoun)} master and become the new Nemesis! The nightmare continues!`;
 			await sql.setPlayer(winner);
 			await this.setNemesis(winner.channel, winner.username);
-			winner = await sql.getPlayer(winner.channel, winner.username);
+			winner = await sql.getPlayerByUsername(winner.channel, winner.username);
 		}
 		
 		// Death timer
