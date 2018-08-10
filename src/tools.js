@@ -748,14 +748,16 @@ module.exports = {
 				}
 				for(const key in gloryGains) {
 					const g = gloryGains[key];
-					const rankUp = this.rankUp(g.oldGlory, g.glory);
-					output += `${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}\n`;
-					if(rankUp) {
-						output += `${g.name}'s Rank has increased!\n`;
-					}
 					const gloryPlayer = await sql.getPlayerById(g.id);
-					gloryPlayer.glory += g.glory;
-					await sql.setPlayer(gloryPlayer);
+					if(gloryPlayer && !gloryPlayer.isHenchman) {
+						const rankUp = this.rankUp(g.oldGlory, g.glory);
+						output += `${g.name} gains ${g.glory} glory! Totals glory: ${g.oldGlory + g.glory}\n`;
+						if(rankUp) {
+							output += `${g.name}'s Rank has increased!\n`;
+						}
+						gloryPlayer.glory += g.glory;
+						await sql.setPlayer(gloryPlayer);
+					}
 				}
 			}
 

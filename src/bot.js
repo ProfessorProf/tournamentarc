@@ -329,7 +329,7 @@ async function handleMessage(message) {
 	// Display the output
 	if(outputMessage.embed) {
 		if(outputMessage.informational && outputMessage.private) {
-			message.author.sendMessage({embed: outputMessage.embed});
+			message.author.send({embed: outputMessage.embed});
 		} else {
 			message.channel.send({embed: outputMessage.embed});
 		}
@@ -338,7 +338,7 @@ async function handleMessage(message) {
 	for(const i in outputMessage.print) {
 		const text = outputMessage.print[i];
 		if(outputMessage.informational && outputMessage.private) {
-			message.author.sendMessage(text);
+			message.author.send(text);
 		} else {
 			message.channel.send(text);
 		}
