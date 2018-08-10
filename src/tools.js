@@ -720,6 +720,7 @@ module.exports = {
 			} else {
 				// End the nemesis
 				nemesis.id = null;
+				nemesis.ruinTime = null;
 				nemesis.cooldown = now + 24 * hour;
 				await sql.deleteRecruitOffers(nemesis.channel);
 				await sql.deleteHenchmen(nemesis.channel);
