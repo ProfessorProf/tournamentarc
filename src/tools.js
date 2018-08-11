@@ -536,7 +536,7 @@ module.exports = {
 		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Training);
 
 		const time = forcedValue ? forcedValue : (now - trainingState.startTime);
-		const hours = time / hour;
+		let hours = time / hour;
 		if (hours > 72) {
 			hours = 72;
 		}
@@ -2406,7 +2406,7 @@ module.exports = {
 		return output;
 	},
 	async ending(channel) {
-		await sql.endWorld(channel);
+		await this.endWorld(channel);
 		return 'This story has reached an ending, but there are more adventures on the horizon. Onwards, to a new universe...!\n' +
 			'To see the final standing, enter \`!scores\`.';
 	}
