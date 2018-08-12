@@ -847,9 +847,10 @@ module.exports = {
 			case 'scores':
 				// !scores validation rules:
 				// World must have ended
-				if(world.startTime && world.startTime < now) {
+				if(world && world.startTime && world.startTime < now) {
 					errors.push('Scores are only available after the season ends.');
 				}
+				break;
 		}
 
 		if(errors.length > 0) {
