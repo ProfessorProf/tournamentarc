@@ -1126,6 +1126,7 @@ module.exports = {
 		const fusionPlayer = await sql.getPlayerById(fusionId);
 		const fusedPlayer1 = await sql.getPlayerById(playerId1);
 		const fusedPlayer2 = await sql.getPlayerById(playerId2);
+		if(!fusionPlayer || !fusedPlayer1 || !fusedPlayer2) return;
 
 		// Divvy up skill and glory gains
 		const preGarden = fusedPlayer1.gardenLevel + fusedPlayer2.gardenLevel;
