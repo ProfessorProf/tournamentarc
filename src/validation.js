@@ -30,7 +30,7 @@ module.exports = {
 			errors.push(`A new universe is waiting to be born.`);
 			return errors;
 		}
-		if(world.startTime > now &&
+		if(world && world.startTime > now &&
 			cmd != 'scores' && cmd != 'debug') {
 			let duration = world.startTime - now;
 			errors.push(`A new universe will be born in ${tools.getTimeString(duration)}.`);
