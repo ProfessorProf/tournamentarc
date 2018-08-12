@@ -25,7 +25,7 @@ module.exports = {
 		}
 		let errors = [];
 		let now = new Date().getTime();
-		if(!world || !world.startTime &&
+		if((!world || !world.startTime) &&
 			cmd != 'scores' && cmd != 'debug') {
 			errors.push(`A new universe is waiting to be born.`);
 			return errors;

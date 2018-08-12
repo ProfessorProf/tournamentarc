@@ -791,6 +791,7 @@ module.exports = {
 	async playerActivity(channel, username) {
 		const now = new Date().getTime();
 		const player = await this.getPlayerByUsername(channel, username);
+		if(!player) return;
 		player.lastActive = now;
 		await this.setPlayer(player);
 	},
