@@ -53,10 +53,10 @@ client.on('ready', () => {
 				if(channel) {
 					if(channel.name == auth.channel) {
 						channel.send({embed: update.embed});
-					}
-					if(update.pings.length > 0) {
-						const pings = update.pings.map(ping => `<@${ping}>`);
-						channel.send(pings.join(', '));
+						if(update.pings.length > 0) {
+							const pings = update.pings.map(ping => `<@${ping}>`);
+							channel.send(pings.join(', '));
+						}
 					}
 				} else {
 					console.log(`Unrecognized channel ${c}`);
@@ -110,15 +110,14 @@ async function handleMessage(message) {
 
 	const channel = message.channel.id;
 
-	let outputMessage = {
-		print: [],
-		embed: null,
+	let output = {
+		messages: [],
 		private: false,
 		informational: false
 	};
 
     if (cmd.substring(0, 1) == '!') {
-		outputMessage.private = true;
+		output.private = true;
 		cmd = cmd.substring(1);
 	}
 
@@ -130,7 +129,11 @@ async function handleMessage(message) {
 
 	if(cmd == 'init' ) {
 		message.channel.send('Beginning initialization...');
+		try {
 		await sql.initializeGame()
+		} catch (e) {
+			console.log(e);
+		}
 		await sql.initializeChannel(channel);
 		message.channel.send('Initialization complete.');
 		const endTime = new Date().getTime();
@@ -157,31 +160,23 @@ async function handleMessage(message) {
 	const targetName = args[0];
 	switch(cmd) {
 		case 'reg':
-			// Add a new player
-			await tools.registerPlayer(channel, name, message.author.id, targetName);
-			outputMessage.embed = await tools.getPlayerDescription(channel, name);
-			outputMessage.print.push(`Registered player ${name}!`);
+			output.messages = await tools.registerPlayer(channel, name, message.author.id, targetName);
 			break;
 		case 'check':
-			outputMessage.embed = await tools.getPlayerDescription(channel, name);
-			outputMessage.informational = true;
+			output.messages = await tools.getPlayerDescription(channel, name);
+			output.informational = true;
 			break;
 		case 'fight':
-			const fightResult = await tools.tryFight(channel, name, targetName);
-			outputMessage.embed = fightResult.embed;
-			if(fightResult.ping) {
-				outputMessage.print.push(`<@${fightResult.ping}>`);
-			}
+			output.messages = await tools.tryFight(channel, name, targetName);
 			break;
 		case 'unfight':
-			outputMessage.print.push(await tools.unfight(channel, name, message.author.id));
+			output.messages = await tools.unfight(channel, name);
+			break;
+		case 'nemesis':
+			output.messages = await tools.setNemesis(channel, name);
 			break;
 		case 'attack':
-			const attackResult = await tools.attack(channel, name, targetName);
-			outputMessage.embed = attackResult.embed;
-			if(attackResult.ping) {
-				outputMessage.print.push(`<@${attackResult.ping}>`);
-			}
+			output.messages = await tools.attack(channel, name, targetName);
 			break;
 		case 'destroy':
 			outputMessage.embed = await tools.destroy(channel);
@@ -253,10 +248,6 @@ async function handleMessage(message) {
 			if(fusionResult.message) outputMessage.print.push(fusionResult.message);
 			if(fusionResult.embed) outputMessage.embed = fusionResult.embed;
 			break;
-		case 'nemesis':
-			outputMessage.print.push(await tools.setNemesis(channel, name));
-			outputMessage.embed = await tools.getPlayerDescription(channel, name);
-			break;
 		case 'wish':
 			outputMessage.print.push(await tools.wish(channel, name, args[0]));
 			break;
@@ -295,8 +286,8 @@ async function handleMessage(message) {
 			outputMessage.print.push(await tools.startJourney(channel, name, args[0]));
 			break;
 		case 'config':
-			outputMessage.embed = await tools.config(channel, name, args[0], args[1]);
-			outputMessage.informational = true;
+			output.messages = await tools.config(channel, name, args[0], args[1]);
+			output.informational = true;
 			break;
 		case 'help':
 			outputMessage.embed = await help.showHelp(channel, args[0]);
@@ -309,34 +300,27 @@ async function handleMessage(message) {
 			await sql.clone(channel, name, targetName);
 			break;
 		case 'ending':
-			await tools.ending(channel);
-		case 'import':
-			await sql.importChannel(channel, targetName);
+			outputMessage.print.push(await tools.ending(channel));
 			break;
 	}
 
-	if(outputMessage.informational) {
+	if(output.informational) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		// Check if the user has AlwaysPrivate enabled
-		if(player && player.config && player.config.alwaysPrivate) {
-			outputMessage.private = !outputMessage.private;
+		if(player && player.config && player.config.AlwaysPrivate) {
+			output.private = !output.private;
 		}
 	}
 	// Display the output
-	if(outputMessage.embed) {
-		if(outputMessage.informational && outputMessage.private) {
-			message.author.send({embed: outputMessage.embed});
-		} else {
-			message.channel.send({embed: outputMessage.embed});
-		}
+	if(!Array.isArray(output.messages)) {
+		output.messages = [output.messages];
 	}
-
-	for(const i in outputMessage.print) {
-		const text = outputMessage.print[i];
-		if(outputMessage.informational && outputMessage.private) {
-			message.author.send(text);
+	for(const i in output.messages) {
+		const m = output.messages[i];
+		if(output.informational && output.private) {
+			message.author.send(m);
 		} else {
-			message.channel.send(text);
+			message.channel.send(m);
 		}
 	}
 	await sql.playerActivity(channel, name);

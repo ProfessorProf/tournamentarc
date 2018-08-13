@@ -68,7 +68,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
-					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
@@ -78,7 +78,7 @@ module.exports = {
 						if(player.name == target.name) {
 							errors.push('You cannot fight yourself!');
 						}
-						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
@@ -101,8 +101,9 @@ module.exports = {
 				if(player) {
 					this.validateNemesis(errors, player);
 					if(nemesis) {
-						if(nemesis.attackTime > now) {
-							let timeString = tools.getTimeString(nemesis.attackTime - now);
+						const cooldown = player.status.find(s => s.type == enums.Statuses.Cooldown && s.rating == enums.Cooldowns.Attack);
+						if(cooldown) {
+							let timeString = tools.getTimeString(cooldown.endTime - now);
 							errors.push(`**${player.name}** cannot attack indiscriminately for another ${timeString}.`);
 						}
 						if(target) {
@@ -110,7 +111,7 @@ module.exports = {
 							if(player.name == target.name) {
 								errors.push('You cannot attack yourself!');
 							}
-							let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+							let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 							if(targetDefeated) {
 								let timeString = tools.getTimeString(targetDefeated.endTime - now);
 								errors.push(`**${target.name}** cannot fight for another ${timeString}.`);
@@ -167,16 +168,16 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot train for another ' + timeString + '.');
 					} else {
-						if(!player.status.find(s => s.type == enums.StatusTypes.Ready)) {
+						if(!player.status.find(s => s.type == enums.Statuses.Ready)) {
 							errors.push('**' + player.name + '** must lose a fight before they can begin training.');
 						}
 					}
-					if(player.status.find(s => s.type == enums.StatusTypes.Training)) {
+					if(player.status.find(s => s.type == enums.Statuses.Training)) {
 						errors.push('**' + player.name + '** is already training.');
 					}
 				}
@@ -189,20 +190,20 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
-					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push(`**${player.name}** cannot train for another ${timeString}.`);
 					} else {
-						if(!player.status.find(s => s.type == enums.StatusTypes.Ready) &&
-						   !player.status.find(s => s.type == enums.StatusTypes.Training)) {
+						if(!player.status.find(s => s.type == enums.Statuses.Ready) &&
+						   !player.status.find(s => s.type == enums.Statuses.Training)) {
 							errors.push(`**${player.name}** must lose a fight before they can begin training.`);
 						}
 					}
-					if(player.status.find(s => s.type == enums.StatusTypes.Journey)) {
+					if(player.status.find(s => s.type == enums.Statuses.Journey)) {
 						errors.push(`**${player.name}** is already on a journey.`);
 					}
-					const orbs = player.items.find(i => i.type == enums.ItemTypes.Orb);
+					const orbs = player.items.find(i => i.type == enums.Items.Orb);
 					if(orbs && orbs.count > 0) {
 						errors.push("You can't take orbs with you on a journey.");
 					}
@@ -249,7 +250,7 @@ module.exports = {
 					this.validateJourney(errors, player);
 				}
 				if(targetName) {
-					let knownPlants = await sql.getKnownPlants(channel);
+					let knownPlants = garden.plantTypes.filter(t => t.known);
 					let plantType = this.getPlantType(targetName, knownPlants);
 					let heldPlants = player.items.find(i => i.type == plantType);
 					if(heldPlants && heldPlants.count >= 3) {
@@ -288,7 +289,7 @@ module.exports = {
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					let knownPlants = await sql.getKnownPlants(channel);
+					let knownPlants = garden.plantTypes.filter(t => t.known);
 					let plantType = this.getPlantType(args[0], knownPlants);
 					if(args.length > 1) {
 						if(plantType == -1) {
@@ -300,16 +301,16 @@ module.exports = {
 									if(target.name == player.name) {
 										errors.push("You can't use plants on yourself.");
 									}
-									let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+									let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 									switch(plantType) {
-										case enums.ItemTypes.Flower:
-										case enums.ItemTypes.Rose:
+										case enums.Items.Flower:
+										case enums.Items.Rose:
 											if(!targetDefeated) {
 												errors.push(`**${target.name}** is already healthy.`);
 											}
 											break;
-										case enums.ItemTypes.Bean:
-										case enums.ItemTypes.Fern:
+										case enums.Items.Bean:
+										case enums.Items.Fern:
 											if(targetDefeated) {
 												let timeString = tools.getTimeString(targetDefeated.endTime - now);
 												errors.push(`**${target.name}** cannot eat that for another ${timeString}.`);
@@ -350,7 +351,7 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
 					this.validateGardenTime(errors, player);
-					let knownPlants = await sql.getKnownPlants(channel);
+					let knownPlants = garden.plantTypes.filter(t => t.known);
 					let plantType = this.getPlantType(targetName, knownPlants);
 					if(plantType == -1 && targetName) {
 						errors.push("You've never heard of that plant.");
@@ -479,7 +480,7 @@ module.exports = {
 				if(player.fusionFlag) {
 					errors.push(`**${player.name} can't fuse again until the game resets.`);
 				}
-				let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+				let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeated) {
 					let timeString = tools.getTimeString(defeated.endTime - now);
 					errors.push('**' + player.name + '** cannot fuse for another ' + timeString + '.');
@@ -498,7 +499,7 @@ module.exports = {
 					if(player.name == target.name) {
 						errors.push("You can't fuse with yourself!");
 					} else {
-						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push('**' + target.name + '** cannot fuse for another ' + timeString + '.');
@@ -539,7 +540,7 @@ module.exports = {
 					if(player.nemesisFlag) {
 						errors.push(`**${player.name}** cannot become a nemesis again.`);
 					}
-					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot become a nemesis for another ' + timeString + '.');
@@ -578,7 +579,7 @@ module.exports = {
 					if(args.length == 0) {
 						errors.push('Enter `!help wish` for more information.');
 					}
-					let orbs = player.items.find(i => i.type == enums.ItemTypes.Orb);
+					let orbs = player.items.find(i => i.type == enums.Items.Orb);
 					if(!orbs || orbs.count < 7) {
 						errors.push('Insufficient orbs.');
 					}
@@ -623,7 +624,7 @@ module.exports = {
 				// - Must not be the Nemesis
 				// - Must not be Berserk
 				this.validatePlayerRegistered(errors, player);
-				if(player.isNemesis || player.status.find(s => s.type == enums.StatusTypes.Berserk)) {
+				if(player.isNemesis || player.status.find(s => s.type == enums.Statuses.Berserk)) {
 					errors.push("You can't stop fighting!");
 				}
 				break;
@@ -638,7 +639,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
-					if(!player.items.find(i => i.type == enums.ItemTypes.Orb)) {
+					if(!player.items.find(i => i.type == enums.Items.Orb)) {
 						errors.push("You don't have any orbs to give!");
 					}
 					if(target) {
@@ -646,7 +647,7 @@ module.exports = {
 						if(player.name == target.name) {
 							errors.push("You can't give yourself orbs!");
 						}
-						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push(`**${target.name}** cannot take orbs for another ${timeString}`);
@@ -794,7 +795,7 @@ module.exports = {
 								errors.push(`${target.name} doesn't work for you.`);
 							}
 						}
-						if(!target.status.find(s => s.type == enums.StatusTypes.Dead)) {
+						if(!target.status.find(s => s.type == enums.Statuses.Dead)) {
 							errors.push(`${target.name} doesn't need to be revived right now.`);
 						}
 						if(nemesis.reviveTime > now) {
@@ -816,7 +817,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
-					let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
@@ -826,7 +827,7 @@ module.exports = {
 						if(player.name == target.name) {
 							errors.push('You cannot taunt yourself!');
 						}
-						let targetDefeated = target.status.find(s => s.type == enums.StatusTypes.Dead);
+						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
@@ -875,7 +876,7 @@ module.exports = {
 		}
 	},
 	validateJourney(errors, player) {
-		if(player.status.find(s => s.type == enums.StatusTypes.Journey)) {
+		if(player.status.find(s => s.type == enums.Statuses.Journey)) {
 			errors.push(`**${player.name}** is away on a journey.`);
 		}
 	},

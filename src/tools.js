@@ -57,12 +57,12 @@ module.exports = {
 		
 		stats += 'Power Level: '
 		
-		if(player.status.find(s => s.type == enums.StatusTypes.Fern)) {
+		if(player.status.find(s => s.type == enums.Statuses.Fern)) {
 			stats += 'Unknown';
 		} else {
 			const level = this.getPowerLevel(player);
 			stats += numeral(level.toPrecision(2)).format('0,0');
-			if(player.status.find(s => s.type == enums.StatusTypes.Training)) {
+			if(player.status.find(s => s.type == enums.Statuses.Training)) {
 				stats += '?';
 			}
 		}
@@ -78,88 +78,66 @@ module.exports = {
 
 		// Display Status
 		let statuses = [];
-		let defeated = player.status.find(s => s.type == enums.StatusTypes.Dead);
+		let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 		for(const i in player.status) {
 			const s = player.status[i];
 			if(!s.ends || s.endTime > now) {
 				switch(s.type) {
-					case enums.StatusTypes.Dead:
+					case enums.Statuses.Dead:
 						statuses.push(`Defeated (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Journey:
+					case enums.Statuses.Journey:
 						statuses.push(`On a journey (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Training:
+					case enums.Statuses.Training:
 						statuses.push(`Training (${this.getTimeString(now - s.startTime)} so far)`);
 						break;
-					case enums.StatusTypes.Energized:
+					case enums.Statuses.Energized:
 						statuses.push(`Energized (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Overdrive:
+					case enums.Statuses.Overdrive:
 						statuses.push(`Overdriving (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Ready:
+					case enums.Statuses.Ready:
 						if(!defeated)
 							statuses.push(`Ready to train`);
 						break;
-					case enums.StatusTypes.Carrot:
+					case enums.Statuses.Carrot:
 						statuses.push(`Enhanced senses (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Bean:
+					case enums.Statuses.Bean:
 						statuses.push(`Power boosted (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Fern:
+					case enums.Statuses.Fern:
 						statuses.push(`Power level hidden (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.Fused:
+					case enums.Statuses.Fused:
 						statuses.push(`Fused (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
-					case enums.StatusTypes.PowerWish:
+					case enums.Statuses.PowerWish:
 						statuses.push(`Blessed with power`);
 						break;
-					case enums.StatusTypes.ImmortalityWish:
+					case enums.Statuses.ImmortalityWish:
 						statuses.push(`Immortal`);
 						break;
-					case enums.StatusTypes.Berserk:
+					case enums.Statuses.Berserk:
 						statuses.push(`Berserk (${this.getTimeString(s.endTime - now)} remaining)`);
 						break;
 				}
 			}
 		}
-		if(player.gardenTime > now) {
-			statuses.push(`Ready to garden in ${this.getTimeString(player.gardenTime - now)}`);
-		}
-		if(player.actionTime > now) {
-			statuses.push(`Ready to act in ${this.getTimeString(player.actionTime - now)}`);
-		}
-		if(player.isNemesis) {
-			const nemesis = await sql.getNemesis(player.channel);
-			if(nemesis.attackTime > now) {
-				statuses.push(`Ready to attack in ${this.getTimeString(nemesis.attackTime - now)}`);
-			}
-			if(nemesis.destroyTime > now) {
-				statuses.push(`Ready to destroy in ${this.getTimeString(nemesis.destroyTime - now)}`);
-			}
-			if(nemesis.burnTime > now) {
-				statuses.push(`Ready to burn in ${this.getTimeString(nemesis.burnTime - now)}`);
-			}
-			if(nemesis.energizeTime > now) {
-				statuses.push(`Ready to energize a henchman in ${this.getTimeString(nemesis.energizeTime - now)}`);
-			}
-			if(nemesis.reviveTime > now) {
-				statuses.push(`Ready to revive a henchman in ${this.getTimeString(nemesis.reviveTime - now)}`);
-			}
-		}
 		if(statuses.length > 0) {
 			embed.addField('Status', statuses.join('\n'));
 		}
-
-		// Display Inventory
-		let items = [];
-		for(const i in player.items) {
-			const item = player.items[i];
-			items.push(`${item.name} (${item.count} held)`);
+		const cooldowns = player.cooldowns.map(c => { 
+			return `${enums.Cooldowns.Names[c.type]}: Ready in ${this.getTimeString(player.actionTime - now)}`
+		});
+		if(cooldowns.length > 0) {
+			embed.addField('Cooldowns', cooldowns.join('\n'));
 		}
+		const items = player.items.map(i => { 
+			return `${item.name} (${item.count} held)`;
+		});
 		if(items.length > 0) {
 			embed.addField('Inventory', items.join('\n'));
 		}
@@ -214,9 +192,9 @@ module.exports = {
 		}
 		
 		stats = 'Power Level: '
-		const training = player.status.find(s => s.type == enums.StatusTypes.Training);
+		const training = player.status.find(s => s.type == enums.Statuses.Training);
 		const trainingTime = now - (training ? training.startTime : 0);
-		if(player.status.find(s => s.type == enums.StatusTypes.Fern)) {
+		if(player.status.find(s => s.type == enums.Statuses.Fern)) {
 			stats += 'Unknown';
 		} else {
 			let seenLevel = this.getPowerLevel(player);
@@ -227,11 +205,11 @@ module.exports = {
 				if (hours > 72) {
 					hours = 72;
 				}
-				const newPowerLevel = Math.pow(100, 1 + (world.heat + hours) / 1200);
+				let newPowerLevel = Math.pow(100, 1 + (world.heat + hours) / 1000);
 				if (this.isFusion(player)) {
 					newPowerLevel *= 1.3;
 				}
-				if (player.status.find(s => s.type == enums.StatusTypes.PowerWish)) {
+				if (player.status.find(s => s.type == enums.Statuses.PowerWish)) {
 					newPowerLevel *= 1.5;
 				}
 				if (hours <= 16) {
@@ -335,10 +313,13 @@ module.exports = {
 			let seenLevel = this.getPowerLevel(p);
 			let level = numeral(seenLevel.toPrecision(2)).format('0,0');
 			
-			if(p.status.find(s => s.type == enums.StatusTypes.Fern)) {
+			if(p.status.find(s => s.type == enums.Statuses.Fern)) {
 				level = 'Unknown'
-			} else if(p.status.find(s => s.type == enums.StatusTypes.Training)) {
+			} else if(p.status.find(s => s.type == enums.Statuses.Training)) {
 				level += '?'
+			}
+			if(p.npc) {
+				level += ' [NPC]';
 			}
 			if(p.isNemesis) {
 				level += ' [NEMESIS]';
@@ -349,7 +330,7 @@ module.exports = {
 			if(this.isFusion(p)) {
 				level += ' [FUSION]';
 			}
-			const orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
+			const orbs = p.items.find(i => i.type == enums.Items.Orb);
 			if(orbs && orbs.count > 0) {
 				level += ` [${'*'.repeat(orbs.count)}]`;
 			}
@@ -439,7 +420,6 @@ module.exports = {
 	async attack(channel, player, target) {
 		let player1 = await sql.getPlayerByUsername(channel, player);
 		let player2 = await sql.getPlayer(channel, target);
-		let nemesis = await sql.getNemesis(channel);
 		let embed = new Discord.RichEmbed();
 		const now = new Date().getTime();
 		
@@ -447,18 +427,17 @@ module.exports = {
 			.setColor(0x00AE86);
 		embed.setDescription(`**${player1.name}** attacks without warning, targeting **${player2.name}!**`);
 		
-		nemesis.attackTime = now + hour * 3;
-		await sql.setNemesis(channel, nemesis);
+		player1.addStatus(channel, player.id, enums.Statuses.Cooldown, now + 3 * hour, enums.Cooldowns.Attack);
 		
-		return await this.fight(player1, player2, false, embed);
+		await this.fight(player1, player2, false, embed);
+		let output = [embed];
+		if(player2.config.Ping) {
+			output.push(`<@${player2.userId}>`);
+		}
 	},
 	async unfight(channel, username, userId) {
 		let player = await sql.getPlayerByUsername(channel, username);
 		await sql.unfightOffers(player.id);
-		if(!player.userId) {
-			player.userId = userId;
-			await sql.setPlayer(player);
-		}
 		return `${player.name} no longer wants to fight anyone.`;
 	},
 	async taunt(channel, player, target) {
@@ -480,7 +459,7 @@ module.exports = {
 				await sql.addOffer(player1, player2, enums.OfferTypes.Taunt, glory);
 				return {
 					embed: embed,
-					ping: player2.config.ping ? player2.userId : null
+					ping: player2.config.Ping ? player2.userId : null
 				};
 			} else {
 				// There's already a challenge here - just FIGHT
@@ -492,6 +471,7 @@ module.exports = {
 	},
 	// Either fights a player or sends them a challenge, depending on whether or not they've issued a challenge.
     async tryFight(channel, player, target) {
+		let output = [];
 		let player1 = await sql.getPlayerByUsername(channel, player);
 		let embed = new Discord.RichEmbed();
 		
@@ -503,25 +483,28 @@ module.exports = {
 				// If they haven't offered, send a challenge
 				embed.setTitle('BATTLE CHALLENGE')
 					.setColor(0x00AE86)
-					.setDescription(`**${player1.name}** has issued a battle challenge to **${player2.name}**! ${player2.name}, enter \`!fight ${player1.name}\` to accept the challenge and begin the battle.`);
+					.setDescription(`**${player1.name}** has issued a battle challenge to **${player2.name}**! ` +
+						`${player2.name}, enter \`!fight ${player1.name}\` to accept the challenge and begin the battle.`);
 				await sql.addOffer(player1, player2, enums.OfferTypes.Fight);
-				return {
-					embed: embed,
-					ping: player2.config.ping ? player2.userId : null
-				};
+				output.push(embed);
 			} else {
 				// FIGHT
 				embed.setTitle(`${player1.name.toUpperCase()} vs ${player2.name.toUpperCase()}`)
 						.setColor(0x00AE86);
-				return this.fight(player1, player2, offer ? offer.type == enums.OfferTypes.Taunt : false, embed);
+				embed = await this.fight(player1, player2, offer ? offer.type == enums.OfferTypes.Taunt : false, embed);
+				output.push(embed);
+			}
+			if(player2.config.Ping) {
+				output.push(`<@${player2.userId}>`);
 			}
 		} else {
 			await sql.addOffer(player1, null, enums.OfferTypes.Fight);
 			embed.setTitle('BATTLE CHALLENGE')
 				.setColor(0x00AE86)
 				.setDescription(`**${player1.name}** wants to fight anyone! The next person to enter \`!fight ${player1.name}\` will accept the challenge and begin the battle.`);
-			return {embed: embed};
+			output.push(embed);
 		}
+		return output;
 	},
 	// End training and power up a player. Will do nothing if player is not training.
 	async completeTraining(player, forcedValue) {
@@ -532,8 +515,8 @@ module.exports = {
 			// Not training, so no need to do anything
 			return;
 		}
-		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Journey);
-		await sql.deleteStatus(player.channel, player.id, enums.StatusTypes.Training);
+		await sql.deleteStatus(player.channel, player.id, enums.Statuses.Journey);
+		await sql.deleteStatus(player.channel, player.id, enums.Statuses.Training);
 
 		const time = forcedValue ? forcedValue : (now - trainingState.startTime);
 		let hours = time / hour;
@@ -545,7 +528,7 @@ module.exports = {
 		if (this.isFusion(player)) {
 			newPowerLevel *= 1.3;
 		}
-		if (player.status.find(s => s.type == enums.StatusTypes.PowerWish)) {
+		if (player.status.find(s => s.type == enums.Statuses.PowerWish)) {
 			newPowerLevel *= 1.5;
 		}
 		console.log(`Upgrading ${player.name}'s power level after ${hours} hours of training, +${newPowerLevel}`);
@@ -562,9 +545,6 @@ module.exports = {
 		let channel = player1.channel;	
 		let world = await sql.getWorld(channel);
 
-		// Give the attacked player a ping if they want one
-		const ping = player2.config.ping ? player2.userId : null;
-		
 		// If fighters are training - take them out of training and power them up
 		await this.completeTraining(player1);
 		await this.completeTraining(player2);
@@ -579,8 +559,8 @@ module.exports = {
 			const henchmen = await sql.getHenchmen(channel);
 			for(const i in henchmen) {
 				const h = await sql.getPlayerById(henchmen[i].id);
-				if(!h.status.find(s => s.type == enums.StatusTypes.Dead) && h.id != player1.id && 
-					!h.status.find(s => s.type == enums.StatusTypes.Journey)) {
+				if(!h.status.find(s => s.type == enums.Statuses.Dead) && h.id != player1.id && 
+					!h.status.find(s => s.type == enums.Statuses.Journey)) {
 					// Living henchman, send energy
 					const boost = this.getPowerLevel(h) * (1 - 0.2 * henchmen[i].defeats);
 					if(boost > 0) {
@@ -640,22 +620,22 @@ module.exports = {
 		
 		let battleLog = '';
 		if(skill1 < 0.8) {
-			battleLog += `${player1.name} underestimates ${this.their(player1.config.pronoun)} foe!`;
+			battleLog += `${player1.name} underestimates ${this.their(player1.config.Pronoun)} foe!`;
 		} else if(skill1 > 1.6) {
 			battleLog += `${player1.name} goes *even further beyond!*`;
 		} else if(skill1 > 1.2) {
-			battleLog += `${player1.name} surpasses ${this.their(player1.config.pronoun)} limits!`;
+			battleLog += `${player1.name} surpasses ${this.their(player1.config.Pronoun)} limits!`;
 		} else {
 			battleLog += `${player1.name} fights hard!`;
 		}
 		battleLog += ` Battle rating: ${numeral(score1.toPrecision(2)).format('0,0')}\n`;
 		
 		if(skill2 < 0.8) {
-			battleLog += `${player2.name} underestimates ${this.their(player2.config.pronoun)} foe!`;
+			battleLog += `${player2.name} underestimates ${this.their(player2.config.Pronoun)} foe!`;
 		} else if(skill2 > 1.6) {
 			battleLog += `${player2.name} goes *even further beyond!*`;
 		} else if(skill2 > 1.2) {
-			battleLog += `${player2.name} surpasses ${this.their(player2.config.pronoun)} limits!`;
+			battleLog += `${player2.name} surpasses ${this.their(player2.config.Pronoun)} limits!`;
 		} else {
 			battleLog += `${player2.name} fights hard!`;
 		}
@@ -674,14 +654,11 @@ module.exports = {
 		}
 		
 		const nemesisHistory = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
-		const output = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], 
+		const outcome = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], 
 			taunted && players[1].id == player2.id, nemesisHistory);
-		embed.addField('Results', output);
+		embed.addField('Results', outcome);
 
-		return {
-			embed: embed,
-			ping: ping
-		};
+		return embed;
 	},
 	// Process updates based on who won and lost a fight.
 	async handleFightOutcome(data, winner, loser, winnerSkill, loserSkill, taunted, nemesisHistory) {
@@ -689,10 +666,10 @@ module.exports = {
 		let output = '';
 		
 		// Loser gains the Ready status, winner loses ready status if training
-		if(winner.status.find(s => s.type == enums.StatusTypes.Training)) {
-			await sql.deleteStatus(data.channel, winner.id, enums.StatusTypes.Training);
+		if(winner.status.find(s => s.type == enums.Statuses.Training)) {
+			await sql.deleteStatus(data.channel, winner.id, enums.Statuses.Training);
 		}
-		await sql.deleteStatus(data.channel, loser.id, enums.StatusTypes.Berserk);
+		await sql.deleteStatus(data.channel, loser.id, enums.Statuses.Berserk);
 		
 		// Determine length of KO
 		const difference = winnerSkill - loserSkill + 1; 		// Effective 0-2 (barring skill modifiers)
@@ -708,7 +685,7 @@ module.exports = {
 			let nemesis = await sql.getNemesis(winner.channel);
 			if(nemesis.type == enums.NemesisTypes.FirstForm) {
 				// Reveal true form
-				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.pronoun} revealed ${this.their(loser.config.pronoun)} true form!\n` +
+				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.Pronoun} revealed ${this.their(loser.config.Pronoun)} true form!\n` +
 					`The real battle begins here!\n`;
 				nemesis.type = 2;
 				loser.level = nemesis.basePower * (Math.random() + 2.5);
@@ -801,28 +778,28 @@ module.exports = {
 		
 		// Orb transfers
 		if(!trueForm) {
-			const loserOrbs = loser.items.find(i => i.type == enums.ItemTypes.Orb);
-			const winnerOrbs = winner.items.find(i => i.type == enums.ItemTypes.Orb);
+			const loserOrbs = loser.items.find(i => i.type == enums.Items.Orb);
+			const winnerOrbs = winner.items.find(i => i.type == enums.Items.Orb);
 			if(loserOrbs) {
 				output += `\n${winner.name} took ${loserOrbs.count} magic ${loserOrbs.count > 1 ? 'orbs' : 'orb'} from ${loser.name}!`;
-				await sql.addItems(winner.channel, winner.id, enums.ItemTypes.Orb, loserOrbs.count);
-				await sql.addItems(loser.channel, loser.id, enums.ItemTypes.Orb, -loserOrbs.count);
+				await sql.addItems(winner.channel, winner.id, enums.Items.Orb, loserOrbs.count);
+				await sql.addItems(loser.channel, loser.id, enums.Items.Orb, -loserOrbs.count);
 				if(loserOrbs.count + (winnerOrbs ? winnerOrbs.count : 0) == 7) {
 					output += `\n${winner.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 				}
 			}
 			// Overdrive penalty
-			if(loser.status.find(s => s.type == enums.StatusTypes.Overdrive)) {
+			if(loser.status.find(s => s.type == enums.Statuses.Overdrive)) {
 				hours += 3;
 			}
 
 			// Berserk penalty
-			if(loser.status.find(s => s.type == enums.StatusTypes.Berserk)) {
+			if(loser.status.find(s => s.type == enums.Statuses.Berserk)) {
 				hours += 3;
 			}
 
 			// Immortality
-			if(loser.status.find(s => s.type == enums.StatusTypes.ImmortalityWish)) {
+			if(loser.status.find(s => s.type == enums.Statuses.ImmortalityWish)) {
 				hours = 1;
 			}
 		}
@@ -838,7 +815,7 @@ module.exports = {
 
 		// Nemesis hijack
 		if(winner.isHenchman && loser.isNemesis && !trueForm) {
-			output += `\n${winner.name} has betrayed ${this.their(winner.config.pronoun)} master and become the new Nemesis! The nightmare continues!`;
+			output += `\n${winner.name} has betrayed ${this.their(winner.config.Pronoun)} master and become the new Nemesis! The nightmare continues!`;
 			await sql.setPlayer(winner);
 			await this.setNemesis(winner.channel, winner.username);
 			winner = await sql.getPlayerByUsername(winner.channel, winner.username);
@@ -852,7 +829,7 @@ module.exports = {
         
 		// Delete challenges
 		await sql.deleteOffersFromFight(winner.id, loser.id);
-		if(winner.status.find(s => s.type == enums.StatusTypes.Berserk)) {
+		if(winner.status.find(s => s.type == enums.Statuses.Berserk)) {
 			// Winner is berserk - re-challenge the world
 			await sql.addOffer(winner, null, enums.OfferTypes.Fight);
 		}
@@ -895,7 +872,7 @@ module.exports = {
 			// Send an offer
 			embed.setTitle('HENCHMAN RECRUITMENT')
 				.setColor(0x00AE86)
-				.setDescription(`**${player.name}** wishes for **${target.name}** to join ${this.their(player.config.pronoun)} army of evil! ` +
+				.setDescription(`**${player.name}** wishes for **${target.name}** to join ${this.their(player.config.Pronoun)} army of evil! ` +
 				`If you join, you'll become more powerful, and your power will make the Nemesis stronger. ` +
 				`${target.name}, enter \`!join ${player.name}\` to accept the offer and serve the Nemesis in battle.`);
 			await sql.addOffer(player, target, enums.OfferTypes.Recruit);
@@ -904,7 +881,7 @@ module.exports = {
 			await sql.addOffer(player, null, enums.OfferTypes.Recruit);
 			embed.setTitle('HENCHMAN RECRUITMENT')
 				.setColor(0x00AE86)
-				.setDescription(`**${player.name}** wishes for anyone to join ${this.their(player.config.pronoun)} army of evil! ` +
+				.setDescription(`**${player.name}** wishes for anyone to join ${this.their(player.config.Pronoun)} army of evil! ` +
 				`If you join, you'll become more powerful, and your power will make the Nemesis stronger. ` +
 				`the next person to enter \`!join ${player.name}\` will accept the offer and serve the Nemesis in battle.`);
 			return {embed: embed};
@@ -917,7 +894,7 @@ module.exports = {
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
 		
 		await sql.setHenchman(channel, target.id, false);
-		await sql.deleteStatus(channel, target.id, enums.StatusTypes.Energized);
+		await sql.deleteStatus(channel, target.id, enums.Statuses.Energized);
 
 		return `**${target.name}** is no longer ${nemesisPlayer.name}'s henchman!`;
 	},
@@ -943,8 +920,8 @@ module.exports = {
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
 		const now = new Date().getTime();
 		
-		await sql.deleteStatus(channel, target.id, enums.StatusTypes.Dead);
-		await sql.addStatus(channel, target.id, enums.StatusTypes.Ready);
+		await sql.deleteStatus(channel, target.id, enums.Statuses.Dead);
+		await sql.addStatus(channel, target.id, enums.Statuses.Ready);
 		nemesis.reviveTime = now + hour * 24;
 		await sql.setNemesis(channel, nemesis);
 
@@ -966,7 +943,7 @@ module.exports = {
 		if(henchmen.length + 1 >= maxHenchmen) {
 			await sql.deleteRecruitOffers(channel);
 		}
-		return `**${player.name}** has joined the Nemesis in ${this.their(nemesisPlayer.config.pronoun)} campaign of destruction!\n` +
+		return `**${player.name}** has joined the Nemesis in ${this.their(nemesisPlayer.config.Pronoun)} campaign of destruction!\n` +
 			`Your power level is increased, and you automatically boost the Nemesis's power when they come under attack. For more info, enter \`!help henchmen\`.`;
 	},
 	// Destroy command.
@@ -978,13 +955,13 @@ module.exports = {
 		let embed = new Discord.RichEmbed();
 		
 		embed.setTitle('DESTRUCTION')
-			.setDescription(`The Nemesis uses ${this.their(nemesisPlayer.config.pronoun)} full power to destroy an entire planet!`)
+			.setDescription(`The Nemesis uses ${this.their(nemesisPlayer.config.Pronoun)} full power to destroy an entire planet!`)
 			.setColor(0x00AE86);
 		
 		let targetPlayers = [];
 		for(const i in players) {
 			let p = players[i];
-			if(p && !p.isNemesis && !p.status.find(s => s.type == enums.StatusTypes.Dead)) {
+			if(p && !p.isNemesis && !p.status.find(s => s.type == enums.Statuses.Dead)) {
 				targetPlayers.push(p);
 			}
 		}
@@ -997,18 +974,18 @@ module.exports = {
 			await this.completeTraining(target);
 			
 			if(target.status.find(s => s.type == 11)) {
-				await sql.addStatus(target.channel, target.id, enums.StatusTypes.Dead, now + hour * 1);
+				await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, now + hour * 1);
 				output += `${target.name} cannot fight for another 1 hour!`;
 			} else {
-				await sql.addStatus(target.channel, target.id, enums.StatusTypes.Dead, now + hour * 12);
+				await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, now + hour * 12);
 				output += `${target.name} cannot fight for another 12 hours!`;
 			}
 
-			let orbs = target.items.find(i => i.type == enums.ItemTypes.Orb);
+			let orbs = target.items.find(i => i.type == enums.Items.Orb);
 			if(orbs && orbs.count > 0) {
 				// Their orbs are scattered
 				output += ` ${orbs.count} ${orbs.count == 1 ? 'orb is' : 'orbs are'} lost in the depths of space!`;
-				await sql.addItems(channel, target.id, enums.ItemTypes.Orb, -orbs.count);
+				await sql.addItems(channel, target.id, enums.Items.Orb, -orbs.count);
 				let world = await sql.getWorld(channel);
 				world.lostOrbs += orbs.count;
 				await sql.setWorld(world);
@@ -1083,7 +1060,7 @@ module.exports = {
 				config: {
 					alwaysPrivate: false, // Private doesn't work for fusions yet
 					ping: false, // Ping doesn't work for fusions yet
-					pronoun: sourcePlayer.config.pronoun == targetPlayer.config.pronoun ? sourcePlayer.config.pronoun : 'they'
+					pronoun: sourcePlayer.config.Pronoun == targetPlayer.config.Pronoun ? sourcePlayer.config.Pronoun : 'they'
 				}
 			};
 			const fusionId = await sql.addPlayer(fusedPlayer);
@@ -1093,7 +1070,7 @@ module.exports = {
 			await sql.setFusionId(targetPlayer.id, fusionId);
 			await sql.deleteAllFusionOffers(sourcePlayer.id);
 			await sql.deleteAllFusionOffers(targetPlayer.id);
-			await sql.addStatus(channel, fusionId, enums.StatusTypes.Fused, now + 24 * hour);
+			await sql.addStatus(channel, fusionId, enums.Statuses.Fused, now + 24 * hour);
 			for (const item of sourcePlayer.items) {
 				await sql.addItems(channel, fusionId, item.type, item.count);
 				await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
@@ -1119,7 +1096,7 @@ module.exports = {
 			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter \`${fuseCommand}\` to accept the offer and fuse.\n` +
 			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
 			'The offer will expire in six hours.');
-		const message = targetPlayer.config.ping ? `<@${targetPlayer.userId}>` : null;
+		const message = targetPlayer.config.Ping ? `<@${targetPlayer.userId}>` : null;
 		return { embed: embed, message: message };
 	},
 	async breakFusion(channel, fusionId, playerId1, playerId2, pings, messages) {
@@ -1180,16 +1157,16 @@ module.exports = {
 			messages.push(`**${fusionPlayer.name}** disappears in a flash of light, leaving two warriors behind.`);
 		}
 
-		if(pings && fusedPlayer1.config.ping) {
+		if(pings && fusedPlayer1.config.Ping) {
 			pings.push(fusedPlayer1.userId);
 		}
-		if(pings && fusedPlayer2.config.ping) {
+		if(pings && fusedPlayer2.config.Ping) {
 			pings.push(fusedPlayer2.userId);
 		}
 	},
 	// Establish a character as a new Nemesis.
     async setNemesis(channel, username) {
-		let data = await sql.getWorld(channel);
+		let world = await sql.getWorld(channel);
 		let player = await sql.getPlayerByUsername(channel, username)
 		let nemesis = await sql.getNemesis(channel);
 		if(!player) {
@@ -1203,51 +1180,43 @@ module.exports = {
 			.setColor(0x00AE86);
 		
 		// Raise heat, abort training
-		this.addHeat(data, 100);
-		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Training);
-		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
+		this.addHeat(world, 100);
+		await sql.deleteStatus(channel, player.id, enums.Statuses.Training);
+		await sql.deleteStatus(channel, player.id, enums.Statuses.Ready);
 		
 		if(nemesis) {
 			nemesis.id = player.id;
 			nemesis.startTime = now;
-			nemesis.attackTime = now;
-			nemesis.destroyTime = now;
-			nemesis.reviveTime = now;
-			nemesis.energizeTime = now;
-			nemesis.burnTime = now;
 		} else {
 			nemesis = {
 				id: player.id,
-				startTime: now,
-				attackTime: now,
-				destroyTime: now,
-				reviveTime: now,
-				burnTime: now,
-				energizeTime: now,
-				cooldown: now
+				startTime: now
 			};
 		}
 		
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
-			player.level = this.newPowerLevel(data.heat) * 4;
-			nemesis.type = enums.StatusTypes.FirstForm;
+			player.level = this.newPowerLevel(world.heat) * 4;
+			nemesis.type = enums.Statuses.FirstForm;
 		} else {
 			// A normal Nemesis
-			player.level = this.newPowerLevel(data.heat) * 10;
-			nemesis.type = enums.StatusTypes.Basic;
+			player.level = this.newPowerLevel(world.heat) * 10;
+			nemesis.type = enums.Statuses.Basic;
 		}
-		player.level *= Math.max(10, data.maxPopulation) / 10;
+		player.level *= Math.max(10, world.maxPopulation) / 10;
 		nemesis.basePower = player.level;
 		
-		await sql.setHeat(channel, data.heat);
+		await sql.setHeat(channel, world.heat);
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
-		return `**${player.name}** has become a Nemesis, and has declared war on the whole galaxy! ` +
-			`Their rampage will continue until ${player.config.pronoun} are defeated in battle.\n` + 
+
+		let output = [];
+		output.push(`**${player.name}** has become a Nemesis, and has declared war on the whole galaxy! ` +
+			`Their rampage will continue until ${player.config.Pronoun} are defeated in battle.\n` + 
 			`The Nemesis can no longer use most peaceful actions, but in exchange, ` +
-			`${player.config.pronoun} ${this.have(player.config.pronoun)} access to several powerful new abilities. ` + 
-			`For more information, enter \`!help nemesis\`.`;
+			`${player.config.Pronoun} ${this.have(player.config.Pronoun)} access to several powerful new abilities. ` + 
+			`For more information, enter \`!help nemesis\`.`);
+		output.push(this.generatePlayerDescription(player));
 	},
 	// Check whether or not a player is a fusion.
     isFusion(player) {
@@ -1256,7 +1225,7 @@ module.exports = {
 	// Generates a new power level based on the current Heat.
     newPowerLevel(heat) {
         const base = Math.ceil((1 + Math.random()) * 100);
-        let level = Math.pow(base, 1 + heat / 1200);
+        let level = Math.pow(base, 1 + heat / 1000);
         if(level > 1000000000000000000) level = 1000000000000000000; // JS craps out if we go higher than this
         return level;
 	},
@@ -1264,7 +1233,7 @@ module.exports = {
     addHeat(data, heat) {
 		if(!data) return;
 		const multiplier = 10 / Math.max(10, data.maxPopulation);
-        const addedHeat = heat * Math.pow(1.05, data.resets) * multiplier;
+        const addedHeat = heat * (1 + 0.05 * data.resets) * multiplier;
         data.heat += addedHeat;
         console.log(`Heat increased by ${heat} to ${data.heat}`);
 	},
@@ -1287,7 +1256,7 @@ module.exports = {
 			plantName = 'flower';
 		}
 
-		let plantId = Object.values(enums.ItemTypes).find(t => enums.ItemTypes.Name[t] == plantName.toLowerCase());
+		let plantId = Object.values(enums.Items).find(t => enums.Items.Name[t] == plantName.toLowerCase());
 		if(!plantId) plantId = -1;
 		if(plantId == -1) {
 			return;
@@ -1373,7 +1342,7 @@ module.exports = {
 		let plantItem = player.items.find(i => i.name.toLowerCase() == plantType.toLowerCase());
 		const now = new Date().getTime();
 
-		if(!target && plantItem.type != enums.ItemTypes.Sedge) {
+		if(!target && plantItem.type != enums.Items.Sedge) {
 			return;
 		}
 		if(!plantItem) {
@@ -1383,46 +1352,46 @@ module.exports = {
 		let output = '';
 		let defeatedState;
 		switch(plantItem.type) {
-			case enums.ItemTypes.Flower:
+			case enums.Items.Flower:
 				// Flower
-				defeatedState = target.status.find(s => s.type == enums.StatusTypes.Dead);
+				defeatedState = target.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeatedState) {
 					defeatedState.endTime -= 6 * hour;
 					if(defeatedState.endTime < now) {
-						await sql.deleteStatus(channel, target.id, enums.StatusTypes.Dead);
+						await sql.deleteStatus(channel, target.id, enums.Statuses.Dead);
 						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					} else {
 						await sql.setStatus(defeatedState);
 						const duration = defeatedState.endTime - now;
-						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+						output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
 				}
 				break;
 			case 2:
 				// Rose
-				defeatedState = target.status.find(s => s.type == enums.StatusTypes.Dead);
+				defeatedState = target.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeatedState) {
 					defeatedState.endTime -= 12 * hour;
 					if(defeatedState.endTime < now) {
-						await sql.deleteStatus(channel, target.id, enums.StatusTypes.Dead);
+						await sql.deleteStatus(channel, target.id, enums.Statuses.Dead);
 						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					} else {
 						await sql.setStatus(defeatedState);
 						const duration = defeatedState.endTime - now;
-						output = `**${player.name}** heals **${target.name}**, but ${target.config.pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+						output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 					}
 				}
 				break;
 			case 3:
 				// Carrot
-				await sql.addStatus(channel, target.id, enums.StatusTypes.Carrot, now + hour * 6);
-				output = `**${target.name}** eats the carrot, and ${this.their(target.config.pronoun)} senses feel sharper!`;
+				await sql.addStatus(channel, target.id, enums.Statuses.Carrot, now + hour * 6);
+				output = `**${target.name}** eats the carrot, and ${this.their(target.config.Pronoun)} senses feel sharper!`;
 				break;
 			case 4:
 				// Bean
-				await sql.addStatus(channel, target.id, enums.StatusTypes.Bean, now + hour);
+				await sql.addStatus(channel, target.id, enums.Statuses.Bean, now + hour);
 				const levelBoost = this.getPowerLevel(target) * .12;
-				output = `**${target.name}** eats the bean, and ${this.their(target.config.pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
+				output = `**${target.name}** eats the bean, and ${this.their(target.config.Pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
 			case 5:
 				// Sedge
@@ -1440,12 +1409,12 @@ module.exports = {
 				break;
 			case 6:
 				// Fern
-				await sql.addStatus(channel, target.id, enums.StatusTypes.Fern, now + hour * 12);
-				output = `**${target.name}** eats the fern, and ${this.their(target.config.pronoun)} power is hidden!`;
+				await sql.addStatus(channel, target.id, enums.Statuses.Fern, now + hour * 12);
+				output = `**${target.name}** eats the fern, and ${this.their(target.config.Pronoun)} power is hidden!`;
 				break;
 		}
 
-		if(target && target.config.ping) {
+		if(target && target.config.Ping) {
 			output += `\n<@${target.userId}>`;
 		}
 		await sql.addItems(channel, player.id, plantItem.type, -1);
@@ -1509,10 +1478,10 @@ module.exports = {
 				garden.researchLevel = Math.floor(garden.researchLevel) - 0.01;
 			} else {
 				// Discover a new plant species
-				let unknownPlants = await sql.getUnknownPlants(channel);
+				let unknownPlants = garden.plantTypes.filter(t => !t.known);
 				if(unknownPlants.length > 0) {
 					let newPlant = unknownPlants[Math.floor(Math.random() * unknownPlants.length)];
-					output += `\nResearch level increased! New plant "${newPlant.name}" can now be planted in the garden.`;
+					output += `\nResearch level increased! New plant "${enums.Items.Name[newPlant.id]}" can now be planted in the garden.`;
 					garden.growthLevel -= 3;
 					await sql.researchPlant(channel, newPlant.id);
 				}
@@ -1563,6 +1532,7 @@ module.exports = {
 	},
 	// Register a new player.
 	async registerPlayer(channel, username, userId, name) {
+		let output = [];
 		let world = await sql.getWorld(channel);
 		const now = new Date().getTime();
 		this.addHeat(world, 10);
@@ -1575,22 +1545,19 @@ module.exports = {
 			level: this.newPowerLevel(world.heat),
 			lastActive: now,
 			lastFought: now,
-			gardenTime: now - hour,
 			gardenLevel: 0,
-			actionTime: now - hour,
 			actionLevel: 0,
 			fusionId: null,
 			nemesisFlag: false,
 			fusionFlag: false,
-			wishFlag: false,
-			config: {
-				alwaysPrivate: false,
-				ping: false,
-				pronoun: 'they'
-			}
+			wishFlag: false
 		};
 		await sql.addPlayer(player);
 		console.log(`Registered ${username} as ${name}`);
+		output.push(`Registered player ${name}!`);
+		output.push(await this.getPlayerDescription(channel, username));
+
+		return output;
 	},
 	// Display the garden status.
 	async displayGarden(channel) {
@@ -1600,18 +1567,19 @@ module.exports = {
 		embed.setTitle('The Garden')
 			.setColor(0x00AE86);
 		
-		let plants = garden.plants.map(p => this.getPlantStatus(p));
-		let plantStatus = '';
-		for(let i = 0; i < 3; i++) {
-			plantStatus += `Plant #${i+1}: ${plants[i]}\n`;
-		}
+		const plants = garden.plants.map(p => `Plant #${p.slot}: ${this.getPlantStatus(p)}`);
+		let plantStatus = plants.join('\n');
 
 		const growthLevel = Math.floor(garden.growthLevel);
 		const growthProgress = Math.floor((garden.growthLevel - Math.floor(growthLevel)) * 100);
 		const researchLevel = Math.floor(garden.researchLevel);
 		const researchProgress = Math.floor((garden.researchLevel - Math.floor(researchLevel)) * 100);
+		const sizeLevel = Math.floor(garden.sizeLevel);
+		const sizeProgress = Math.floor((garden.sizeLevel - Math.floor(sizeLevel)) * 100);
 
-		plantStatus += `\nGrowth Level: ${growthLevel} (${growthProgress}%)\nResearch Level: ${researchLevel} (${researchProgress}%)`
+		plantStatus += `\nGrowth Level: ${growthLevel} (${growthProgress}%)\n` +
+			`Research Level: ${researchLevel} (${researchProgress}%)\n` +
+			`Size Level: ${sizeLevel} (${sizeProgress}%)`;
 		embed.setDescription(plantStatus);
 
 		return embed;
@@ -1640,7 +1608,7 @@ module.exports = {
 		const effectiveTime = Math.min(now - world.lastWish, hour * 72);
 		let searchModifier = effectiveTime / (hour * 72);
 		searchModifier *= 10 / Math.max(world.maxPopulation, 10)
-		if(player.status.find(s => s.type == enums.StatusTypes.Carrot)) searchModifier *= 3;
+		if(player.status.find(s => s.type == enums.Statuses.Carrot)) searchModifier *= 3;
 		if(player.isHenchman) searchModifier *= 2;
 		let searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
 		if(world.lostOrbs == 0) searchChance = 0;
@@ -1648,10 +1616,10 @@ module.exports = {
 		if(roll < searchChance) {
 			console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 			// They found an orb!
-			await sql.addItems(channel, player.id, enums.ItemTypes.Orb, 1);
+			await sql.addItems(channel, player.id, enums.Items.Orb, 1);
 			world.lostOrbs--;
 			output = `${player.name} searches the world, and finds a magic orb!`;
-			const existingOrbs = player.items.find(i => i.type == enums.StatusTypes.Orb);
+			const existingOrbs = player.items.find(i => i.type == enums.Statuses.Orb);
 			if(!existingOrbs) {
 				// Start the fight timer
 				player.lastFought = now;
@@ -1667,22 +1635,22 @@ module.exports = {
 				const plantType = Math.floor(Math.random() % 6) + 1;
 				let plantName;
 				switch(plantType) {
-					case enums.ItemTypes.Flower:
+					case enums.Items.Flower:
 						plantName = 'flower';
 						break;
-					case enums.ItemTypes.Rose:
+					case enums.Items.Rose:
 						plantName = 'rose';
 						break;
-					case enums.ItemTypes.Carrot:
+					case enums.Items.Carrot:
 						plantName = 'carrot';
 						break;
-					case enums.ItemTypes.Bean:
+					case enums.Items.Bean:
 						plantName = 'bean';
 						break;
-					case enums.ItemTypes.Sedge:
+					case enums.Items.Sedge:
 						plantName = 'sedge';
 						break;
-					case enums.ItemTypes.Fern:
+					case enums.Items.Fern:
 						plantName = 'fern';
 						break;
 				}
@@ -1725,6 +1693,11 @@ module.exports = {
 					console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 					output = `${player.name} searches the world, and finds ${junk}`;
 				} else {
+					roll = Math.random();
+					if(roll < 1) { //TODO: Make this lower
+						// Zorb discovered!
+						await this.addNpc(channel, enums.NpcTypes.Zorb);
+					}
 					console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 					if(world.lostOrbs == 0) {
 						output = `${player.name} searches the world, but there are no orbs left to find.`;
@@ -1757,17 +1730,17 @@ module.exports = {
 		switch(wish.toLowerCase()) {
 			case 'power':
 				player.level *= Math.random() + 1.5;
-				await sql.addStatus(channel, player.id, enums.StatusTypes.PowerWish);
+				await sql.addStatus(channel, player.id, enums.Statuses.PowerWish);
 				output += '\nYou can feel great power surging within you!';
 				break;
 			case 'resurrection':
 				let players = await sql.getPlayers(channel);
 				for(const i in players) {
 					const p = players[i];
-					const defeatedState = p.status.find(s => s.type == enums.StatusTypes.Dead);
+					const defeatedState = p.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeatedState) {
 						output += `\n${p.name} is revived!`;
-						await sql.deleteStatus(channel, p.id, enums.StatusTypes.Dead);
+						await sql.deleteStatus(channel, p.id, enums.Statuses.Dead);
 						p.level *= 1.2;
 						await sql.setPlayer(p);
 					}
@@ -1775,11 +1748,11 @@ module.exports = {
 				break;
 			case 'immortality':
 				output += '\nNo matter how great of an injury you suffer, you will always swiftly return!';
-				const defeatedState = player.status.find(s => s.type == enums.StatusTypes.Dead);
+				const defeatedState = player.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeatedState) {
-					await sql.deleteStatus(channel, player.id, enums.StatusTypes.Dead);
+					await sql.deleteStatus(channel, player.id, enums.Statuses.Dead);
 				}
-				await sql.addStatus(channel, player.id, enums.StatusTypes.ImmortalityWish);
+				await sql.addStatus(channel, player.id, enums.Statuses.ImmortalityWish);
 				break;
 			case 'gardening':
 				output += '\nYou have become the master of gardening!';
@@ -1796,7 +1769,7 @@ module.exports = {
 				break;
 		}
 		
-		await sql.addItems(channel, player.id, enums.ItemTypes.Orb, -7);
+		await sql.addItems(channel, player.id, enums.Items.Orb, -7);
 		output += `\nThe orbs scatter to the furthest reaches of the world!`;
 		player.wishFlag = true;
 		await sql.setPlayer(player);
@@ -1809,8 +1782,8 @@ module.exports = {
 	},
 	async train(channel, name) {
 		let player = await sql.getPlayerByUsername(channel, name);
-		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
-		await sql.addStatus(channel, player.id, enums.StatusTypes.Training);
+		await sql.deleteStatus(channel, player.id, enums.Statuses.Ready);
+		await sql.addStatus(channel, player.id, enums.Statuses.Training);
 
 		return `**${player.name}** has begun training.`;
 	},
@@ -1820,14 +1793,14 @@ module.exports = {
 		const hours = parseInt(hoursString);
 		if(hours != hours) return;
 
-		const training = player.status.find(s => s.type == enums.StatusTypes.Training);
+		const training = player.status.find(s => s.type == enums.Statuses.Training);
 		const trainingTime = training ? now - training.startTime : 0;
 
-		await sql.addStatus(channel, player.id, enums.StatusTypes.Journey, now + hours * hour, trainingTime);
-		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Ready);
-		await sql.deleteStatus(channel, player.id, enums.StatusTypes.Training);
+		await sql.addStatus(channel, player.id, enums.Statuses.Journey, now + hours * hour, trainingTime);
+		await sql.deleteStatus(channel, player.id, enums.Statuses.Ready);
+		await sql.deleteStatus(channel, player.id, enums.Statuses.Training);
 
-		const pronoun = player.config.pronoun.charAt(0).toUpperCase() + player.config.pronoun.substring(1);
+		const pronoun = player.config.Pronoun.charAt(0).toUpperCase() + player.config.Pronoun.substring(1);
 		return `**${player.name}** sets off on a journey to become stronger! ${pronoun} won't return for another ${hours} hours.`;
 	},
 	async updateGarden(channel, lastUpdate) {
@@ -1872,19 +1845,19 @@ module.exports = {
 				activePlayers++;
 				if(p.lastFought + 24 * hour < now) {
 					// Player has gone 24 hours without fighting
-					let orbs = p.items.find(i => i.type == enums.StatusTypes.Dead);
+					let orbs = p.items.find(i => i.type == enums.Statuses.Dead);
 					if(orbs) {
-						await sql.addItems(channel, p.id, enums.ItemTypes.Orb, -1);
+						await sql.addItems(channel, p.id, enums.Items.Orb, -1);
 						world.lostOrbs++;
 						messages.push(`${p.name} has gone for too long without fighting; one of their orbs vanishes.`);
 					}
 					p.lastFought += 24 * hour;
 				} else if(p.lastFought + 23 * hour <= now &&
 						  p.lastFought + 23 * hour > lastUpdate) {
-					let orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
+					let orbs = p.items.find(i => i.type == enums.Items.Orb);
 					if(orbs) {
 						messages.push(`${p.name} must fight someone in the next hour or lose an orb.`);
-						if(p.config.ping) {
+						if(p.config.Ping) {
 							pings.push(p.userId);
 						}
 					}
@@ -1895,13 +1868,13 @@ module.exports = {
 				}
 			} else if(p.lastActive + 24 * hour > lastUpdate) {
 				// Player has become inactive
-				const orbs = p.items.find(i => i.type == enums.ItemTypes.Orb);
+				const orbs = p.items.find(i => i.type == enums.Items.Orb);
 				console.log(`${p.name} logged idle; last activity recorded at ${new Date(p.lastActive).toLocaleString('en-US')}`);
 				if(orbs) {
-					await sql.addItems(channel, p.id, enums.ItemTypes.Orb, -orbs.count);
+					await sql.addItems(channel, p.id, enums.Items.Orb, -orbs.count);
 					world.lostOrbs += orbs.count;
 					messages.push(`${p.name} has been idle for too long; ` + 
-						`${this.their(p.config.pronoun)} ${orbs.count} ${orbs.count > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
+						`${this.their(p.config.Pronoun)} ${orbs.count} ${orbs.count > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
 				}
 			}
 		}
@@ -1943,10 +1916,10 @@ module.exports = {
 		for(const i in players) {
 			let p = players[i];
 			if(this.isFusion(p)) {
-				this.breakFusion(channel, p.id, p.fusionIDs[0], p.fusionIDs[1]);
+				//this.breakFusion(channel, p.id, p.fusionIDs[0], p.fusionIDs[1]);
 			}
 		}
-		await sql.endWorld(channel);
+		//await sql.endWorld(channel);
 	},
 	async deleteExpired(channel, pings) {
 		let expired = await sql.getExpired(channel);
@@ -1959,13 +1932,13 @@ module.exports = {
 			let player = await sql.getPlayerById(status.playerId);
 			let decrease;
 			switch(status.type) {
-				case enums.StatusTypes.Dead:
+				case enums.Statuses.Dead:
 				    // Death
 					messages.push(`**${player.name}** is ready to fight.`);
-					await sql.addStatus(channel, player.id, enums.StatusTypes.Ready);
-					if(pings && player.config.ping) pings.push(player.userId);
+					await sql.addStatus(channel, player.id, enums.Statuses.Ready);
+					if(pings && player.config.Ping) pings.push(player.userId);
 					break;
-				case enums.StatusTypes.Journey:
+				case enums.Statuses.Journey:
 					// Journey
 					const storedTrainingTime = status.rating;
 					const journeyTime = status.endTime - status.startTime;
@@ -1981,30 +1954,30 @@ module.exports = {
 					}
 					await sql.setPlayer(player);
 					break;
-				case enums.StatusTypes.Energized:
+				case enums.Statuses.Energized:
 					// Energize
 					decrease = this.getPowerLevel(player) - this.getPowerLevel(player) / 1.3;
 					messages.push(`**${player.name}** is no longer energized; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
-				case enums.StatusTypes.Overdrive: 
+				case enums.Statuses.Overdrive: 
 					// Overdrive - reduce power level
 					decrease = this.getPowerLevel(player) * 0.1;
 					player.level *= 0.9;
 					await sql.setPlayer(player);
 					messages.push(`**${player.name}** is no longer overdriving; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
-				case enums.StatusTypes.Bean: 
+				case enums.Statuses.Bean: 
 					// Bean
 					decrease = this.getPowerLevel(player) - this.getPowerLevel(player) / 1.12;
 					messages.push(`**${player.name}** is no longer bean-boosted; power level fell by ${numeral(decrease.toPrecision(2)).format('0,0')}.`);
 					break;
-				case enums.StatusTypes.Fused:
+				case enums.Statuses.Fused:
 					// Fusion
 					await this.breakFusion(channel, player.id, player.fusionIDs[0], player.fusionIDs[1], pings, messages);
 					break;
-				case enums.StatusTypes.Berserk:
+				case enums.Statuses.Berserk:
 				    // Berserk
-					messages.push(`**${player.name}** calms down from ${this.their(player.config.pronoun)} battle frenzy.`);
+					messages.push(`**${player.name}** calms down from ${this.their(player.config.Pronoun)} battle frenzy.`);
 					break;
 			}
 		}
@@ -2046,6 +2019,7 @@ module.exports = {
 	},
 	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
 	async updateWorld(channel) {
+		return {embed: null, abort: false, pings: []};
 		const now = new Date().getTime();
 		let world = await sql.getWorld(channel);
 		if(!world) {
@@ -2086,20 +2060,20 @@ module.exports = {
 			// Update the config
 			switch(configFlag.toLowerCase()) {
 				case 'alwaysprivate':
-					player.config.alwaysPrivate = this.readConfigBoolean(value);
+					player.config.AlwaysPrivate = this.readConfigBoolean(value);
 					break;
 				case 'ping':
-					player.config.ping = this.readConfigBoolean(value);
+					player.config.Ping = this.readConfigBoolean(value);
 					break;
 				case 'pronoun':
 					if(value.toLowerCase() == 'he') {
-						player.config.pronoun = 'he';
+						player.config.Pronoun = 'he';
 					} else if(value.toLowerCase() == 'she') {
-						player.config.pronoun = 'she';
+						player.config.Pronoun = 'she';
 					} else {
-						player.config.pronoun = 'they';
+						player.config.Pronoun = 'they';
 					}
-					player.config.alwaysPrivate = this.readConfigBoolean(value, player.config.alwaysPrivate);
+					player.config.AlwaysPrivate = this.readConfigBoolean(value, player.config.AlwaysPrivate);
 					break;
 			}
 		}
@@ -2112,10 +2086,9 @@ module.exports = {
 		const config = player.config;
 		embed.setTitle(`${player.name} Config`)
 			.setColor(0x00AE86);
-		//
-		let output = `AlwaysPrivate: ${config.alwaysPrivate ? 'On' : 'Off'}\n`;
-		output += `Ping: ${config.ping ? 'On' : 'Off'}\n`;
-		output += `Pronoun: ${config.pronoun}`;
+		let output = `AlwaysPrivate: ${config.AlwaysPrivate ? 'On' : 'Off'}\n`;
+		output += `Ping: ${config.Ping ? 'On' : 'Off'}\n`;
+		output += `Pronoun: ${config.Pronoun}`;
 		embed.setDescription(output);
 
 		return embed;
@@ -2123,24 +2096,24 @@ module.exports = {
 	getPowerLevel(player) {
 		let level = player.level;
 		// Overdrive
-		const overdrive = player.status.find(s => s.type == enums.StatusTypes.Overdrive);
+		const overdrive = player.status.find(s => s.type == enums.Statuses.Overdrive);
 		if(overdrive) {
 			level *= overdrive.rating;
 		}
 		// Power Wish
-		if(player.status.find(s => s.type == enums.StatusTypes.PowerWish)) {
+		if(player.status.find(s => s.type == enums.Statuses.PowerWish)) {
 			level *= 1.5;
 		}
 		// Fusion
-		if(player.status.find(s => s.type == enums.StatusTypes.Fused)) {
+		if(player.status.find(s => s.type == enums.Statuses.Fused)) {
 			level *= 1.3;
 		}
 		// Bean
-		if(player.status.find(s => s.type == enums.StatusTypes.Bean)) {
+		if(player.status.find(s => s.type == enums.Statuses.Bean)) {
 			level *= 1.12;
 		}
 		// Energized
-		if(player.status.find(s => s.type == enums.StatusTypes.Energized)) {
+		if(player.status.find(s => s.type == enums.Statuses.Energized)) {
 			level *= 1.3;
 		}
 		// Henchmen
@@ -2202,11 +2175,11 @@ module.exports = {
 		let player = await sql.getPlayerByUsername(channel, name);
 		let target = await sql.getPlayer(channel, targetName);
 
-		await sql.addItems(channel, player.id, enums.ItemTypes.Orb, -1);
-		await sql.addItems(channel, target.id, enums.ItemTypes.Orb, 1);
+		await sql.addItems(channel, player.id, enums.Items.Orb, -1);
+		await sql.addItems(channel, target.id, enums.Items.Orb, 1);
 
 		let output = `${player.name} gives a magic orb to ${target.name}.`;
-		const existingOrbs = target.items.find(i => i.type == enums.ItemTypes.Orb);
+		const existingOrbs = target.items.find(i => i.type == enums.Items.Orb);
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 		}
@@ -2288,8 +2261,8 @@ module.exports = {
 		player.level -= transfer;
 		target.level += transfer;
 
-		let output = `${player.name} sends ${this.their(player.config.pronoun)} energy to ${target.name}, ` +
-			`increasing ${this.their(target.config.pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
+		let output = `${player.name} sends ${this.their(player.config.Pronoun)} energy to ${target.name}, ` +
+			`increasing ${this.their(target.config.Pronoun)} power level by ${numeral(transfer.toPrecision(2)).format('0,0')}!`;
 		
 		if(!player.actionLevel) player.actionLevel = 0;
 		const oldActionLevel = Math.floor(player.actionLevel);
@@ -2307,10 +2280,10 @@ module.exports = {
 	},
 	async graveyard(channel) {
 		let players = await sql.getPlayers(channel);
-		const deadPlayers = players.filter(p => p.status.find(s => s.type == enums.StatusTypes.Dead));
+		const deadPlayers = players.filter(p => p.status.find(s => s.type == enums.Statuses.Dead));
 		deadPlayers.sort((a, b) => {
-			const aDeath = a.status.find(s => s.type == enums.StatusTypes.Dead);
-			const bDeath = b.status.find(s => s.type == enums.StatusTypes.Dead);
+			const aDeath = a.status.find(s => s.type == enums.Statuses.Dead);
+			const bDeath = b.status.find(s => s.type == enums.Statuses.Dead);
 			return aDeath.endTime - bDeath.endTime;
 		});
 		const now = new Date().getTime();
@@ -2322,7 +2295,7 @@ module.exports = {
 		
 		for(const i in deadPlayers) {
 			const p = deadPlayers[i];
-			const s = p.status.find(s => s.type == enums.StatusTypes.Dead);
+			const s = p.status.find(s => s.type == enums.Statuses.Dead);
 			
 			if(output.length > 0) output += '\n';
 			output += `${p.name} (Recovers in ${this.getTimeString(s.endTime - now)})`;
@@ -2384,14 +2357,14 @@ module.exports = {
 		let output = '';
 		const rating = 1 + ((Math.random() * 10 + 15) * (1 + 0.075 * player.actionLevel)) / 100;
 		const increase = this.getPowerLevel(player) * (rating - 1);
-		await sql.addStatus(channel, player.id, enums.StatusTypes.Overdrive, now + hour, rating);
-		output += `${player.name} pushes past ${this.their(player.config.pronoun)} limits, increasing ${this.their(player.config.pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
+		await sql.addStatus(channel, player.id, enums.Statuses.Overdrive, now + hour, rating);
+		output += `${player.name} pushes past ${this.their(player.config.Pronoun)} limits, increasing ${this.their(player.config.Pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 
 		if(Math.random() < player.overdriveCount / 40) {
-			output += `\nA mighty roar echoes across the planet! The surge in power makes ${player.config.pronoun} go berserk!`;
+			output += `\nA mighty roar echoes across the planet! The surge in power makes ${player.config.Pronoun} go berserk!`;
 			player.overdriveCount = 0;
 			await sql.addOffer(player, null, enums.OfferTypes.Fight);
-			await sql.addStatus(channel, player.id, enums.StatusTypes.Berserk, now + hour);
+			await sql.addStatus(channel, player.id, enums.Statuses.Berserk, now + hour);
 		}
 		if(!player.actionLevel) player.actionLevel = 0;
 		const oldActionLevel = Math.floor(player.actionLevel);
@@ -2410,5 +2383,29 @@ module.exports = {
 		await this.endWorld(channel);
 		return 'This story has reached an ending, but there are more adventures on the horizon. Onwards, to a new universe...!\n' +
 			'To see the final standing, enter \`!scores\`.';
+	},
+	// Creates a new NPC character.
+	async addNpc(channel, type) {
+		let world = await sql.getWorld();
+		let players = await sql.getPlayers(channel);
+		let npc = {
+			channel: channel,
+			glory: 0,
+			lastActive: now,
+			lastFought: now,
+			npc: type,
+			config: {}
+		};
+
+		switch(type) {
+			case enums.NpcTypes.Zorb:
+				npc.name = 'Zorb';
+				npm.level = this.newPowerLevel(world.heat) * 2;
+				break;
+			case enums.NpcTypes.Zorbmaster:
+				npc.name = 'Zorbmaster';
+				npm.level = this.newPowerLevel(world.heat) * 20;
+				break;
+		}
 	}
 }
