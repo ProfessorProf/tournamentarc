@@ -7,7 +7,7 @@ module.exports = {
         Bean: 4,
         Sedge: 5,
         Fern: 6,
-        Zower: 7,
+        Zlower: 7,
         Zarrot: 8,
         Zedge: 9,
         Name: {
@@ -18,7 +18,7 @@ module.exports = {
             4: 'bean',
             5: 'sedge',
             6: 'fern',
-            7: 'zower',
+            7: 'zlower',
             8: 'zarrot',
             9: 'zedge'
         },
@@ -44,6 +44,13 @@ module.exports = {
             7: 3,
             8: 3,
             9: 3
+        },
+        NeedsTarget: {
+            1: true,
+            2: true,
+            3: true,
+            4: true,
+            6: true
         }
     },
     ItemTypes: {
@@ -131,22 +138,24 @@ module.exports = {
         Revive: 5,
         Burn: 6,
         Search: 7, // For Zarrots
-        Empower: 8, // For Zowers
+        Empower: 8, // For Zlowers
         Unwater: 9, // For Zedge
         NextNemesis: 10,
         NextTournament: 11,
         Ruin: 12,
+        Journey: 13,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',
-            2: '!attack',
-            3: '!destroy',
-            4: '!energize',
-            5: '!revive',
-            6: '!burn',
+            2: 'Attack',
+            3: 'Destroy',
+            4: 'Energize',
+            5: 'Revive',
+            6: 'Burn',
             7: 'Auto-Search',
             8: 'Auto-Empower',
-            9: 'Drain Garden'
+            9: 'Drain Garden',
+            13: 'Journey'
         }
     },
     Configs: {

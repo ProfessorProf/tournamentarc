@@ -130,12 +130,24 @@ module.exports = {
 				if(player) {
 					this.validateNemesis(errors, player);
 					if(nemesis) {
-						if(nemesis.destroyTime > now) {
-							let timeString = tools.getTimeString(nemesis.destroyTime - now);
-							errors.push('**' + player.name + '** cannot destroy a planet for another ' + timeString + '.');
+						const cooldown = player.status.find(s => s.type == enums.Statuses.Cooldown && s.rating == enums.Cooldowns.Destroy);
+						if(cooldown) {
+							let timeString = tools.getTimeString(cooldown.endTime - now);
+							errors.push(`**${player.name}** cannot attack destroy a planet for another ${timeString}.`);
 						}
 						if(glory < 400) {
-							errors.push(`**${player.name}** must be at least Rank SS to use destruction.`);
+							errors.push(`**${player.name}** must be at least Rank S+ to use destruction.`);
+						}
+						const players = await sql.getPlayers(channel);
+						let targetPlayers = [];
+						for(const i in players) {
+							let p = players[i];
+							if(p && !p.isNemesis && !p.status.find(s => s.type == enums.Statuses.Dead)) {
+								targetPlayers.push(p);
+							}
+						}
+						if(targetPlayers.length == 0) {
+							errors.push(`There are no available targets to destroy.`);
 						}
 					}
 				}
@@ -171,14 +183,14 @@ module.exports = {
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push('**' + player.name + '** cannot train for another ' + timeString + '.');
+						errors.push(`**${player.name}** cannot train for another ${timeString}.`);
 					} else {
 						if(!player.status.find(s => s.type == enums.Statuses.Ready)) {
-							errors.push('**' + player.name + '** must lose a fight before they can begin training.');
+							errors.push(`**${player.name}** must lose a fight before they can begin training.`);
 						}
 					}
 					if(player.status.find(s => s.type == enums.Statuses.Training)) {
-						errors.push('**' + player.name + '** is already training.');
+						errors.push(`**${player.name}** is already training.`);
 					}
 				}
 				break;
@@ -317,8 +329,8 @@ module.exports = {
 											}
 											break;
 									}
-									if(player.isHenchman && !target.isNemesis) {
-										errors.push('A henchman can only use plants on the Nemesis.');
+									if(player.isUnderling && !target.isNemesis && !target.isUnderling) {
+										errors.push('A underling can only use plants on their allies.');
 									}
 								} else {
 									errors.push('Must specify a valid target.');
@@ -328,12 +340,12 @@ module.exports = {
 							}
 						}
 					} else {
-						if (plantType == 5) {
+						if (enums.Items.NeedsTarget[plantType]) {
 							if(!player.items.find(i => i.type == plantType)) {
 								errors.push("You don't have any of that plant.");
 							}
 							let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
-							if(plantCount == 0) {
+							if(plantCount == 0 && plantType == enums.Items.Sedge) {
 								errors.push("There aren't any growing plants right now.");
 							}
 						} else {
@@ -357,7 +369,7 @@ module.exports = {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p).length;
-					if(plantCount == 3) {
+					if(plantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
 					}
 				}
@@ -365,11 +377,20 @@ module.exports = {
 			case 'expand':
 				// !plant validation rules:
 				// - Must not have done any gardening in past hour
+				// - Must pick a type
+				// - Must not be on a journey
+				// - Must not be the Nemesis
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
+					if(!targetName) {
+						errors.push("Your options are: `!expand growth`, `!expand size`, or `!expand research`.");
+					}
+					if(glory < 50) {
+						errors.push(`**${player.name}** must be at least Rank C to expand the garden.`);
+					}
 				}
 				break;
 			case 'water':
@@ -384,30 +405,6 @@ module.exports = {
 					let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
 					if(plantCount == 0) {
 						errors.push("There aren't any plants that need watering right now.");
-					}
-				}
-				break;
-			case 'research':
-				// !plant validation rules:
-				// - Must be registered
-				// - Must not be the Nemesis
-				// - Must not have done any world actions in past hour
-				// - Must not be over the limit
-				this.validatePlayerRegistered(errors, player);
-				if(player) {
-					this.validateNotNemesis(errors, player);
-					this.validateGardenTime(errors, player);
-					this.validateJourney(errors, player);
-					let knownPlants = garden.plantTypes.filter(t => t.known).length;
-					let unknownPlants = garden.plantTypes.filter(t => !t.known).length;
-					if(garden.researchLevel >= knownPlants - 1.01 && garden.growthLevel < 3) {
-						errors.push("You can't research further right now - try `!expand` to work on the garden instead.");
-					}
-					if(unknownPlants == 0) {
-						errors.push("There are no new plant species to discover.");
-					}
-					if(glory < 50) {
-						errors.push(`**${player.name}** must be at least Rank C to research new plants.`);
 					}
 				}
 				break;
@@ -453,8 +450,8 @@ module.exports = {
 						if(glory < 50) {
 							errors.push(`**${player.name}** must be at least Rank C to send energy.`);
 						}
-						if(player.isHenchman && !target.isNemesis) {
-							errors.push('A henchman can only send energy to the Nemesis.');
+						if(player.isUnderling && !target.isNemesis) {
+							errors.push('A underling can only send energy to the Nemesis.');
 						}
 					} else {
 						errors.push('Must pick a valid target.');
@@ -474,6 +471,9 @@ module.exports = {
 				}
 				this.validateNotNemesis(errors, player);
 				this.validateJourney(errors, player);
+				if(args.length == 1) {
+					errors.push('Must include a fusion name.');
+				}
 				if(args.length > 2) {
 					errors.push('Fusion Name must not contain spaces.');
 				}
@@ -483,14 +483,14 @@ module.exports = {
 				let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeated) {
 					let timeString = tools.getTimeString(defeated.endTime - now);
-					errors.push('**' + player.name + '** cannot fuse for another ' + timeString + '.');
+					errors.push(`**${player.name}** cannot fuse for another ${timeString}.`);
 				}
 				if(glory < 100) {
 					errors.push(`**${player.name}** must be at least Rank B to use Fusion.`);
 				}
 				if(target) {
 					this.validateJourney(errors, target);
-					if(target.npcFlag) {
+					if(target.npc) {
 						errors.push("You can't fuse with an NPC.");
 					}
 					if(target.fusionFlag) {
@@ -510,7 +510,7 @@ module.exports = {
 						if(tools.isFusion(target)) {
 							errors.push("Fused players can't fuse again.");
 						}
-						if(player.isHenchman || target.isHenchman) {
+						if(player.isUnderling || target.isUnderling) {
 							errors.push("Servants of the Nemesis cannot fuse.");
 						}
 					}
@@ -530,26 +530,30 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
-					if(nemesis && nemesis.cooldown > now) {
-						let timeString = tools.getTimeString(nemesis.cooldown - now);
-						errors.push(`A new nemesis won't rise for at least ${timeString}.`);
+					let cooldown = world.cooldowns.find(c => c.type == enums.Cooldowns.NextNemesis);
+					if(cooldown) {
+						let timeString = tools.getTimeString(cooldown.endTime - now);
+						errors.push(`A new Nemesis won't rise for at least ${timeString}.`);
 					}
 					if(player.isNemesis) {
-						errors.push(`**${player.name}** is already a nemesis.`);
+						errors.push(`**${player.name}** is already a Nemesis.`);
 					}
 					if(player.nemesisFlag) {
-						errors.push(`**${player.name}** cannot become a nemesis again.`);
+						errors.push(`**${player.name}** cannot become a Nemesis again.`);
 					}
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push('**' + player.name + '** cannot become a nemesis for another ' + timeString + '.');
+						errors.push(`**${player.name}** cannot become a Nemesis for another ${timeString}.`);
 					}
 					if(tools.isFusion(player)) {
-						errors.push("A fusion can't become a nemesis.");
+						errors.push("A fusion can't become a Nemesis.");
 					}
 					if(glory < 250) {
-						errors.push(`**${player.name}** must be at least Rank S to become a nemesis.`);
+						errors.push(`**${player.name}** must be at least Rank S to become a Nemesis.`);
+					}
+					if(world.lostOrbs > 2) {
+						errors.push(`The power of the orbs is preventing the rise of a new Nemesis.`)
 					}
 				}
 				break;
@@ -580,7 +584,20 @@ module.exports = {
 						errors.push('Enter `!help wish` for more information.');
 					}
 					let orbs = player.items.find(i => i.type == enums.Items.Orb);
-					if(!orbs || orbs.count < 7) {
+					let orbCount = orbs ? orbs.count : 0;
+					if(player.isNemesis) {
+						const underlings = await sql.getUnderlings(channel);
+						for(const underling of underlings) {
+							const underlingPlayer = await sql.getPlayerById(underling.id);
+							if(underlingPlayer) {
+								const underlingOrbs = underlingPlayer.items.find(i => i.type == enums.Items.Orb);
+								if(underlingOrbs) {
+									orbCount += underlingOrbs.count;
+								}
+							}
+						}
+					}
+					if(orbCount < 7) {
 						errors.push('Insufficient orbs.');
 					}
 					if(player.wishFlag) {
@@ -595,21 +612,18 @@ module.exports = {
 							case 'power':
 							case 'immortality':
 							case 'gardening':
-								if(player.isNemesis) {
-									errors.push('The Nemesis can only wish for ruin.');
-								}
-								break;
 							case 'resurrection':
 								if(player.isNemesis) {
-									errors.push('The Nemesis can only wish for ruin.');
+									errors.push("The Nemesis can't wish for that.");
 								}
 								break;
 							case 'ruin':
+							case 'snap':
 								if(!player.isNemesis) {
-									errors.push('Only the Nemesis can wish for ruin.');
+									errors.push('Only the Nemesis can wish for that.');
 								}
 								if(glory < 400) {
-									errors.push('Requires Rank SS.');
+									errors.push('Requires Rank S+.');
 								}
 								break;
 							default:
@@ -624,8 +638,12 @@ module.exports = {
 				// - Must not be the Nemesis
 				// - Must not be Berserk
 				this.validatePlayerRegistered(errors, player);
-				if(player.isNemesis || player.status.find(s => s.type == enums.Statuses.Berserk)) {
-					errors.push("You can't stop fighting!");
+				if(player) {
+					const offers = await sql.getOutgoingOffers(player.id);
+					if((player.isNemesis || player.status.find(s => s.type == enums.Statuses.Berserk)) &&
+						!offers.find(o => o.type == enums.OfferTypes.Taunt)) {
+						errors.push("You can't stop fighting!");
+					}
 				}
 				break;
 			case 'give':
@@ -635,7 +653,7 @@ module.exports = {
 				// - Target must be alive
 				// - Target must not be you
 				// - Must have at least one orb
-				// TEMP: !give is in, but only for henchmen
+				// TEMP: !give is in, but only for underlings
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
@@ -652,11 +670,14 @@ module.exports = {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
 							errors.push(`**${target.name}** cannot take orbs for another ${timeString}`);
 						}
-						if(!player.isHenchman) {
-							errors.push('Only henchmen can use this command.');
+						if(!player.isUnderling && !player.wishFlag) {
+							errors.push('In order to give orbs, you must either be an underling or have already used up your wish.');
 						}
-						if(player.isHenchman && !target.isNemesis) {
-							errors.push('A henchman can only give orbs to the Nemesis.');
+						if(player.isUnderling && !target.isNemesis) {
+							errors.push('A underling can only give orbs to the Nemesis.');
+						}
+						if(target.wishFlag) {
+							errors.push("That person doesn't need any orbs.");
 						}
 					} else {
 						errors.push('Must specify a valid target.');
@@ -676,19 +697,19 @@ module.exports = {
 				// !recruit validation
 				// - Must be registered
 				// - Must be the Nemesis
-				// - Must not be capped out on henchmen
+				// - Must not be capped out on underlings
 				// - Target must exist and not be you
-				// - Target must not already be a henchman
+				// - Target must not already be a underling
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
 				if(target) {
 					this.validateJourney(errors, target);
-					let henchmen = await sql.getHenchmen(channel);
-					let maxHenchmen = Math.floor(world.maxPopulation / 5) - 1;
-					if(henchmen.length >= maxHenchmen) {
-						errors.push("You can't recruit more henchmen.");
+					let underlings = await sql.getUnderlings(channel);
+					let maxUnderlings = Math.floor(world.maxPopulation / 5) - 1;
+					if(underlings.length >= maxUnderlings) {
+						errors.push("You can't recruit more underlings.");
 					}
-					if(target.isHenchman) {
+					if(target.isUnderling) {
 						errors.push(`${target.name} already works for you.`);
 					}
 					if(target.id == player.id) {
@@ -697,31 +718,29 @@ module.exports = {
 					if(target.fusionNames.length == 2) {
 						errors.push("You can't recruit a fusion.");
 					}
-					if(target.npcFlag) {
+					if(target.npc) {
 						errors.push("You can't recruit NPCs.");
 					}
-				} else {
-					errors.push('Must specify a valid target.');
 				}
 				break;
 			case 'join':
 				// !join validation
 				// - Must be registered
 				// - Offer must be presented
-				// - Must not be a Henchman
+				// - Must not be a Underling
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateJourney(errors, player);
-					if(player.isHenchman) {
+					if(player.isUnderling) {
 						errors.push("You already serve the Nemesis.");
 					} else {
 						if(!player.offers.find(o => o.type == enums.OfferTypes.Recruit)) {
 							errors.push("The Nemesis needs to \`!recruit\` you first.");
 						}
-						let henchmen = await sql.getHenchmen(channel);
-						let maxHenchmen = Math.floor(world.maxPopulation / 5);
-						if(henchmen.length >= maxHenchmen) {
-							errors.push("The Nemesis already has too many henchmen.");
+						let underlings = await sql.getUnderlings(channel);
+						let maxUnderlings = Math.floor(world.maxPopulation / 5);
+						if(underlings.length >= maxUnderlings) {
+							errors.push("The Nemesis already has too many underlings.");
 						}
 						if(player.fusionNames.length == 2) {
 							errors.push("A Fusion can't join the Nemesis.");
@@ -734,14 +753,14 @@ module.exports = {
 				// - Must be registered
 				// - Must be the Nemesis
 				// - Target must exist
-				// - Target must be a henchman
+				// - Target must be a underling
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
 				if(target) {
 					if(target.id == player.id) {
 						errors.push(`The only escape from being the Nemesis is death.`);
 					} else {
-						if(!target.isHenchman) {
+						if(!target.isUnderling) {
 							errors.push(`${target.name} doesn't work for you.`);
 						}
 					}
@@ -754,7 +773,7 @@ module.exports = {
 				// - Must be registered
 				// - Must be the Nemesis
 				// - Target must exist
-				// - Target must be a henchman
+				// - Target must be a underling
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
 				if(player) {
@@ -764,13 +783,13 @@ module.exports = {
 						if(target.id == player.id) {
 							errors.push(`You cannot energize yourself.`);
 						} else {
-							if(!target.isHenchman) {
+							if(!target.isUnderling) {
 								errors.push(`${target.name} doesn't work for you.`);
 							}
 						}
 						if(nemesis.energizeTime > now) {
 							let timeString = tools.getTimeString(nemesis.energizeTime - now);
-							errors.push('**' + player.name + '** cannot energize a henchman for another ' + timeString + '.');
+							errors.push('**' + player.name + '** cannot energize a underling for another ' + timeString + '.');
 						}
 					} else {
 						errors.push('Must specify a valid target.');
@@ -782,7 +801,7 @@ module.exports = {
 				// - Must be registered
 				// - Must be the Nemesis
 				// - Target must exist
-				// - Target must be a henchman
+				// - Target must be a underling
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
 				if(player) {
@@ -791,7 +810,7 @@ module.exports = {
 						if(target.id == player.id) {
 							errors.push(`You cannot revive yourself.`);
 						} else {
-							if(!target.isHenchman) {
+							if(!target.isUnderling) {
 								errors.push(`${target.name} doesn't work for you.`);
 							}
 						}
@@ -800,7 +819,7 @@ module.exports = {
 						}
 						if(nemesis.reviveTime > now) {
 							let timeString = tools.getTimeString(nemesis.reviveTime - now);
-							errors.push('**' + player.name + '** cannot revive a henchman for another ' + timeString + '.');
+							errors.push('**' + player.name + '** cannot revive a underling for another ' + timeString + '.');
 						}
 					} else {
 						errors.push('Must specify a valid target.');
@@ -882,15 +901,17 @@ module.exports = {
 	},
 	validateActionTime(errors, player) {
 		let now = new Date().getTime();
-		if(player.actionTime > now) {
-			let timeString = tools.getTimeString(player.actionTime - now);
-			errors.push(`**${player.name}** cannot act for another ${timeString}.`);
+		const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Action);
+		if(cooldown) {
+			let timeString = tools.getTimeString(cooldown.endTime - now);
+			//errors.push(`**${player.name}** cannot act for another ${timeString}.`);
 		}
 	},
 	validateGardenTime(errors, player) {
-		let now = new Date().getTime();
-		if(player.gardenTime > now) {
-			let timeString = tools.getTimeString(player.gardenTime - now);
+		const now = new Date().getTime();
+		const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Garden);
+		if(cooldown) {
+			let timeString = tools.getTimeString(cooldown.endTime - now);
 			errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
 		}
 	},
@@ -916,6 +937,14 @@ module.exports = {
 			case 'fern':
 				plantType = 6;
 				break;
+			case 'zlower':
+				plantType = 7;
+				break;
+			case 'zarrot':
+				plantType = 8;
+				break;
+			case 'zedge':
+				plantType = 9;
 			default:
 				plantType = -1;
 				break;
