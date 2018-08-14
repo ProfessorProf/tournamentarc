@@ -53,7 +53,7 @@ client.on('ready', () => {
 				if(channel) {
 					if(channel.name == auth.channel) {
 						for(var u of update.updates) {
-							channel.send(u);
+							if(u) channel.send(u);
 						}
 						if(update.pings) {
 							channel.send(pings);
@@ -148,7 +148,7 @@ async function handleMessage(message) {
 
 		if(update.updates) {
 			for(var u of update.updates) {
-				message.channel.send(u);
+				if(u) message.channel.send(u);
 			}
 			if(update.pings) {
 				message.channel.send(pings);
@@ -217,7 +217,7 @@ async function handleMessage(message) {
 			output.messages = await tools.attack(channel, name, targetName);
 			break;
 		case 'destroy':
-			output.messages = await tools.destroy(channel);
+			output.messages = await tools.destroy(channel, name);
 			break;
 		case 'burn':
 			output.messages = await tools.burn(channel);
@@ -285,6 +285,12 @@ async function handleMessage(message) {
 			break;
 		case 'journey':
 			output.messages = await tools.startJourney(channel, name, args[0]);
+			break;
+		case 'selfdestruct':
+			output.messages = await tools.selfDestruct(channel, name, targetName);
+			break;
+		case 'episode':
+			output.messages = await tools.getEpisode(channel, args[0]);
 			break;
 		case 'config':
 			output.messages = await tools.config(channel, name, args[0], args[1]);

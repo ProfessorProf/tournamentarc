@@ -79,6 +79,8 @@ module.exports = {
         ImmortalityWish: 11,
         Berserk: 12,
         Cooldown: 13,
+        SelfDestruct: 14,
+        Annihilation: 15,
         Name: {
             0: 'Defeated',
             1: 'Journey',
@@ -93,7 +95,9 @@ module.exports = {
             10: 'Power',
             11: 'Immortal',
             12: 'Berserk',
-            13: 'Cooldown'
+            13: 'Cooldown',
+            14: 'Self Destruct',
+            15: 'Annihilation'
         },
         Ends: {
             0: true,
@@ -172,5 +176,14 @@ module.exports = {
             Ping: 'bool',
             Pronoun: 'text'
         }
+    },
+    FightSummaries: {
+        ExpectedWin: 0,
+        UnexpectedWin: 1,
+        NemesisWin: 2,
+        NemesisLoss: 3,
+        NemesisBetrayal: 4,
+        NemesisTrueForm: 5,
+        NemesisSelfDestruct: 6
     }
 }

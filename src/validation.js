@@ -67,6 +67,7 @@ module.exports = {
 				// - Player and Target must both be alive
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
@@ -74,6 +75,7 @@ module.exports = {
 						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
 					}
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push('You cannot fight yourself!');
@@ -101,12 +103,13 @@ module.exports = {
 				if(player) {
 					this.validateNemesis(errors, player);
 					if(nemesis) {
-						const cooldown = player.status.find(s => s.type == enums.Statuses.Cooldown && s.rating == enums.Cooldowns.Attack);
+						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Attack);
 						if(cooldown) {
 							let timeString = tools.getTimeString(cooldown.endTime - now);
 							errors.push(`**${player.name}** cannot attack indiscriminately for another ${timeString}.`);
 						}
 						if(target) {
+							this.validateAnnihilation(errors, target);
 							this.validateJourney(errors, target);
 							if(player.name == target.name) {
 								errors.push('You cannot attack yourself!');
@@ -130,7 +133,7 @@ module.exports = {
 				if(player) {
 					this.validateNemesis(errors, player);
 					if(nemesis) {
-						const cooldown = player.status.find(s => s.type == enums.Statuses.Cooldown && s.rating == enums.Cooldowns.Destroy);
+						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Destroy);
 						if(cooldown) {
 							let timeString = tools.getTimeString(cooldown.endTime - now);
 							errors.push(`**${player.name}** cannot attack destroy a planet for another ${timeString}.`);
@@ -155,7 +158,6 @@ module.exports = {
 			case 'burn':
 				// !burn validation rules:
 				// - Player must be Nemesis
-				// - Nemesis burn cooldown must be off
 				// - Must be at least one plant in the garden
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
@@ -164,9 +166,10 @@ module.exports = {
 						if(!garden.plants.find(p => p)) {
 							errors.push('There are no plants in the garden to burn!');
 						}
-						if(nemesis.burnTime > now) {
-							let timeString = tools.getTimeString(nemesis.burnTime - now);
-							errors.push('**' + player.name + '** cannot attack the garden for another ' + timeString + '.');
+						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Burn);
+						if(cooldown) {
+							let timeString = tools.getTimeString(cooldown.endTime - now);
+							errors.push(`**${player.name}** cannot attack the garden for another ${timeString}.`);
 						}
 					}
 				}
@@ -178,6 +181,7 @@ module.exports = {
 				// - Must not be training
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
@@ -201,6 +205,7 @@ module.exports = {
 				// - Must not be training
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
@@ -258,34 +263,41 @@ module.exports = {
 				// - Must be carrying fewer than 3 of the plant in question
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					this.validateNotNemesis(errors, player);
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
-				}
-				if(targetName) {
-					let knownPlants = garden.plantTypes.filter(t => t.known);
-					let plantType = this.getPlantType(targetName, knownPlants);
-					let heldPlants = player.items.find(i => i.type == plantType);
-					if(heldPlants && heldPlants.count >= 3) {
-						errors.push("You can't carry any more of that plant.");
-					}
-					let plantCount = garden.plants.filter(p => p && p.type == plantType && p.endTime < now).length;
-					if(plantType == -1) {
-						errors.push("You've never heard of that plant.");
-					} else if(plantCount == 0) {
-						errors.push("None of those are ready to be picked.");
-					}
-				} else {
-					// If there's no plant specified, then it defaults to picking the first thing in the garden
-					let plant = garden.plants.find(p => p && p.endTime < now);
-					if(plant) {
-						let heldPlants = player.items.find(i => i.type == plant.type);
+					if(targetName) {
+						const knownPlants = garden.plantTypes.filter(t => t.known);
+						const plantType = this.getPlantType(targetName, knownPlants);
+						const darkPlantType = this.getDarkPlantType(targetName);
+						if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
+							errors.push("That plant was sealed away thousands of years ago.");
+						}
+						if(plantType != -1 && darkPlantType == -1 && player.isNemesis) {
+							errors.push("You have no need of such a pathetic plant.");
+						}
+						let heldPlants = player.items.find(i => i.type == plantType);
 						if(heldPlants && heldPlants.count >= 3) {
 							errors.push("You can't carry any more of that plant.");
 						}
-					}
-					let plantCount = garden.plants.filter(p => p && p.endTime < now).length;
-					if(plantCount == 0) {
-						errors.push('There are no finished plants in the garden.');
+						const plantCount = garden.plants.filter(p => p && (p.type == plantType || p.type == darkPlantType) && p.endTime < now).length;
+						if(plantType == -1 && darkPlantType == -1) {
+							errors.push("You've never heard of that plant.");
+						} else if(plantCount == 0) {
+							errors.push("None of those are ready to be picked.");
+						}
+					} else {
+						// If there's no plant specified, then it defaults to picking the first thing in the garden
+						let plant = garden.plants.find(p => p && p.endTime < now);
+						if(plant) {
+							let heldPlants = player.items.find(i => i.type == plant.type);
+							if(heldPlants && heldPlants.count >= 3) {
+								errors.push("You can't carry any more of that plant.");
+							}
+						}
+						let plantCount = garden.plants.filter(p => p && p.endTime < now).length;
+						if(plantCount == 0) {
+							errors.push('There are no finished plants in the garden.');
+						}
 					}
 				}
 				break;
@@ -299,6 +311,7 @@ module.exports = {
 				// - Player and Target must be different people
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known);
@@ -309,6 +322,7 @@ module.exports = {
 						} else {
 							if(player.items.find(i => i.type == plantType)) {
 								if(target) {
+									this.validateAnnihilation(errors, target);
 									this.validateJourney(errors, target);
 									if(target.name == player.name) {
 										errors.push("You can't use plants on yourself.");
@@ -360,17 +374,27 @@ module.exports = {
 				// - Must be room in the garden for a new plant
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
-					this.validateNotNemesis(errors, player);
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known);
-					let plantType = this.getPlantType(targetName, knownPlants);
-					if(plantType == -1 && targetName) {
+					const plantType = this.getPlantType(targetName, knownPlants);
+					const darkPlantType = this.getDarkPlantType(targetName);
+					if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
+						errors.push("That plant was sealed away thousands of years ago.");
+					}
+					if(plantType != -1 && darkPlantType == -1 && player.isNemesis) {
+						errors.push("You have no need of such a pathetic plant.");
+					}
+					if(plantType == -1 && darkPlantType == -1 && targetName) {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p).length;
-					if(plantCount >= garden.slots) {
+					if(plantType != -1 && plantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
+					}
+					if(darkPlantType != -1 && garden.plants.find(p => p.slot == 99)) {
+						errors.push("There can only be one dark plant in the garden at a time.");
 					}
 				}
 				break;
@@ -382,6 +406,7 @@ module.exports = {
 				// - Must not be the Nemesis
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
@@ -399,6 +424,7 @@ module.exports = {
 				// - Must be at least one waterable plant
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
@@ -415,6 +441,7 @@ module.exports = {
 				// - Must not have done any world actions in past hour
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
 					this.validateJourney(errors, player);
@@ -427,6 +454,7 @@ module.exports = {
 				// - Must not have done any world actions in past hour
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
 					this.validateJourney(errors, player);
@@ -442,10 +470,12 @@ module.exports = {
 				// - Must not have done any world actions in past hour
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
 					this.validateJourney(errors, player);
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(glory < 50) {
 							errors.push(`**${player.name}** must be at least Rank C to send energy.`);
@@ -469,6 +499,7 @@ module.exports = {
 				if (!player) {
 					break;
 				}
+				this.validateAnnihilation(errors, player);
 				this.validateNotNemesis(errors, player);
 				this.validateJourney(errors, player);
 				if(args.length == 1) {
@@ -489,7 +520,9 @@ module.exports = {
 					errors.push(`**${player.name}** must be at least Rank B to use Fusion.`);
 				}
 				if(target) {
+					this.validateAnnihilation(errors, target);
 					this.validateJourney(errors, target);
+					this.validateNotNpc(errors, target);
 					if(target.npc) {
 						errors.push("You can't fuse with an NPC.");
 					}
@@ -529,6 +562,7 @@ module.exports = {
 				// - 24 hours must have passed since the previous Nemesis died
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					let cooldown = world.cooldowns.find(c => c.type == enums.Cooldowns.NextNemesis);
 					if(cooldown) {
@@ -552,7 +586,7 @@ module.exports = {
 					if(glory < 250) {
 						errors.push(`**${player.name}** must be at least Rank S to become a Nemesis.`);
 					}
-					if(world.lostOrbs > 2) {
+					if(world.lostOrbs < 5) {
 						errors.push(`The power of the orbs is preventing the rise of a new Nemesis.`)
 					}
 				}
@@ -562,8 +596,10 @@ module.exports = {
 				// - Must specify a valid target
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						if(player.name == target.name) {
 							errors.push('You cannot scan yourself!');
 						}
@@ -579,6 +615,7 @@ module.exports = {
 				// - Nemesis can only wish for ruin
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					if(args.length == 0) {
 						errors.push('Enter `!help wish` for more information.');
@@ -639,6 +676,7 @@ module.exports = {
 				// - Must not be Berserk
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					const offers = await sql.getOutgoingOffers(player.id);
 					if((player.isNemesis || player.status.find(s => s.type == enums.Statuses.Berserk)) &&
 						!offers.find(o => o.type == enums.OfferTypes.Taunt)) {
@@ -653,14 +691,17 @@ module.exports = {
 				// - Target must be alive
 				// - Target must not be you
 				// - Must have at least one orb
-				// TEMP: !give is in, but only for underlings
+				// - Must have used up your wish, or must be an underling
+				// - If underling, target must be nemesis
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					if(!player.items.find(i => i.type == enums.Items.Orb)) {
 						errors.push("You don't have any orbs to give!");
 					}
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push("You can't give yourself orbs!");
@@ -699,11 +740,13 @@ module.exports = {
 				// - Must be the Nemesis
 				// - Must not be capped out on underlings
 				// - Target must exist and not be you
-				// - Target must not already be a underling
+				// - Target must not already be an underling
 				this.validatePlayerRegistered(errors, player);
 				this.validateNemesis(errors, player);
 				if(target) {
+					this.validateAnnihilation(errors, target);
 					this.validateJourney(errors, target);
+					this.validateNotNpc(errors, target);
 					let underlings = await sql.getUnderlings(channel);
 					let maxUnderlings = Math.floor(world.maxPopulation / 5) - 1;
 					if(underlings.length >= maxUnderlings) {
@@ -730,6 +773,7 @@ module.exports = {
 				// - Must not be a Underling
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					if(player.isUnderling) {
 						errors.push("You already serve the Nemesis.");
@@ -753,19 +797,22 @@ module.exports = {
 				// - Must be registered
 				// - Must be the Nemesis
 				// - Target must exist
-				// - Target must be a underling
+				// - Target must be an underling
 				this.validatePlayerRegistered(errors, player);
-				this.validateNemesis(errors, player);
-				if(target) {
-					if(target.id == player.id) {
-						errors.push(`The only escape from being the Nemesis is death.`);
-					} else {
-						if(!target.isUnderling) {
-							errors.push(`${target.name} doesn't work for you.`);
+				if(player) {
+					this.validateNemesis(errors, player);
+					if(target) {
+						this.validateAnnihilation(errors, target);
+						if(target.id == player.id) {
+							errors.push(`The only escape from being the Nemesis is death.`);
+						} else {
+							if(!target.isUnderling) {
+								errors.push(`${target.name} doesn't work for you.`);
+							}
 						}
+					} else {
+						errors.push('Must specify a valid target.');
 					}
-				} else {
-					errors.push('Must specify a valid target.');
 				}
 				break;
 			case 'energize':
@@ -773,12 +820,13 @@ module.exports = {
 				// - Must be registered
 				// - Must be the Nemesis
 				// - Target must exist
-				// - Target must be a underling
+				// - Target must be an underling
 				this.validatePlayerRegistered(errors, player);
-				this.validateNemesis(errors, player);
 				if(player) {
+					this.validateNemesis(errors, player);
 					this.validateJourney(errors, player);
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(target.id == player.id) {
 							errors.push(`You cannot energize yourself.`);
@@ -787,9 +835,10 @@ module.exports = {
 								errors.push(`${target.name} doesn't work for you.`);
 							}
 						}
-						if(nemesis.energizeTime > now) {
-							let timeString = tools.getTimeString(nemesis.energizeTime - now);
-							errors.push('**' + player.name + '** cannot energize a underling for another ' + timeString + '.');
+						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Energize);
+						if(cooldown) {
+							let timeString = tools.getTimeString(cooldown.endTime - now);
+							errors.push(`**${player.name}** cannot energize an underling for another ${timeString}.`);
 						}
 					} else {
 						errors.push('Must specify a valid target.');
@@ -801,11 +850,12 @@ module.exports = {
 				// - Must be registered
 				// - Must be the Nemesis
 				// - Target must exist
-				// - Target must be a underling
+				// - Target must be an underling
 				this.validatePlayerRegistered(errors, player);
-				this.validateNemesis(errors, player);
 				if(player) {
+					this.validateNemesis(errors, player);
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(target.id == player.id) {
 							errors.push(`You cannot revive yourself.`);
@@ -817,9 +867,10 @@ module.exports = {
 						if(!target.status.find(s => s.type == enums.Statuses.Dead)) {
 							errors.push(`${target.name} doesn't need to be revived right now.`);
 						}
-						if(nemesis.reviveTime > now) {
-							let timeString = tools.getTimeString(nemesis.reviveTime - now);
-							errors.push('**' + player.name + '** cannot revive a underling for another ' + timeString + '.');
+						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Revive);
+						if(cooldown) {
+							let timeString = tools.getTimeString(cooldown.endTime - now);
+							errors.push(`**${player.name}** cannot revive an underling for another ${timeString}.`);
 						}
 					} else {
 						errors.push('Must specify a valid target.');
@@ -835,13 +886,15 @@ module.exports = {
 				// - Player must not have a sent taunt
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
+					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
+						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
 					}
 					if(target) {
+						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push('You cannot taunt yourself!');
@@ -866,11 +919,45 @@ module.exports = {
 				break;
 			case 'scores':
 				// !scores validation rules:
-				// World must have ended
+				// - World must have ended
 				if(world && world.startTime && world.startTime < now) {
 					errors.push('Scores are only available after the season ends.');
 				}
 				break;
+			case 'selfdestruct':
+				// !selfdestruct validation rules:
+				// - Rank A
+				// - Must not be the Nemesis
+				// - Must not be on a Journey
+				// - Target must be valid
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateAnnihilation(errors, player);
+					this.validateNotNemesis(errors, player);
+					this.validateJourney(errors, player);
+					if(glory < 150) {
+						errors.push(`**${player.name}** must be at least Rank A to self-destruct.`);
+					}
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+					if(defeated) {
+						let timeString = tools.getTimeString(defeated.endTime - now);
+						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
+					}
+					if(target) {
+						this.validateAnnihilation(errors, target);
+						this.validateJourney(errors, target);
+						if(player.name == target.name) {
+							errors.push("If you're going to explode, at least take someone else out with you.");
+						}
+						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
+						if(targetDefeated) {
+							let timeString = tools.getTimeString(targetDefeated.endTime - now);
+							errors.push(`**${target.name}** cannot fight for another ${timeString}.`);
+						}
+					} else {
+						errors.push(`Must specify a valid target.`);
+					}
+				}
 		}
 
 		if(errors.length > 0) {
@@ -899,12 +986,22 @@ module.exports = {
 			errors.push(`**${player.name}** is away on a journey.`);
 		}
 	},
+	validateAnnihilation(errors, player) {
+		if(player.status.find(s => s.type == enums.Statuses.Annihilation)) {
+			errors.push(`**${player.name}** no longer exists in this world.`);
+		}
+	},
+	validateNotNpc(errors, player) {
+		if(player.npc) {
+			errors.push(`That action can't target an NPC.`);
+		}
+	},
 	validateActionTime(errors, player) {
 		let now = new Date().getTime();
 		const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Action);
 		if(cooldown) {
 			let timeString = tools.getTimeString(cooldown.endTime - now);
-			//errors.push(`**${player.name}** cannot act for another ${timeString}.`);
+			errors.push(`**${player.name}** cannot act for another ${timeString}.`);
 		}
 	},
 	validateGardenTime(errors, player) {
@@ -954,5 +1051,18 @@ module.exports = {
 			return -1;
 		}
 		return plantType;
+	},
+	getDarkPlantType(plantName) {
+		if(!plantName) return -1;
+		switch(plantName.toLowerCase()) {
+			case 'zlower':
+				return 7;
+			case 'zarrot':
+				return 8;
+			case 'zedge':
+				return 9;
+			default:
+				return -1;
+		}
 	}
 }

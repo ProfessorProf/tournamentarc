@@ -6,7 +6,8 @@ const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
-	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER);
+	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER);
+CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
 	Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
@@ -144,6 +145,7 @@ module.exports = {
 				lastWish: row.Last_Wish,
 				lastUpdate: row.Last_Update,
 				startTime: row.Start_Time,
+				episode: row.Episode,
 				cooldowns: statusRows.map(c => { return {
 					type: c.Rating,
 					endTime: c.EndTime
@@ -461,6 +463,16 @@ module.exports = {
 			// Ending a KO status = become capable of training
 			await this.addStatus(channel, playerId, 5);
 		}
+	},
+	// Delete all Status for a player.
+	async annihilatePlayer(channel, playerId) {
+		const orbs = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = 0`, {$playerId: playerId});
+		if(orbs) {
+			await sql.get(`UPDATE Worlds SET Lost_Orbs = Lost_Orbs + $orbs WHERE Channel = $channel`, {$channel: channel, $orbs: orbs.Count});
+		}
+		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
 	},
 	// Delete a Status.
 	async deleteStatusById(channel, id) {
@@ -826,7 +838,18 @@ module.exports = {
 		await sql.run(`UPDATE Nemesis SET Ruin_Time = NULL WHERE CHannel = $channel`, {$channel: channel});
 	},
 	async scatterOrbs(channel) {
-		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel AND Type = 0`, {$channel: channel});
-		await sql.run(`UPDATE Worlds SET Lost_Orbs = 0 WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel AND Item_ID = 0`, {$channel: channel});
+		await sql.run(`UPDATE Worlds SET Lost_Orbs = 7 WHERE Channel = $channel`, {$channel: channel});
+	},
+	async getEpisode(channel, episode) {
+		return await sql.get(`SELECT ID as id, Air_Date as airDate, Summary as summary FROM Episodes WHERE ID = $episode AND Channel = $channel`,
+			{$channel: channel, $episode: episode});
+	},
+	async addEpisode(channel, summary) {
+		const row = await sql.get(`SELECT Episode FROM Worlds WHERE Channel = $channel`, {$channel: channel});
+		const episodeNumber = row ? row.Episode : 1;
+		await sql.run(`INSERT INTO Episodes (ID, Channel, Air_Date, Summary) VALUES ($id, $channel, $airDate, $summary)`, 
+			{$id: episodeNumber, $channel: channel, $airDate: new Date().getTime(), $summary: summary});
+		await sql.run(`UPDATE Worlds SET Episode = $episode WHERE Channel = $channel`, {$channel: channel, $episode: episodeNumber + 1});
 	}
 }

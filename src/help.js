@@ -159,7 +159,7 @@ Rank ??? 1000 Glory
                 case 'underlings':
                     output.setDescription('Underlings:')
                         .addField('!join', 'Accept a recruitment offer from the Nemesis, and become one of their underlings!')
-                        .addField('Underling properties', "When you join the Nemesis, you get a considerable boost to your Power Level.\nThe Nemesis can energize their underlings, boosting their Power Level even further.\nThe Nemesis can bring fallen underlings back to life.\nUnderlings have increased chances to find orbs while searching the world.\nIf the Nemesis is attacked, their power is increased for each active underling.\nEach time a underling falls in battle, the amount of power they grant to the Nemesis decreases by 20%.\nUnderlings can only use the commands !use, !empower and !give on the Nemesis.")
+                        .addField('Underling properties', "When you join the Nemesis, you get a considerable boost to your Power Level.\nThe Nemesis can energize their underlings, boosting their Power Level even further.\nThe Nemesis can bring fallen underlings back to life.\nUnderlings have increased chances to find orbs while searching the world.\nIf the Nemesis is attacked, their power is increased for each active underling.\nEach time an underling falls in battle, the amount of power they grant to the Nemesis decreases by 20%.\nUnderlings can only use the commands !use, !empower and !give on the Nemesis.")
                     break;
                 case 'wish':
                     output.setTitle('Help: Wishes')
@@ -325,6 +325,14 @@ Rank ??? 1000 Glory
             case 'world':
                 embed.addField('!world', "Displays basic info about the world - age, countdown timers, how many orbs are still in hiding. Can be used by anyone.");
                 break;
+            case 'scores':
+                embed.addField('!score', "Displays the top ten greatest warriors of the previous season, sorted by Glory. Can be used by anyone, but only after the season ends.");
+                break;
+            case 'selfdestruct':
+                embed.addField('!selfdestruct target', "Uses all of your remaining life force for one last fight. " +
+                    "Your power is increased massively, but you won't come back from this one with a simple rest...\n" +
+                    "**Do not use this command unless you are comfortable with being gone for a long time!**\n" +
+                    "Requirements: Must be Rank A. Must be alive. Target must be alive. Must not be the Nemesis.")
             default:
                 return false;
         }
