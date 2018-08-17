@@ -951,10 +951,10 @@ module.exports = {
 				break;
 		}
 		let summary = templateList[Math.floor(Math.random() * templateList.length)];
-		summary = summary.replace(new RegExp('\$winner', 'g'), winner.name)
-			.replace(new RegExp('\$loser', 'g'), loser.name)
-			.replace(new RegExp('\$wTheir', 'g'), this.their(winner.config.pronoun))
-			.replace(new RegExp('\$lTheir', 'g'), this.their(loser.config.pronoun));
+		summary = summary.replace(new RegExp('\\$winner', 'g'), winner.name)
+			.replace(new RegExp('\\$loser', 'g'), loser.name)
+			.replace(new RegExp('\\$wTheir', 'g'), this.their(winner.config.pronoun))
+			.replace(new RegExp('\\$lTheir', 'g'), this.their(loser.config.pronoun));
 		await sql.addEpisode(winner.channel, summary);
 
 		// Save changes
