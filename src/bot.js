@@ -289,6 +289,9 @@ async function handleMessage(message) {
 		case 'selfdestruct':
 			output.messages = await tools.selfDestruct(channel, name, targetName);
 			break;
+		case 'filler':
+			output.messages = await tools.filler(channel, name, targetName);
+			break;
 		case 'episode':
 			output.messages = await tools.getEpisode(channel, args[0]);
 			break;

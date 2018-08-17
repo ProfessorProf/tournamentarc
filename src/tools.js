@@ -558,6 +558,10 @@ module.exports = {
 		}
 		await sql.deleteStatus(player.channel, player.id, enums.Statuses.Journey);
 		await sql.deleteStatus(player.channel, player.id, enums.Statuses.Training);
+		await sql.addStatus(player.channel, player.id, enums.Statuses.TrainingComplete);
+		player.status.push({
+			type: enums.Statuses.TrainingComplete
+		});
 
 		const time = forcedValue ? forcedValue : (now - trainingState.startTime);
 		let hours = time / hour;
@@ -653,6 +657,13 @@ module.exports = {
 		}
 		if(player2.isNemesis) {
 			skill1 += 0.075;
+		}
+
+		if(player1.status.find(s => s.type == enums.Statuses.TrainingComplete && skill1 < 1)) {
+			skill1 = 1;
+		}
+		if(player2.status.find(s => s.type == enums.Statuses.TrainingComplete && skill2 < 1)) {
+			skill2 = 1;
 		}
 		
 		console.log(`${player1.name}: PL ${Math.floor(level1 * 10) / 10}, Skill ${Math.floor(skill1 * 10) / 10}`);
@@ -871,6 +882,10 @@ module.exports = {
 			// Winner is berserk - re-challenge the world
 			await sql.addOffer(winner, null, enums.OfferTypes.Fight);
 		}
+
+		// Delete training complete status
+		await sql.deleteStatus(winner.channel, winner.id, enums.Statuses.TrainingComplete);
+		await sql.deleteStatus(loser.channel, loser.id, enums.Statuses.TrainingComplete);
 		
 		if(loser.npc) {
 			output += `\n${loser.name} is slain, its body disintegrating in the wind!`;
@@ -2561,7 +2576,6 @@ module.exports = {
 		if(history.length > 10) history = history.slice(0, 10);
 		for(const i in history) {
 			const h = history[i];
-			const battleTime = moment(h.battleTime).format('MMM Do');
 
 			if(output.length > 0) output += '\n';
 
@@ -2569,7 +2583,7 @@ module.exports = {
 			const winnerRating = Math.sqrt(h.winnerLevel * h.winnerSkill);
 			const winnerName = h.winnerName ? h.winnerName : 'Someone';
 			const loserName = h.loserName ? h.loserName : 'Someone';
-			output += `${battleTime}: ${winnerName} defeated ${loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
+			output += `Episode ${h.episode}: ${winnerName} defeated ${loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
 		}
 		embed.addField(`Last ${history.length} ${history.length == 1 ? 'fight' : 'fights'}`, output);
 
@@ -2822,11 +2836,60 @@ module.exports = {
 	},
 	async filler(channel, name, targetName) {
 		const players = await sql.getPlayers(channel);
+		const player = await sql.getPlayerByUsername(channel, name);
+		const target = await sql.getPlayer(channel, targetName);
+		const world = await sql.getWorld(channel);
+		const now = new Date().getTime();
 
-		const templates = [
-			"$0 has to get a driver's license; $1 helps them get it. The result is a total disaster.",
-		];
-		const junk = junkItems[Math.floor(Math.random() * junkItems.length)];
+		const fillerTemplates = templates.FillerTemplates;
+		let summary = fillerTemplates[Math.floor(Math.random() * fillerTemplates.length)];
+
+		let playerCount = 2;
+		if(summary.indexOf('$3')) playerCount = 4;
+		else if(summary.indexOf('$2')) playerCount = 3;
+
+		// Gather our cast
+		let cast = [player];
+		if(targetName) cast.push(target);
+
+		let remainingPlayers = players.filter(p => p.id != player.id && (!target || p.id != target.id));
+		this.shuffle(remainingPlayers);
+		while(cast.length < playerCount) {
+			cast.push(remainingPlayers[0]);
+			remainingPlayers = remainingPlayers.slice(1);
+		}
+
+		// Fill in the template
+		for(i in cast) {
+			let p = cast[i];
+			summary = summary.replace(`$${i}their`, this.their(p.config.pronoun));
+			summary = summary.replace(`$${i}them`, this.them(p.config.pronoun));
+			summary = summary.replace(`$${i}`, p.name);
+		}
+
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`EPISODE ${world.episode}`)
+			.setColor(0x00AE86)
+			.setDescription(summary);
+		
+		await sql.addEpisode(channel, summary);
+
+		let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+		if(defeated) {
+			// Remove 10 minutes of defeated time
+			let remaining = defeated.endTime - now;
+			let reduction = 10 * 60 * 1000;
+			if(remaining < reduction) {
+				await sql.deleteStatusById(channel, defeated.id);
+			} else {
+				defeated.endTime -= reduction;
+				await sql.setStatus(defeated);
+			}
+		}
+		await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Action);
+
+		
+		return embed;
 	},
 	async getEpisode(channel, number) {
 		const episodeNumber = parseInt(number);
@@ -2842,5 +2905,260 @@ module.exports = {
 			.addField('Episode Summary', episode.summary);
 
 		return embed;
+	},
+	async tournament(channel, name, command) {
+		const player = await sql.getPlayerByUsername(channel, name);
+		if(!command) {
+			return this.displayTournament(channel);
+		}
+		switch(command) {
+			case 'single':
+				return this.createTournament(channel, player, enums.TournamentTypes.SingleElimination);
+			case 'royale':
+				return this.createTournament(channel, player, enums.TournamentTypes.BattleRoyale);
+			case 'join':
+				return this.joinTournament(channel, player);
+			case 'start':
+				return this.startTournament(channel);
+		}
+	},
+	async displayTournament(channel) {
+		const tournament = await sql.getTournament(channel);
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`Tournament Status`)
+			.setColor(0x4f0a93)
+		const now = new Date().getTime();
+		let output = '';
+
+		if(!tournament || tournament.status == enums.TournamentStatuses.Off) {
+			output = "There isn't a tournament going on! Enter `!tourney single` or `!tourney royale` to recruit for one.";
+		} else {
+			let names = tournament.players.filter(p => p).map(p => p.name);
+			switch(tournament.status) {
+				case enums.TournamentStatuses.Recruiting:
+					const organizer = await sql.getPlayerById(tournament.organizerId);
+					output = `Sign-ups are open for ${organizer.name}'s tournament! To join, enter \`!tourney join\`. ${organizer.name}, enter \`!tourney start\` to begin.\n\n`;
+					switch(tournament.type) {
+						case enums.TournamentTypes.SingleElimination:
+							output += 'Format: Single Elimination\n';
+							break;
+						case enums.TournamentTypes.BattleRoyale:
+							output += 'Format: Battle Royale\n';
+							break;
+					}
+					output += `Players: ${names.join(', ')} (${names.length}/16)`
+					break;
+				case enums.TournamentStatuses.Active:
+					const world = await sql.getWorld(channel);
+					if(tournament.players.length == 2) {
+						output += `FINAL ROUND\n`;
+					} else if(tournament.players.length == 4) {
+						output += `SEMIFINAL ROUND\n`;
+					} else {
+						output += `ROUND ${tournament.round}\n`;
+					}
+					output += `Remaining Players: ${names.join(', ')}\n`;
+					let nextRound = world.cooldowns.find(c => c.type == enums.Cooldowns.NextRound);
+					if(nextRound) {
+						output += `Round ends in ${this.getTimeString(nextRound.endTime - now)}.\n\n`;
+					}
+
+					let matches = [];
+					for(let i = 0; i < tournament.players.length; i += 2) {
+						const leftPlayer = tournament.players[i];
+						const rightPlayer = tournament.players[i+1];
+
+						if(leftPlayer && rightPlayer) {
+							let match = `${leftPlayer.name} VS ${rightPlayer.name} `;
+							switch(leftPlayer.status) {
+								case enums.TournamentPlayerStatuses.Pending:
+									match += ` (Pending)`;
+									break;
+								case enums.TournamentPlayerStatuses.Won:
+									match += ` (${leftPlayer.name} won)`;
+									break;
+								case enums.TournamentPlayerStatuses.Lost:
+									match += ` (${rightPlayer.name} won)`;
+							}
+							matches.push(match);
+						}
+					}
+					output += `This round's matches:\n` + ( matches.join(`\n`));
+					break;
+			}
+		}
+
+		embed.setDescription(output);
+
+		return embed;
+	},
+	async createTournament(channel, player, type) {
+		let tournament = await sql.getTournament(channel);
+
+		if(!tournament) {
+			tournament = {
+				channel: channel
+			};
+		}
+
+		tournament.organizerId = player.id;
+		tournament.type = type;
+		tournament.status = enums.TournamentStatuses.Recruiting;
+		await sql.setTournament(tournament);
+		await sql.joinTournament(channel, player.id);
+		
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`Tournament Time!`)
+			.setColor(0x4f0a93)
+			.setDescription(`**${player.name}** is starting a ${enums.TournamentTypes.Name[type]} tournament! Enter \`!tourney join\`.\n` +
+				`The tournament will begin when the organizer starts it with \`!tourney start\`. Up to 16 players can join.`);
+		
+		return embed;
+	},
+	async joinTournament(channel, player) {
+		await sql.joinTournament(channel, player.id);
+		const tournament = await sql.getTournament(channel);
+
+		return `${player.name} has joined the tournament! There's room for ${16 - tournament.players.length} more players.`;
+	},
+	async startTournament(channel) {
+		let tournament = await sql.getTournament(channel);
+
+		// Generate seed list
+		let seeds = tournament.players;
+		seeds = this.shuffle(seeds);
+		const numRounds = Math.ceil(Math.log(tournament.players.length) / Math.log(2));
+		const slots = Math.pow(2, numRounds);
+		let nextEmptySeed = 1;
+		while(seeds.length < slots) {
+			seeds = seeds.slice(0,nextEmptySeed)
+				.concat([null])
+				.concat(seeds.slice(nextEmptySeed));
+			nextEmptySeed += 2;
+		}
+		
+		// Set everyone's positions accordingly
+		for(const i in seeds) {
+			const player = seeds[i];
+			if(player) {
+				player.position = i;
+				player.status = enums.TournamentPlayerStatuses.Pending;
+			}
+		}
+
+		tournament.status = enums.TournamentStatuses.Active;
+		tournament.reward = tournament.players.length * 10;
+		tournament.round = 1;
+		await sql.setTournament(tournament);
+		await sql.addStatus(channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextRound);
+
+		return this.displayTournament(channel);
+	},
+	async tournamentMatch(channel, winnerId, loserId) {
+		const tournament = await sql.getTournament(channel);
+
+		if(tournament) {
+			let winner = tournament.players.find(p => p && p.id == winnerId);
+			let loser = tournament.players.find(p => p && p.id == loserId);
+			if(winner && loser &&
+				((winner.position + 1 == loser.position && winner.position % 2 == 0) ||
+				(loser.position + 1 == winner.position && loser.position % 2 == 0))) {
+				// This was a tournament match! Resolve it
+				winner.status = enums.TournamentPlayerStatuses.Won;
+				loser.status = enums.TournamentPlayerStatuses.Lost;
+
+				if(tournament.players.length == 2) {
+					output = `The tournament is over! ${winner} is the world's strongest warrior!`;
+					let winnerPlayer = await sql.getPlayerById(winner.id);
+					let world = await sql.getWorld(channel);
+					if(world.lostOrbs) {
+						output = ` The new champion is awarded ${tournament.reward} Glory and a magic orb!`;
+						winnerPlayer.glory += tournament.reward;
+						await sql.addItems(channel, winner.id, enums.Items.Orb, 1);
+					} else {
+						output = ` The new champion is awarded ${tournament.reward * 2} Glory!`;
+						winnerPlayer.glory += tournament.reward * 2;
+					}
+					await sql.setPlayer(winnerPlayer);
+					tournament.status = enums.TournamentStatuses.Complete;
+					let roundTimer = world.cooldowns.find(c => c.type == enums.Cooldowns.NextRound);
+					if(roundTimer) {
+						await sql.deleteStatusById(roundTimer.id);
+					}
+				} else {
+					output = `${winner.name} advances to the next round of the tournament!`;
+				}
+
+				let remainingMatches = false;
+				for(let i = 0; i < tournament.players.length; i += 2) {
+					const leftPlayer = tournament.players[i];
+					const rightPlayer = tournament.players[i+1];
+					if(leftPlayer && rightPlayer && 
+						(leftPlayer.status == enums.TournamentPlayerStatuses.Pending || rightPlayer.status == enums.TournamentPlayerStatuses.Pending)) {
+						remainingMatches = true;
+					}
+				}
+				if(!remainingMatches && tournament.players.length > 0) {
+					await this.advanceTournament(tournament);
+				}
+
+				await sql.setTournament(tournament);
+			}
+		}
+		if(output) {
+			return '\n' + output;
+		} else {
+			return '';
+		}
+	},
+	async advanceTournament(tournament) {
+		let world = await sql.getWorld(tournament.channel);
+
+		let newPlayers = [];
+		let oldPlayers = [];
+		for(let i = 0; i < tournament.players.length; i += 2) {
+			const leftPlayer = tournament.players[i];
+			const rightPlayer = tournament.players[i+1];
+			if((leftPlayer && leftPlayer.status == enums.TournamentPlayerStatuses.Won) ||
+				(!rightPlayer)) {
+				newPlayers.push(leftPlayer);
+				oldPlayers.push(rightPlayer);
+			} else {
+				newPlayers.push(rightPlayer);
+				oldPlayers.push(leftPlayer);
+			}
+		}
+
+		if(newPlayers.length == 0) {
+			// We can't just let every player idle out
+			return;
+		}
+
+		for(const p of oldPlayers) {
+			if(p) {
+				await sql.eliminatePlayer(p.id);
+			}
+		}
+		for(const p of newPlayers) {
+			if(p) {
+				p.position = Math.floor(p.position / 2);
+				p.status = enums.TournamentPlayerStatuses.Pending;
+			}
+		}
+		tournament.players = newPlayers;
+		tournament.round++;
+
+		let roundTimer = world.cooldowns.find(c => c.type == enums.Cooldowns.NextRound);
+		if(roundTimer) {
+			await sql.deleteStatusById(roundTimer.id);
+		}
+		await sql.addStatus(tournament.channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextRound);
+
+		const numRounds = Math.ceil(Math.log(tournament.players.length) / Math.log(2));
+		if(tournament.round == numRounds) {
+			return ` It's time for the tournament finals!`;
+		} else {
+			return ` It's time for the next round of the tournament!`;
+		}
 	}
 }

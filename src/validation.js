@@ -958,6 +958,52 @@ module.exports = {
 						errors.push(`Must specify a valid target.`);
 					}
 				}
+				break;
+			case 'filler':
+				// !journey validation rules:
+				// - Must be alive
+				// - Must have lost a fight since they last stopped training
+				// - Must not be training
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateActionTime(errors, player);
+					const players = await sql.getPlayers(channel);
+					if(players.length < 4) {
+						errors.push(`There must be at least four players before filler episodes can begin.`);
+					}
+				}
+				break;
+			case 'tournament':
+				if(targetName) {
+					this.validatePlayerRegistered(errors, player);
+					const tournament = await sql.getTournament(channel);
+					switch(targetName) {
+						case 'single':
+						case 'royale':
+							const players = await sql.getPlayers(channel);
+							if(players.length < 4) {
+								errors.push(`You need at least four players for a tournament.`);
+							}
+							if(glory < 100) {
+								errors.push(`**${player.name}** must be at least Rank B to organize a tournament.`);
+							}
+							break;
+						case 'join':
+							this.validateNotNemesis(errors, player);
+							if(tournament.players.find(p => p.id == player.id)) {
+								errors.push("You've already joined this tournament.");
+							}
+							break;
+						case 'start':
+							if(tournament.organizerId != player.id) {
+								errors.push('Only the organizer can start the tournament.');
+							}
+							if(tournament.players.length < 4) {
+								errors.push(`You need at least four players for a tournament..`);
+							}
+					}
+				}
+			break;
 		}
 
 		if(errors.length > 0) {

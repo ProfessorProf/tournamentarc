@@ -22,15 +22,13 @@ CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Size_Level REAL, Growth_Level 
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER, Slot INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Start_Time INTEGER, Nemesis_Type INTEGER, Last_Ruin_Update INTEGER, Base_Power REAL);
 CREATE TABLE IF NOT EXISTS Underlings (Channel TEXT, Player_ID INTEGER, Defeats INTEGER);
-CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
+CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Episode INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Level REAL, Loser_Level REAL,
 	Winner_Skill REAL, Loser_Skill REAL,
 	Winner_Name TEXT, Loser_Name TEXT);
 CREATE TABLE IF NOT EXISTS Tournaments (Channel TEXT, Organizer_ID INTEGER, Status INTEGER, Type INTEGER, 
-    Round INTEGER, Round_Time INTEGER, Next_Tournament_Time INTEGER);
-CREATE TABLE IF NOT EXISTS TournamentPlayers (Channel TEXT, Player_ID INTEGER);
-CREATE TABLE IF NOT EXISTS TournamentMatches (ID INTEGER, Left_Parent_ID INTEGER, Right_Parent_ID INTEGER, 
-    Left_Player_ID INTEGER, Right_Player_ID INTEGER);
+    Round INTEGER, Reward INTEGER);
+CREATE TABLE IF NOT EXISTS TournamentPlayers (Channel TEXT, Player_ID INTEGER, Position INTEGER, Status INTEGER);
 CREATE UNIQUE INDEX IF NOT EXISTS Worlds_Channel ON Worlds(Channel);
 CREATE UNIQUE INDEX IF NOT EXISTS Players_ID ON Players(ID); 
 CREATE UNIQUE INDEX IF NOT EXISTS Status_ChannelStatusRating ON Status(Channel, Player_ID, Type, Rating);
@@ -49,7 +47,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS Config_PlayerKey ON Config(Player_ID, Key);
 const newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
 DELETE FROM Gardens WHERE Channel = $channel;
 DELETE FROM Items WHERE Channel = $channel;
-INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish, Start_Time) VALUES ($channel, 0, 0, 0, 7, 0, $now);
+INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish, Start_Time, Episode) VALUES ($channel, 0, 0, 0, 7, 0, $now, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (0, $channel, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (1, $channel, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (2, $channel, 0);
@@ -641,11 +639,14 @@ module.exports = {
 		};
 	},
 	async addHistory(channel, winnerId, winnerLevel, winnerSkill, loserId, loserLevel, loserSkill) {
-		const winner = sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: winnerId});
-		const loser = sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: loserId});
-		await sql.run(`INSERT INTO History (Channel, Battle_Time, Winner_Id, Loser_ID, Winner_Level, Loser_Level, Winner_Skill, Loser_Skill, Winner_Name, Loser_Name)
-			VALUES ($channel, $battleTime, $winnerId, $loserId, $winnerLevel, $loserLevel, $winnerSkill, $loserSkill, $winnerName, $loserName)`, {
+		const episodeRow = await sql.get(`SELECT Episode FROM Worlds WHERE Channel = $channel`);
+		const winner = await sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: winnerId});
+		const loser = await sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: loserId});
+		const episodeNumber = episodeRow ? episodeRow : 1;
+		await sql.run(`INSERT INTO History (Channel, Episode, Battle_Time, Winner_Id, Loser_ID, Winner_Level, Loser_Level, Winner_Skill, Loser_Skill, Winner_Name, Loser_Name)
+			VALUES ($channel, $episode, $battleTime, $winnerId, $loserId, $winnerLevel, $loserLevel, $winnerSkill, $loserSkill, $winnerName, $loserName)`, {
 			$channel: channel,
+			$episode: episodeNumber,
 			$battleTime: new Date().getTime(),
 			$winnerId: winnerId,
 			$winnerSkill: winnerSkill,
@@ -763,6 +764,7 @@ module.exports = {
 		if(history) {
 			return history.map(h => { return {
 				battleTime: h.Battle_Time,
+				episode: h.Episode,
 				winnerId: h.Winner_ID,
 				winnerLevel: h.Winner_Level,
 				winnerSkill: h.Winner_Skill,
@@ -851,5 +853,70 @@ module.exports = {
 		await sql.run(`INSERT INTO Episodes (ID, Channel, Air_Date, Summary) VALUES ($id, $channel, $airDate, $summary)`, 
 			{$id: episodeNumber, $channel: channel, $airDate: new Date().getTime(), $summary: summary});
 		await sql.run(`UPDATE Worlds SET Episode = $episode WHERE Channel = $channel`, {$channel: channel, $episode: episodeNumber + 1});
+	},
+	async getTournament(channel) {
+		const tournamentRow = await sql.get(`SELECT * FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
+		const playerRows = await sql.all(`SELECT t.*, p.Name FROM TournamentPlayers t
+			LEFT JOIN Players p ON p.ID = t.Player_ID
+			WHERE t.Channel = $channel ORDER BY t.Position`, {$channel: channel});
+
+		if(!tournamentRow) {
+			return null;
+		}
+
+		let players = []
+		for(const row of playerRows) {
+			while(players.length < row.Position) {
+				players.push(null);
+			}
+			players.push({
+				id: row.Player_ID,
+				name: row.Name,
+				position: row.Position,
+				status: row.Status
+			});
+		}
+
+		let tournament = {
+			channel: tournamentRow.Channel,
+			organizerId: tournamentRow.Organizer_ID,
+			status: tournamentRow.Status,
+			type: tournamentRow.Type,
+			round: tournamentRow.Round,
+			reward: tournamentRow.Reward,
+			players: players
+		};
+
+		return tournament;
+	},
+	async setTournament(tournament) {
+		await sql.run(`INSERT OR REPLACE INTO Tournaments (Channel, Organizer_ID, Status, Type, Round, Reward) VALUES ` +
+			`($channel, $organizerId, $status, $type, $round, $reward)`, {
+				$channel: tournament.channel,
+				$organizerId: tournament.organizerId,
+				$status: tournament.status,
+				$type: tournament.type,
+				$round: tournament.round,
+				$reward: tournament.reward
+			});
+		if(tournament.players) {
+			for(const player of tournament.players) {
+				if(player) {
+					const existingPlayer = await sql.get(`SELECT * FROM TournamentPlayers WHERE Player_ID = $id`, {$id: player.id});
+					if(existingPlayer) {
+						await sql.run(`UPDATE TournamentPlayers SET Position = $position, Status = $status WHERE Player_ID = $id`, 
+							{$id: player.id, $position: player.position, $status: player.status});
+					} else {
+						await this.joinTournament(tournament.channel, player.id);
+					}
+				}
+			}
+		}
+	},
+	async joinTournament(channel, id) {
+		await sql.run(`INSERT OR REPLACE INTO TournamentPlayers (Channel, Player_ID, Position) VALUES ($channel, $id, 0)`, {$channel: channel, $id: id});
+	},
+	async eliminatePlayer(id) {
+		await sql.run(`DELETE FROM TournamentPlayers WHERE Player_ID = $id`, {$id: id});
 	}
 }

@@ -81,6 +81,7 @@ module.exports = {
         Cooldown: 13,
         SelfDestruct: 14,
         Annihilation: 15,
+        TrainingComplete: 16,
         Name: {
             0: 'Defeated',
             1: 'Journey',
@@ -97,7 +98,8 @@ module.exports = {
             12: 'Berserk',
             13: 'Cooldown',
             14: 'Self Destruct',
-            15: 'Annihilation'
+            15: 'Annihilation',
+            16: 'Training Complete'
         },
         Ends: {
             0: true,
@@ -148,6 +150,7 @@ module.exports = {
         NextTournament: 11,
         Ruin: 12,
         Journey: 13,
+        NextRound: 14,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',
@@ -185,5 +188,25 @@ module.exports = {
         NemesisBetrayal: 4,
         NemesisTrueForm: 5,
         NemesisSelfDestruct: 6
+    },
+    TournamentTypes: {
+        SingleElimination: 0,
+        BattleRoyale: 1,
+        Name: {
+            0: 'single elimination',
+            1: 'battle royale'
+        }
+    },
+    TournamentStatuses: {
+        Off: 0,
+        Recruiting: 1,
+        Active: 2,
+        Complete: 3
+    },
+    TournamentPlayerStatuses: {
+        Pending: 0,
+        Won: 1,
+        Lost: 2,
+        Idle: 3
     }
 }

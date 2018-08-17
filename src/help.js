@@ -120,10 +120,11 @@ Rank ??? 1000 Glory
                     this.addHelpField('journey');
                     break;
                 case 'actions':
-                    output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !overdrive boosts your Action Level.')
-                        .addField('!search', 'Searches the world for something mysterious. Rate of success increases based on your action level.')
-                        .addField('!empower name', "Requires Rank C. Send another player your energy! Reduces your Power Level, but increases the target's Power Level by the same amount..")
-                        .addField('!overdrive', "Requires Rank A. Go beyond the impossible! Increases your Power Level by an amount depending on your Action Level. However, after it ends, your Power Level falls lower than it was before, and using it too often might be dangerous...");
+                    output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !overdrive boosts your Action Level.');
+                    this.addHelpField('search');
+                    this.addHelpField('empower');
+                    this.addHelpField('overdrive');
+                    this.addHelpField('filler');
                     break;
                 case 'fusion':
                     output.setDescription('Fusion:')
