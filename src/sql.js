@@ -818,8 +818,6 @@ module.exports = {
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE Nemesis SET Start_Time = Start_Time + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
-		await sql.run(`UPDATE Tournaments SET Round_Time = Round_Time + $time WHERE Channel = $channel`,
-			{$channel: channel, $time: time});
 	},
 	async delayOffer(channel, playerId, targetId, type) {
 		const delayTime = new Date().getTime() + 5 * 60 * 1000;
