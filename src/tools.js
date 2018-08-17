@@ -1935,7 +1935,7 @@ module.exports = {
 					console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 					output.push(`${player.name} searches the world, and finds ${junk}`);
 				} else {
-					searchChance = 0.05; //TODO: Make this lower
+					searchChance = 0.05;
 					roll = Math.random();
 					if(roll < searchChance && !player.npc) {
 						if(Math.random() < 0.1) {
@@ -1967,7 +1967,7 @@ module.exports = {
 			player.actionLevel += 1 / (1 + player.actionLevel);
 			const newActionLevel = Math.floor(player.actionLevel);
 			if(newActionLevel > oldActionLevel) {
-				output.push('Action level increased!');
+				output += '\nAction level increased!';
 			}
 			await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Action);
 		}
