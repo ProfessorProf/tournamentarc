@@ -47,16 +47,17 @@ client.on('ready', () => {
 			const c = channels[i];
 			
 			const update = await tools.updateWorld(c);
-			if(update.embed) {
+			if(update.updates) {
 				updatedChannels.push(c);
 				const channel = client.channels.find(x => x.id == c);
 				if(channel) {
 					if(channel.name == auth.channel) {
-						channel.send({embed: update.embed});
-					}
-					if(update.pings.length > 0) {
-						const pings = update.pings.map(ping => `<@${ping}>`);
-						channel.send(pings.join(', '));
+						for(var u of update.updates) {
+							if(u) channel.send(u);
+						}
+						if(update.pings) {
+							channel.send(pings);
+						}
 					}
 				} else {
 					console.log(`Unrecognized channel ${c}`);
@@ -110,15 +111,14 @@ async function handleMessage(message) {
 
 	const channel = message.channel.id;
 
-	let outputMessage = {
-		print: [],
-		embed: null,
+	let output = {
+		messages: [],
 		private: false,
 		informational: false
 	};
 
     if (cmd.substring(0, 1) == '!') {
-		outputMessage.private = true;
+		output.private = true;
 		cmd = cmd.substring(1);
 	}
 
@@ -130,7 +130,11 @@ async function handleMessage(message) {
 
 	if(cmd == 'init' ) {
 		message.channel.send('Beginning initialization...');
+		try {
 		await sql.initializeGame()
+		} catch (e) {
+			console.log(e);
+		}
 		await sql.initializeChannel(channel);
 		message.channel.send('Initialization complete.');
 		const endTime = new Date().getTime();
@@ -139,12 +143,21 @@ async function handleMessage(message) {
 		return;
 	}
 
-	const update = await tools.updateWorld(channel);
-	if(update.embed) { 
-		message.channel.send({embed: update.embed});
+	if(cmd != 'debug') {
+		const update = await tools.updateWorld(channel);
+
+		if(update.updates) {
+			for(var u of update.updates) {
+				if(u) message.channel.send(u);
+			}
+			if(update.pings) {
+				message.channel.send(pings);
+			}
+		}
+		
+		if(update.abort) return;
 	}
-	if(update.abort) return;
-	
+
 	const errors = await validation.validate(channel, name, cmd, args);
 	if(errors) {
 		message.channel.send({embed: {
@@ -157,186 +170,171 @@ async function handleMessage(message) {
 	const targetName = args[0];
 	switch(cmd) {
 		case 'reg':
-			// Add a new player
-			await tools.registerPlayer(channel, name, message.author.id, targetName);
-			outputMessage.embed = await tools.getPlayerDescription(channel, name);
-			outputMessage.print.push(`Registered player ${name}!`);
+			output.messages = await tools.registerPlayer(channel, name, message.author.id, targetName);
 			break;
 		case 'check':
-			outputMessage.embed = await tools.getPlayerDescription(channel, name);
-			outputMessage.informational = true;
-			break;
-		case 'fight':
-			const fightResult = await tools.tryFight(channel, name, targetName);
-			outputMessage.embed = fightResult.embed;
-			if(fightResult.ping) {
-				outputMessage.print.push(`<@${fightResult.ping}>`);
-			}
-			break;
-		case 'unfight':
-			outputMessage.print.push(await tools.unfight(channel, name, message.author.id));
-			break;
-		case 'attack':
-			const attackResult = await tools.attack(channel, name, targetName);
-			outputMessage.embed = attackResult.embed;
-			if(attackResult.ping) {
-				outputMessage.print.push(`<@${attackResult.ping}>`);
-			}
-			break;
-		case 'destroy':
-			outputMessage.embed = await tools.destroy(channel);
-			break;
-		case 'burn':
-			outputMessage.print.push(await tools.burn(channel, name));
-			break;
-		case 'recruit':
-			outputMessage.print.push(await tools.recruit(channel, targetName));
-			break;
-		case 'join':
-			outputMessage.print.push(await tools.joinNemesis(channel, name));
-			break;
-		case 'exile':
-			outputMessage.print.push(await tools.exile(channel, targetName));
-			break;
-		case 'energize':
-			outputMessage.print.push(await tools.energize(channel, targetName));
-			break;
-		case 'revive':
-			outputMessage.print.push(await tools.revive(channel, targetName));
-			break;
-		case 'train':
-			outputMessage.print.push(await tools.train(channel, name));
-			break;
-		case 'scan':
-			outputMessage.embed = await tools.scoutPlayer(channel, targetName);
-			outputMessage.informational = true;
-			break;
-		case 'reset':
-			await tools.resetData(channel);
-			outputMessage.print.push('Onwards, to a new universe...! Some Glory is preserved, but all Power Levels and player status has been reverted.');
-			break;
-		case 'garden':
-			outputMessage.embed = await tools.displayGarden(channel);
-			outputMessage.informational = true;
-			break;
-		case 'plant':
-			outputMessage.print.push(await tools.plant(channel, name, targetName));
-			break;
-		case 'water':
-			outputMessage.print.push(await tools.water(channel, name));
-			break;
-		case 'pick':
-			outputMessage.print.push(await tools.pick(channel, name, targetName));
-			break;
-		case 'use':
-			outputMessage.print.push(await tools.useItem(channel, name, args[0], args[1]));
-			break;
-		case 'expand':
-			outputMessage.print.push(await tools.expand(channel, name));
-			break;
-		case 'search':
-			outputMessage.print.push(await tools.search(channel, name));
+			output.messages = await tools.getPlayerDescription(channel, name);
+			output.informational = true;
 			break;
 		case 'roster':
-			const rosterOutput = await tools.displayRoster(channel);
-			outputMessage.print.push(`\`\`\`\n${rosterOutput}\`\`\``);
-			outputMessage.informational = true;
+			output.messages = await tools.displayRoster(channel);
+			output.informational = true;
+			break;
+		case 'scan':
+			output.messages = await tools.scoutPlayer(channel, targetName);
+			output.informational = true;
+			break;
+		case 'fight':
+			output.messages = await tools.tryFight(channel, name, targetName);
+			break;
+		case 'unfight':
+			output.messages = await tools.unfight(channel, name);
+			break;
+		case 'garden':
+			output.messages = await tools.displayGarden(channel);
+			output.informational = true;
+			break;
+		case 'plant':
+			output.messages = await tools.plant(channel, name, targetName);
+			output.informational = true;
+			break;
+		case 'water':
+			output.messages = await tools.water(channel, name);
+			break;
+		case 'pick':
+			output.messages = await tools.pick(channel, name, targetName);
+			break;
+		case 'use':
+			output.messages = await tools.useItem(channel, name, args[0], args[1]);
+			break;
+		case 'expand':
+			output.messages = await tools.expand(channel, name, args[0]);
+			break;
+		case 'nemesis':
+			output.messages = await tools.setNemesis(channel, name);
+			break;
+		case 'attack':
+			output.messages = await tools.attack(channel, name, targetName);
+			break;
+		case 'destroy':
+			output.messages = await tools.destroy(channel, name);
+			break;
+		case 'burn':
+			output.messages = await tools.burn(channel);
+			break;
+		case 'recruit':
+			output.messages = await tools.recruit(channel, targetName);
+			break;
+		case 'join':
+			output.messages = await tools.joinNemesis(channel, name);
+			break;
+		case 'exile':
+			output.messages = await tools.exile(channel, targetName);
+			break;
+		case 'energize':
+			output.messages = await tools.energize(channel, targetName);
+			break;
+		case 'revive':
+			output.messages = await tools.revive(channel, targetName);
+			break;
+		case 'train':
+			output.messages = await tools.train(channel, name);
+			break;
+		case 'reset':
+			output.messages = await tools.resetData(channel);
+			break;
+		case 'search':
+			output.messages = await tools.search(channel, name);
 			break;
 		case 'scores':
-			const scoresOutput = await tools.displayScores(channel);
-			outputMessage.print.push(`\`\`\`\n${scoresOutput}\`\`\``);
+			output.messages = await tools.displayScores(channel);
 			outputMessage.informational = true;
 			break;
 		case 'fuse':
-			const fusionName = args.length > 1 ? args[1] : null;
-			const fusionResult = await tools.fuse(channel, name, targetName, fusionName);
-			if(fusionResult.message) outputMessage.print.push(fusionResult.message);
-			if(fusionResult.embed) outputMessage.embed = fusionResult.embed;
-			break;
-		case 'nemesis':
-			outputMessage.print.push(await tools.setNemesis(channel, name));
-			outputMessage.embed = await tools.getPlayerDescription(channel, name);
+			output.messages = await tools.fuse(channel, name, targetName, args[1]);
 			break;
 		case 'wish':
-			outputMessage.print.push(await tools.wish(channel, name, args[0]));
+			output.messages = await tools.wish(channel, name, args[0]);
 			break;
 		case 'research':
-			outputMessage.print.push(await tools.research(channel, name));
+			output.messages = await tools.expand(channel, name, 'research');
 			break;
 		case 'overdrive':
-			outputMessage.print.push(await tools.overdrive(channel, name));
+			output.messages = await tools.overdrive(channel, name);
 			break;
 		case 'empower':
-			outputMessage.print.push(await tools.empower(channel, name, targetName));
+			output.messages = await tools.empower(channel, name, targetName);
 			break;
 		case 'give':
-			outputMessage.print.push(await tools.give(channel, name, args[0]));
+			output.messages = await tools.give(channel, name, args[0]);
 			break;
 		case 'history':
-			outputMessage.embed = await tools.history(channel, name, targetName);
-			outputMessage.informational = true;
+			output.messages = await tools.history(channel, name, targetName);
+			output.informational = true;
 			break;
 		case 'graveyard':
-			outputMessage.embed = await tools.graveyard(channel);
-			outputMessage.informational = true;
+			output.messages = await tools.graveyard(channel);
+			output.informational = true;
 			break;
 		case 'world':
-			outputMessage.embed = await tools.worldInfo(channel);
-			outputMessage.informational = true;
+			output.messages = await tools.worldInfo(channel);
+			output.informational = true;
 			break;
 		case 'taunt':
-			const tauntResult = await tools.taunt(channel, name, targetName);
-			outputMessage.embed = tauntResult.embed;
-			if(tauntResult.ping) {
-				outputMessage.print.push(`<@${tauntResult.ping}>`);
-			}
+			output.messages = await tools.taunt(channel, name, targetName);
 			break;
 		case 'journey':
-			outputMessage.print.push(await tools.startJourney(channel, name, args[0]));
+			output.messages = await tools.startJourney(channel, name, args[0]);
+			break;
+		case 'selfdestruct':
+			output.messages = await tools.selfDestruct(channel, name, targetName);
+			break;
+		case 'filler':
+			output.messages = await tools.filler(channel, name, targetName);
+			break;
+		case 'episode':
+			output.messages = await tools.getEpisode(channel, args[0]);
 			break;
 		case 'config':
-			outputMessage.embed = await tools.config(channel, name, args[0], args[1]);
-			outputMessage.informational = true;
+			output.messages = await tools.config(channel, name, args[0], args[1]);
+			output.informational = true;
 			break;
 		case 'help':
-			outputMessage.embed = await help.showHelp(channel, args[0]);
-			outputMessage.informational = true;
+			output.messages = await help.showHelp(channel, name, args[0]);
+			output.informational = true;
 			break;
 		case 'debug':
-			await sql.execute(args[0], args.slice(1).join(' '));
+			await sql.execute(args.join(' '));
 			break;
 		case 'clone':
 			await sql.clone(channel, name, targetName);
 			break;
 		case 'ending':
-			await tools.ending(channel);
-		case 'import':
-			await sql.importChannel(channel, targetName);
+			outputMessage.print.push(await tools.ending(channel));
 			break;
 	}
 
-	if(outputMessage.informational) {
+	if(output.informational) {
 		let player = await sql.getPlayerByUsername(channel, name);
 		// Check if the user has AlwaysPrivate enabled
-		if(player && player.config && player.config.alwaysPrivate) {
-			outputMessage.private = !outputMessage.private;
+		if(player && player.config && player.config.AlwaysPrivate) {
+			output.private = !output.private;
 		}
 	}
 	// Display the output
-	if(outputMessage.embed) {
-		if(outputMessage.informational && outputMessage.private) {
-			message.author.send({embed: outputMessage.embed});
-		} else {
-			message.channel.send({embed: outputMessage.embed});
-		}
+	if(output.messages && !Array.isArray(output.messages)) {
+		output.messages = [output.messages];
 	}
-
-	for(const i in outputMessage.print) {
-		const text = outputMessage.print[i];
-		if(outputMessage.informational && outputMessage.private) {
-			message.author.send(text);
-		} else {
-			message.channel.send(text);
+	if(output.messages && output.messages.length > 0) {
+		for(const i in output.messages) {
+			const m = output.messages[i];
+			if(m) {
+				if(output.informational && output.private) {
+					message.author.send(m);
+				} else {
+					message.channel.send(m);
+				}
+			}
 		}
 	}
 	await sql.playerActivity(channel, name);

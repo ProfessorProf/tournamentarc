@@ -21,10 +21,10 @@ Writing this later.
 - !give command - transfers one orb to another player.
 - !journey command - details later.
 - Garden restructure.
-- !recruit and !join commands for the Nemesis to recruit henchmen.
-- !energize command to power up henchmen.
-- Honor henchmen properties in other places.
-- !revive command to revive henchmen.
+- !recruit and !join commands for the Nemesis to recruit underlings.
+- !energize command to power up underlings.
+- Honor underlings properties in other places.
+- !revive command to revive underlings.
 - !burn command to destroy plants.
 - !tournament command - details later.
 - !history command - displays past battle history between two players.
