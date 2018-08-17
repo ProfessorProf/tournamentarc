@@ -951,10 +951,10 @@ module.exports = {
 				break;
 		}
 		let summary = templateList[Math.floor(Math.random() * templateList.length)];
-		summary = summary.replace('$winner', winner.name)
-			.replace('$loser', loser.name)
-			.replace('$wTheir', this.their(winner.config.pronoun))
-			.replace('$lTheir', this.their(loser.config.pronoun));
+		summary = summary.replace(new RegExp('$winner', 'g'), winner.name)
+			.replace(new RegExp('$loser', 'g'), loser.name)
+			.replace(new RegExp('$wTheir', 'g'), this.their(winner.config.pronoun))
+			.replace(new RegExp('$lTheir', 'g'), this.their(loser.config.pronoun));
 		await sql.addEpisode(winner.channel, summary);
 
 		// Save changes
@@ -2862,9 +2862,9 @@ module.exports = {
 		// Fill in the template
 		for(i in cast) {
 			let p = cast[i];
-			summary = summary.replace(`$${i}their`, this.their(p.config.pronoun));
-			summary = summary.replace(`$${i}them`, this.them(p.config.pronoun));
-			summary = summary.replace(`$${i}`, p.name);
+			summary = summary.replace(new RegExp(`\\$${i}their`, 'g'), this.their(p.config.pronoun));
+			summary = summary.replace(new RegExp(`\\$${i}them`, 'g'), this.them(p.config.pronoun));
+			summary = summary.replace(new RegExp(`\\$${i}`, 'g'), p.name);
 		}
 
 		let embed = new Discord.RichEmbed();
