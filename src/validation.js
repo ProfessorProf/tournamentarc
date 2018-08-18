@@ -321,7 +321,7 @@ module.exports = {
 					this.validateJourney(errors, player);
 					const knownPlants = garden.plantTypes.filter(t => t.known);
 					const plantType = this.getPlantType(args[0]);
-					const hasPlant = player.items.find(i => i.thype == plantType);
+					const hasPlant = player.items.find(i => i.type == plantType);
 					const plantExists = plantType != -1;
 					const plantKnown = knownPlants.find(p => p.id == plantType);
 					if(args.length > 1) {
@@ -362,7 +362,7 @@ module.exports = {
 							}
 						}
 					} else {
-						if (!enums.Items.NeedsTarget[plantType]) {
+						if (args.length > 0 && !enums.Items.NeedsTarget[plantType]) {
 							if(plantKnown && !hasPlant) {
 								errors.push("You don't have any of that plant.");
 							}

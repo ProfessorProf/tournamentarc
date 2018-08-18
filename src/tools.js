@@ -887,6 +887,9 @@ module.exports = {
 		await sql.deleteStatus(winner.channel, winner.id, enums.Statuses.TrainingComplete);
 		await sql.deleteStatus(loser.channel, loser.id, enums.Statuses.TrainingComplete);
 		
+		// Add new row to history
+		await sql.addHistory(winner.channel, winner.id, this.getPowerLevel(winner), winnerSkill, loser.id, this.getPowerLevel(loser), loserSkill);
+		
 		if(loser.npc) {
 			output += `\n${loser.name} is slain, its body disintegrating in the wind!`;
 			await sql.deletePlayer(loser.id);
@@ -918,9 +921,6 @@ module.exports = {
 			await sql.addStatus(loser.channel, loser.id, enums.Statuses.Annihilation);
 		}
         
-		// Add new row to history
-		await sql.addHistory(winner.channel, winner.id, this.getPowerLevel(winner), winnerSkill, loser.id, this.getPowerLevel(loser), loserSkill);
-		
 		// Reset fight clock
 		loser.lastFought = now;
 		winner.lastFought = now;

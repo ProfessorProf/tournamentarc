@@ -55,9 +55,6 @@ client.on('ready', () => {
 						for(var u of update.updates) {
 							if(u) channel.send(u);
 						}
-						if(update.pings) {
-							channel.send(pings);
-						}
 					}
 				} else {
 					console.log(`Unrecognized channel ${c}`);
