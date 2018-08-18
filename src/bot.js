@@ -210,7 +210,6 @@ async function handleMessage(message) {
 			break;
 		case 'plant':
 			output.messages = await tools.plant(channel, name, targetName);
-			output.informational = true;
 			break;
 		case 'water':
 			output.messages = await tools.water(channel, name);
