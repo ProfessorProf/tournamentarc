@@ -227,6 +227,7 @@ Rank ??? 1000 Glory
                 embed.addField('!taunt target', "Challenges another player to a fight, and shames them if they decline!\n" +
                     "If the target ignores the taunt for six hours, then they'll lose Glory. If they accept, and fight you, then *you'll* lose Glory.\n" +
                     "Requirements: Must be registered. You can only have one outstanding taunt at a time. Multiple people can't taunt the same target.");
+                break;
             case 'unfight':
                 embed.addField('!unfight', "Cancels all your outgoing fight offers or taunts.\n" +
                     "Requirements: Must be registered. Must have challenged someone to a fight. If you're the Nemesis, you can only unfight taunts.");

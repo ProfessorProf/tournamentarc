@@ -49,8 +49,8 @@ module.exports = {
 				if(!targetName) {
 					errors.push('You must specify a character name.');
 				}
-				if(targetName.startsWith('Zorb') || targetName.startsWith('Zedge') ||
-					targetName.startsWith('Zlower') || targetName.startsWith('Zarrot')) {
+				if(targetName && (targetName.startsWith('Zorb') || targetName.startsWith('Zedge') ||
+					targetName.startsWith('Zlower') || targetName.startsWith('Zarrot'))) {
 					errors.push('Invalid name.');
 				}
 				if(args.length > 1) {
