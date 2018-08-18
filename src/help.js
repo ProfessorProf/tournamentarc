@@ -13,7 +13,7 @@ module.exports = {
         if(!topic) {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
-                .addField('!help info', 'Help with informational commands: !check, !scan, !roster, !garden, !graveyard, !history.')
+                .addField('!help info', 'Help with informational commands: !check, !scan, !roster, !episode, !graveyard, !history.')
                 .addField('!help actions', 'Help with commands related to world actions: !search, !empower, !overdrive.')
                 .addField('!help garden', 'Help with commands related to the garden: !garden, !expand, !water, !plant, !pick, !use.')
                 .addField('!help battle', 'Help with commands related to combat: !fight, !unfight, !taunt, !train, !journey.')
@@ -30,6 +30,15 @@ module.exports = {
                     this.addHelpField(output, 'reg');
                     this.addHelpField(output, 'config');
                     this.addHelpField(output, 'check');
+                    break;
+                case 'info':
+                    output.setTitle('Help: Info Commands');
+                    this.addHelpField(output, 'check');
+                    this.addHelpField(output, 'scan');
+                    this.addHelpField(output, 'roster');
+                    this.addHelpField(output, 'graveyard');
+                    this.addHelpField(output, 'history');
+                    this.addHelpField(output, 'episode');
                 case 'config':
                     output.setTitle('Help: Configuration Commands')
                         .addField('!config', 'Displays your current config options.')
@@ -118,6 +127,7 @@ Rank ??? 1000 Glory
                     this.addHelpField(output, 'unfight');
                     this.addHelpField(output, 'train');
                     this.addHelpField(output, 'journey');
+                    this.addHelpField(output, 'selfdestruct');
                     break;
                 case 'actions':
                     output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !overdrive boosts your Action Level.');
@@ -334,6 +344,14 @@ Rank ??? 1000 Glory
                     "Your power is increased massively, but you won't come back from this one with a simple rest...\n" +
                     "**Do not use this command unless you are comfortable with being gone for a long time!**\n" +
                     "Requirements: Must be Rank A. Must be alive. Target must be alive. Must not be the Nemesis.")
+            case 'filler':
+                embed.addField('!filler target', "Creates a randomized filler episode! If you specify a target, they'll be " +
+                    "involved in the episode as well. If the person who uses the command is defeated, their timer will " +
+                    "fast forward by ten minutes.");
+                break;
+            case 'episode':
+                embed.addField('!episode number', "Shows the air date and summary of a specific episode.");
+                break;
             default:
                 return false;
         }
