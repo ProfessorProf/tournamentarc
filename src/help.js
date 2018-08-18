@@ -343,7 +343,8 @@ Rank ??? 1000 Glory
                 embed.addField('!selfdestruct target', "Uses all of your remaining life force for one last fight. " +
                     "Your power is increased massively, but you won't come back from this one with a simple rest...\n" +
                     "**Do not use this command unless you are comfortable with being gone for a long time!**\n" +
-                    "Requirements: Must be Rank A. Must be alive. Target must be alive. Must not be the Nemesis.")
+                    "Requirements: Must be Rank A. Must be alive. Target must be alive. Must not be the Nemesis.");
+                break;
             case 'filler':
                 embed.addField('!filler target', "Creates a randomized filler episode! If you specify a target, they'll be " +
                     "involved in the episode as well. If the person who uses the command is defeated, their timer will " +
