@@ -532,9 +532,6 @@ module.exports = {
 					this.validateAnnihilation(errors, target);
 					this.validateJourney(errors, target);
 					this.validateNotNpc(errors, target);
-					if(target.npc) {
-						errors.push("You can't fuse with an NPC.");
-					}
 					if(target.fusionFlag) {
 						errors.push(`**${target.name} can't fuse again until the game resets.`);
 					}
