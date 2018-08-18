@@ -212,7 +212,7 @@ Rank ??? 1000 Glory
                     'Requirements: Must be registered.');
                 break;
             case 'roster':
-                embed.addField('!check', 'Displays basic info about all - current Power Level, Rank, status. Usable by anyone.');
+                embed.addField('!roster', 'Displays basic info about all - current Power Level, Rank, status. Usable by anyone.');
                 break;
             case 'fight':
                 embed.addField('!fight target', "Challenges another player to a fight! If the player has already challenged you, " +
