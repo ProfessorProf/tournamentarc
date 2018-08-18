@@ -113,18 +113,18 @@ Rank ??? 1000 Glory
                     break;
                 case 'battle':
                     output.setTitle('Help: Battle');
-                    this.addHelpField('fight');
-                    this.addHelpField('taunt');
-                    this.addHelpField('unfight');
-                    this.addHelpField('train');
-                    this.addHelpField('journey');
+                    this.addHelpField(output, 'fight');
+                    this.addHelpField(output, 'taunt');
+                    this.addHelpField(output, 'unfight');
+                    this.addHelpField(output, 'train');
+                    this.addHelpField(output, 'journey');
                     break;
                 case 'actions':
                     output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !overdrive boosts your Action Level.');
-                    this.addHelpField('search');
-                    this.addHelpField('empower');
-                    this.addHelpField('overdrive');
-                    this.addHelpField('filler');
+                    this.addHelpField(output, 'search');
+                    this.addHelpField(output, 'empower');
+                    this.addHelpField(output, 'overdrive');
+                    this.addHelpField(output, 'filler');
                     break;
                 case 'fusion':
                     output.setDescription('Fusion:')
