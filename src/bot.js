@@ -55,6 +55,9 @@ client.on('ready', () => {
 						for(var u of update.updates) {
 							if(u) channel.send(u);
 						}
+						if(update.pings) {
+							channel.send(update.pings);
+						}
 					}
 				} else {
 					console.log(`Unrecognized channel ${c}`);
@@ -157,7 +160,7 @@ async function handleMessage(message) {
 				if(u) message.channel.send(u);
 			}
 			if(update.pings) {
-				message.channel.send(pings);
+				message.channel.send(update.pings);
 			}
 		}
 		
