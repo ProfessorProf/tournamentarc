@@ -1952,9 +1952,9 @@ module.exports = {
 					} else {
 						console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 						if(world.lostOrbs == 0) {
-							output = `${player.name} searches the world, but there are no orbs left to find.`;
+							output.push(`${player.name} searches the world, but there are no orbs left to find.`);
 						} else {
-							output = `${player.name} searches the world, but finds nothing of value.`;
+							output.push(`${player.name} searches the world, but finds nothing of value.`);
 						}
 					}
 				}
@@ -1967,7 +1967,7 @@ module.exports = {
 			player.actionLevel += 1 / (1 + player.actionLevel);
 			const newActionLevel = Math.floor(player.actionLevel);
 			if(newActionLevel > oldActionLevel) {
-				output += '\nAction level increased!';
+				output.push('Action level increased!');
 			}
 			await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Action);
 		}
