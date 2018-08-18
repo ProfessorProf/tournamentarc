@@ -274,9 +274,9 @@ Rank ??? 1000 Glory
                 embed.addField('!expand type', 'Requires Rank C. Work on upgrading the garden! Amount is based on your Garden Level. ' +
                     "If you try to expand a garden level that's already higher than the other levels, it will advance more slowly.\n" +
                     'Effect is different based on what you put for type:\n' +
-                    '**!expand size:** Allows the Garden to hold more plants at a time.' +
-                    '**!expand growth:** Makes all plants in the garden grow faster. Max is 10 slots.' +
-                    '**!expand research:** Unlocks new types of plants to plant.');
+                    '**!expand size:** Allows the Garden to hold more plants at a time.\n' +
+                    '**!expand growth:** Makes all plants in the garden grow faster. Max is 10 slots.\n' +
+                    '**!expand research:** Unlocks new types of plants to plant.\n');
                 break;
             case 'plant':
                 embed.addField('!plant type', 'Adds a plant to the garden. When it finishes growing, you can then use `!pick type` to collect it.\n' +

@@ -2222,7 +2222,7 @@ module.exports = {
 				    // Death
 					messages.push(`**${player.name}** is ready to fight.`);
 					await sql.addStatus(channel, player.id, enums.Statuses.Ready);
-					if(pings && player.config.Ping) pings.push(this.getPings(player));
+					if(pings && player.config.Ping) pings.push(await this.getPings(player));
 					break;
 				case enums.Statuses.Journey:
 					// Journey
