@@ -51,6 +51,11 @@ module.exports = {
             3: true,
             4: true,
             6: true
+        },
+        CanUseOnSelf: {
+            3: true,
+            4: true,
+            6: true
         }
     },
     ItemTypes: {

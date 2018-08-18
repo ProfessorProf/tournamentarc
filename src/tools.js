@@ -834,7 +834,7 @@ module.exports = {
 		if(!trueForm) {
 			const loserOrbs = loser.items.find(i => i.type == enums.Items.Orb);
 			const winnerOrbs = winner.items.find(i => i.type == enums.Items.Orb);
-			if(loserOrbs > 0) {
+			if(loserOrbs && loserOrbs.count > 0) {
 				output += `\n${winner.name} took ${loserOrbs.count} magic ${loserOrbs.count > 1 ? 'orbs' : 'orb'} from ${loser.name}!`;
 				await sql.addItems(winner.channel, winner.id, enums.Items.Orb, loserOrbs.count);
 				await sql.addItems(loser.channel, loser.id, enums.Items.Orb, -loserOrbs.count);
@@ -1065,7 +1065,7 @@ module.exports = {
 	async destroy(channel, name) {
 		let players = await sql.getPlayers(channel);
 		let nemesis = await sql.getNemesis(channel);
-		let player = name ? await sql.getPlayerByUsername(name) : await sql.getPlayerById(nemesis.id);
+		let player = name ? await sql.getPlayerByUsername(channel, name) : await sql.getPlayerById(nemesis.id);
 		let embed = new Discord.RichEmbed();
 		
 		embed.setTitle('DESTRUCTION')
@@ -1171,7 +1171,7 @@ module.exports = {
 			const fusedPlayer = {
 				name: name,
 				channel: channel,
-				level: (sourcePlayer.level + targetPlayer.level) / 2 + this.newPowerLevel(world.heat),
+				level: Math.max(sourcePlayer.level, targetPlayer.level) + this.newPowerLevel(world.heat),
 				powerWish: sourcePlayer.powerWish || targetPlayer.powerWish,
 				glory: sourcePlayer.glory + targetPlayer.glory,
 				lastActive: now,
@@ -2056,6 +2056,7 @@ module.exports = {
 						// The nemesis suicided
 						await sql.endNemesis(channel);
 						target.level = this.newPowerLevel(world.heat * 0.8);
+						await sql.setPlayer(target);
 					}
 					output += '\n';
 				}
@@ -2563,7 +2564,7 @@ module.exports = {
 			}
 		} else {
 			if(history.length == 0) {
-				embed.setDescription(`${player1.name} has never fought.`);
+				description = `${player1.name} has never fought.`;
 			} else {
 				const player1wins = history.filter(h => h.winnerId == player1.id).length;
 				const player1losses = history.length - player1wins;
@@ -2585,7 +2586,9 @@ module.exports = {
 			const loserName = h.loserName ? h.loserName : 'Someone';
 			output += `Episode ${h.episode}: ${winnerName} defeated ${loserName}, ${numeral(winnerRating.toPrecision(2)).format('0,0')} to ${numeral(loserRating.toPrecision(2)).format('0,0')}.`;
 		}
-		embed.addField(`Last ${history.length} ${history.length == 1 ? 'fight' : 'fights'}`, output);
+		if(output) {
+			embed.addField(`Last ${history.length} ${history.length == 1 ? 'fight' : 'fights'}`, output);
+		}
 
 		return embed;
 	},

@@ -49,6 +49,10 @@ module.exports = {
 				if(!targetName) {
 					errors.push('You must specify a character name.');
 				}
+				if(targetName.startsWith('Zorb') || targetName.startsWith('Zedge') ||
+					targetName.startsWith('Zlower') || targetName.startsWith('Zarrot')) {
+					errors.push('Invalid name.');
+				}
 				if(args.length > 1) {
 					errors.push('Name must not contain spaces.');
 				} else {
@@ -267,7 +271,8 @@ module.exports = {
 					this.validateJourney(errors, player);
 					if(targetName) {
 						const knownPlants = garden.plantTypes.filter(t => t.known);
-						const plantType = this.getPlantType(targetName, knownPlants);
+						const plantType = this.getPlantType(targetName);
+						const plantKnown = knownPlants.find(p => p.id == plantType);
 						const darkPlantType = this.getDarkPlantType(targetName);
 						if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
 							errors.push("That plant was sealed away thousands of years ago.");
@@ -280,7 +285,7 @@ module.exports = {
 							errors.push("You can't carry any more of that plant.");
 						}
 						const plantCount = garden.plants.filter(p => p && (p.type == plantType || p.type == darkPlantType) && p.endTime < now).length;
-						if(plantType == -1 && darkPlantType == -1) {
+						if((plantType == -1 || !plantKnown) && darkPlantType == -1) {
 							errors.push("You've never heard of that plant.");
 						} else if(plantCount == 0) {
 							errors.push("None of those are ready to be picked.");
@@ -314,18 +319,21 @@ module.exports = {
 					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					let knownPlants = garden.plantTypes.filter(t => t.known);
-					let plantType = this.getPlantType(args[0], knownPlants);
+					const knownPlants = garden.plantTypes.filter(t => t.known);
+					const plantType = this.getPlantType(args[0]);
+					const hasPlant = player.items.find(i => i.thype == plantType);
+					const plantExists = plantType != -1;
+					const plantKnown = knownPlants.find(p => p.id == plantType);
 					if(args.length > 1) {
-						if(plantType == -1) {
+						if(!plantExists || !hasPlant && !plantKnown) {
 							errors.push("You've never heard of that plant.");
 						} else {
-							if(player.items.find(i => i.type == plantType)) {
+							if(hasPlant) {
 								if(target) {
 									this.validateAnnihilation(errors, target);
 									this.validateJourney(errors, target);
-									if(target.name == player.name) {
-										errors.push("You can't use plants on yourself.");
+									if(target.id == player.id && enums.Items.CanUseOnSelf[plantType]) {
+										errors.push("You can't use this plant on yourself.");
 									}
 									let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 									switch(plantType) {
@@ -354,8 +362,8 @@ module.exports = {
 							}
 						}
 					} else {
-						if (enums.Items.NeedsTarget[plantType]) {
-							if(!player.items.find(i => i.type == plantType)) {
+						if (!enums.Items.NeedsTarget[plantType]) {
+							if(plantKnown && !hasPlant) {
 								errors.push("You don't have any of that plant.");
 							}
 							let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
@@ -378,7 +386,8 @@ module.exports = {
 					this.validateJourney(errors, player);
 					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known);
-					const plantType = this.getPlantType(targetName, knownPlants);
+					const plantType = this.getPlantType(targetName);
+					const plantKnown = knownPlants.find(p => p.id == plantType);
 					const darkPlantType = this.getDarkPlantType(targetName);
 					if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
 						errors.push("That plant was sealed away thousands of years ago.");
@@ -386,7 +395,7 @@ module.exports = {
 					if(plantType != -1 && darkPlantType == -1 && player.isNemesis) {
 						errors.push("You have no need of such a pathetic plant.");
 					}
-					if(plantType == -1 && darkPlantType == -1 && targetName) {
+					if((plantType == -1 || !plantKnown) && darkPlantType == -1 && targetName) {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p).length;
@@ -1058,7 +1067,7 @@ module.exports = {
 			errors.push(`**${player.name}** cannot garden for another ${timeString}.`);
 		}
 	},
-	getPlantType(plantName, knownPlants) {
+	getPlantType(plantName) {
 		let plantType = -1;
 		if(!plantName) return -1;
 		switch(plantName.toLowerCase()) {
@@ -1091,10 +1100,6 @@ module.exports = {
 			default:
 				plantType = -1;
 				break;
-		}
-
-		if(!knownPlants.find(p => p.id == plantType)) {
-			return -1;
 		}
 		return plantType;
 	},

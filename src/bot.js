@@ -6,13 +6,13 @@ const validation = require('./validation.js');
 const sql = require ('./sql.js');
 const help = require('./help.js');
 
-let debugmode = false;
+let debugMode = false;
 process.argv.forEach((val, index) => {
 	if(val == '--debug') {
-		debugmode = true;
+		debugMode = true;
 	}
 });
-  
+
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
 
@@ -23,7 +23,7 @@ client.on('ready', () => {
 				const c = channels[i];
 				const channel = client.channels.find(x => x.id == c);
 				if(channel && channel.name == auth.channel) {
-					if(debugmode) {
+					if(debugMode) {
 						channel.send(`Bot in debug mode. Only the admin can use commands.`);
 					} else {
 						channel.send(`Bot online! Greetings, ${channel.name}.`);
@@ -100,8 +100,11 @@ client.on('message', message => {
 });
 
 async function handleMessage(message) {
-	if(debugmode && message.author.username != auth.admin) {
-		return;
+	if(debugMode) {
+		let debuggerRole = message.member.roles.get(auth.debuggerRole);
+		if(message.author.username != auth.admin && !debuggerRole) {
+			return;
+		}
 	}
 	const now = new Date().getTime();
 	let name = message.author.username;
@@ -110,6 +113,7 @@ async function handleMessage(message) {
 	args = args.splice(1);
 
 	const channel = message.channel.id;
+	let overrideErrors = false;
 
 	let output = {
 		messages: [],
@@ -117,12 +121,17 @@ async function handleMessage(message) {
 		informational: false
 	};
 
-    if (cmd.substring(0, 1) == '!') {
+	if(debugMode && cmd.substring(0,2) == '!!') {
+		overrideErrors = true;
+		cmd = cmd.substring(2);
+	}
+
+    if(cmd.substring(0, 1) == '!') {
 		output.private = true;
 		cmd = cmd.substring(1);
 	}
 
-	if(cmd == 'as' && name == auth.admin && debugmode) {
+	if(cmd == 'as' && name == auth.admin && debugMode) {
 		name = args[0];
 		cmd = args[1].toLowerCase();
 		args = args.splice(2);
@@ -160,11 +169,16 @@ async function handleMessage(message) {
 
 	const errors = await validation.validate(channel, name, cmd, args);
 	if(errors) {
+		if(overrideErrors) {
+			errors.push('(Override Errors)');
+		}
 		message.channel.send({embed: {
 			title: 'Error',
 			description: errors.join('\n')
 		}});
-		return;
+		if(!overrideErrors) {
+			return;
+		}
 	}
 	
 	const targetName = args[0];

@@ -738,7 +738,7 @@ module.exports = {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $id AND Type IN (0, 3)`, {$id: id});
 	},
 	async getOutgoingOffers(id) {
-		return await sql.all(`SELECT * FROM Offers WHERE Player_ID = $id`, {$id: id}).map(row => { return {
+		return (await sql.all(`SELECT * FROM Offers WHERE Player_ID = $id`, {$id: id})).map(row => { return {
 			id: row.ID,
 			playerId: row.Player_ID,
 			targetId: row.Target_ID,
