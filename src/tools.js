@@ -1935,7 +1935,7 @@ module.exports = {
 					console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 					output.push(`${player.name} searches the world, and finds ${junk}`);
 				} else {
-					searchChance = 0.05;
+					searchChance = 0.04 * 10 / Math.max(world.maxPopulation, 10);
 					roll = Math.random();
 					if(roll < searchChance && !player.npc) {
 						if(Math.random() < 0.1) {
