@@ -419,7 +419,7 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
-					if(!targetName) {
+					if(!targetName || (targetName != 'growth' && targetName != 'size' && targetName != 'research')) {
 						errors.push("Your options are: `!expand growth`, `!expand size`, or `!expand research`.");
 					}
 					if(glory < 50) {
