@@ -42,7 +42,17 @@ module.exports = {
         "Support local business! $0's store is being muscled out by Big Business, until $1 joins in to help $0them make ends meet.",
         "Shopping spree! When $0 plans a simple trip to the mall, it spirals out of control when $1 gets involved.",
         "The story so far! $0, $1 and $2 spend an evening reminiscing about their past battles, and the animation studio gets to take a break.",
-        "Parallel Works! $0 and $1 star in a non-canon adventure, in an alternate universe where they're high school students... and also mermaids."
+        "Parallel works! $0 and $1 star in a non-canon adventure, in an alternate universe where they're high school students... and also mermaids.",
+        "Lights, camera, action! A new movie is being made based on previous battles... but the role of $0 is being played by $1!",
+        "Road trip! $0, $1, $2 and $3 cram into the same car to go on a journey of self-discovery, and also booze, but it runs into trouble when they end up stranded in the desert.",
+        "Happy Snowflake Day! $0 is initially grumpy, but $1, $2 and $3 teach $0them the true meaning of a generic Christmas-equivalent holiday.",
+        "I want a nice, clean fight! $0 and $1 face off in a pro wrestling battle... but have to hide their powers and act like normal wrestlers!",
+        "Battle of the bands! $0 and $1 form a band, and face off against $2 and $3's band in the finals! Who will win the audience's approval in the end?",
+        "Love is doomed! $0 is preparing for a date, but $1's 'help' almost turns it into a total catastrophe.",
+        "Kitten rescue! $0 and $1 adopt a stray kitten... but their world-shaking fighting skills won't prepare them for pet ownership!",
+        "Just say no! In a very special episode, $0 teaches $1 about the dangers of recreational drugs.",
+        "Running in the 90s! What better to do with your new driver's license than illegal street racing? $0 and $1 drift their way through a battle of pride!",
+        "Anime-only content! While waiting for the manga to release more chapters, $0 and $1 team up to defeat a new villain who has nothing to do with the plot. None of this will ever be mentioned again."
     ],
     DestroyTemplates: [
         "Terrifying destruction!! $nemesis obliterates a planet, leaving myriad warriors lost to the merciless emptiness of space."
