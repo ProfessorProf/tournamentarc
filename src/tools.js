@@ -1392,7 +1392,7 @@ module.exports = {
 			while(slot < garden.slots && garden.plants.find(p => p.slot == slot)) {
 				slot++;
 			}
-			if(slot == 3) {
+			if(slot == garden.slots) {
 				return;
 			}
 		}
