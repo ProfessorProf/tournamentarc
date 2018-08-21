@@ -639,7 +639,7 @@ module.exports = {
 		};
 	},
 	async addHistory(channel, winnerId, winnerLevel, winnerSkill, loserId, loserLevel, loserSkill) {
-		const episodeRow = await sql.get(`SELECT Episode FROM Worlds WHERE Channel = $channel`);
+		const episodeRow = await sql.get(`SELECT Episode FROM Worlds WHERE Channel = $channel`, {$channel: channel});
 		const winner = await sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: winnerId});
 		const loser = await sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: loserId});
 		const episodeNumber = episodeRow ? episodeRow : 1;

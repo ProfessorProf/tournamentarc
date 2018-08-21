@@ -818,7 +818,7 @@ module.exports = {
 			output += `\n${loser.name} loses ${gloryPenalty} Glory.`
 		}
 		
-		if(winner.isNemesis) {
+		if(winner.isNemesis || winner.npc == enums.NpcTypes.Zorbmaster) {
 			// Longer KO, but the Nemesis is weakened
 			hours = 12;
 			let maxPowerLoss = 0.03;
@@ -826,7 +826,7 @@ module.exports = {
 			else if(loserSkill > 1.6) maxPowerLoss = 0.06;
 			else if(loserSkill > 1.2) maxPowerLoss = 0.045;
 			const powerLoss = Math.min(maxPowerLoss * winnerLevel, loserLevel * 0.5);
-			output += `\nThe Nemesis is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
+			output += `\n**${winner.name}** is weakened, losing ${numeral(powerLoss.toPrecision(2)).format('0,0')} Power.`;
 			winner.level -= powerLoss;
 		}
 		
