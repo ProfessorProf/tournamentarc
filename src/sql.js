@@ -642,7 +642,7 @@ module.exports = {
 		const episodeRow = await sql.get(`SELECT Episode FROM Worlds WHERE Channel = $channel`, {$channel: channel});
 		const winner = await sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: winnerId});
 		const loser = await sql.get(`SELECT * FROM Players WHERE ID = $id`, {$id: loserId});
-		const episodeNumber = episodeRow ? episodeRow : 1;
+		const episodeNumber = episodeRow ? episodeRow.Episode : 1;
 		await sql.run(`INSERT INTO History (Channel, Episode, Battle_Time, Winner_Id, Loser_ID, Winner_Level, Loser_Level, Winner_Skill, Loser_Skill, Winner_Name, Loser_Name)
 			VALUES ($channel, $episode, $battleTime, $winnerId, $loserId, $winnerLevel, $loserLevel, $winnerSkill, $loserSkill, $winnerName, $loserName)`, {
 			$channel: channel,
