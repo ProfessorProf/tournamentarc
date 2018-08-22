@@ -1206,6 +1206,16 @@ module.exports = {
 				await sql.addItems(channel, fusionId, item.type, item.count);
 				await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
 			}
+			for(const status of sourcePlayer.status) {
+				if(enums.Statuses.CopyToFusion[status.type]) {
+					await sql.addStatus(channel, fusionId, status.type, status.endTime - now, status.rating);
+				}
+			}
+			for(const status of targetPlayer.status) {
+				if(enums.Statuses.CopyToFusion[status.type]) {
+					await sql.addStatus(channel, fusionId, status.type, status.endTime - now, status.rating);
+				}
+			}
 			console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
 			
 			return {embed: await this.getPlayerDescriptionById(fusionId), message: `**${sourcePlayerName}** and **${targetPlayerName}** pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!` };

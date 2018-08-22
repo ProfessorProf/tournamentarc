@@ -126,6 +126,16 @@ module.exports = {
             4: 200,
             5: 100,
             12: 250
+        },
+        CopyToFusion: {
+            4: true,
+            5: true,
+            6: true,
+            7: true,
+            8: true,
+            10: true,
+            11: true,
+            12: true
         }
     },
     NemesisTypes: {
