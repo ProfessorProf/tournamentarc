@@ -3170,7 +3170,7 @@ module.exports = {
 			return ` It's time for the next round of the tournament!`;
 		}
 	},
-	async healPlayer(player) {
+	async healPlayer(player, amount) {
 		const now = new Date().getTime();
 		let defeatedState = player.status.find(s => s.type == enums.Statuses.Dead);
 		if(defeatedState) {
