@@ -1591,7 +1591,7 @@ module.exports = {
 		let defeatedState;
 		switch(plantItem.type) {
 			case enums.Items.Flower:
-				const defeatedState = await this.healPlayer(target, 6 * hour);
+				defeatedState = await this.healPlayer(target, 6 * hour);
 				if(defeatedState) {
 					const duration = defeatedState.endTime - now;
 					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
@@ -1603,7 +1603,7 @@ module.exports = {
 				}
 				break;
 			case enums.Items.Rose:
-				const defeatedState = await this.healPlayer(target, 12 * hour);
+				defeatedState = await this.healPlayer(target, 12 * hour);
 				if(defeatedState) {
 					const duration = defeatedState.endTime - now;
 					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
