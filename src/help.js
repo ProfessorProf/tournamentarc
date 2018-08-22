@@ -46,6 +46,7 @@ module.exports = {
                         .addField('Config Flags:', '**AlwaysPrivate**: Valid values: "on"/"off". Sends messages via DM by default. If you want a specific message to send via DM, preface it with "!!" instead of "!". ' +
                             'For a list of commands that can be made private, enter `!help info`. Default: Off.\n' +
                             '**Ping**: Valid values: "on"/"off". Mentions you when various important events happen related to your character. Default: Off.\n' + 
+                            '**AutoTrain**: Valid Values: "on"/"off". When active, you will automatically start training whenever you come back from a defeat.\n' +
                             '**Pronoun**: Valid values: "he"/"she"/"they". Determines what pronouns the game uses for messages about you. Default: They.');
                     break;
                 case 'rank':

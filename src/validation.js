@@ -978,7 +978,7 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateActionTime(errors, player);
-					const players = await sql.getPlayers(channel);
+					const players = (await sql.getPlayers(channel)).filter(p => !tools.isFusionPart(p));
 					if(players.length < 4) {
 						errors.push(`There must be at least four players before filler episodes can begin.`);
 					}

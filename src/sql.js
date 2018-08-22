@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER,
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
 	Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
-	NPC INTEGER, AlwaysPrivate_Flag INTEGER, Ping_Flag INTEGER, Pronoun INTEGER);
+	NPC INTEGER);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Status (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Type INTEGER,
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
@@ -344,7 +344,7 @@ module.exports = {
 		};
 
 		for(var i in enums.Configs) {
-			if(i == 'Defaults') continue;
+			if(i == 'Defaults' || i == 'Type') continue;
 			var configValue = configRows.find(row => row.Key == i);
 			if(configValue && configValue.Value) {
 				switch(enums.Configs.Type[i]) {
@@ -458,10 +458,6 @@ module.exports = {
 	// Delete a Status.
 	async deleteStatus(channel, playerId, type) {
 		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId AND Type = $type`, {$playerId: playerId, $type: type});
-		if(type == 0) {
-			// Ending a KO status = become capable of training
-			await this.addStatus(channel, playerId, 5);
-		}
 	},
 	// Delete all Status for a player.
 	async annihilatePlayer(channel, playerId) {

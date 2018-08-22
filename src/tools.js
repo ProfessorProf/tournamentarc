@@ -1035,7 +1035,7 @@ module.exports = {
 		let nemesis = await sql.getNemesis(channel);
 		let nemesisPlayer = await sql.getPlayerById(nemesis.id);
 		
-		await sql.deleteStatus(channel, target.id, enums.Statuses.Dead);
+		await this.healPlayer(target);
 		let increase = this.getPowerLevel(target) * 0.2;
 		target.level *= 1.2;
 		await sql.addStatus(channel, nemesisPlayer.id, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.Revive);
@@ -1185,8 +1185,9 @@ module.exports = {
 				fusionFlag: true,
 				wishFlag: false,
 				config: {
-					alwaysPrivate: false, // Private doesn't work for fusions yet
-					ping: false, // Ping doesn't work for fusions yet
+					alwaysPrivate: sourcePlayer.config.alwaysPrivate && targetPlayer.config.alwaysPrivate,
+					ping: sourceplayer.config.ping && targetPlayer.config.ping,
+					AutoTrain: sourcePlayer.config.AutoTrain && targetPlayer.config.AutoTrain,
 					pronoun: sourcePlayer.config.Pronoun == targetPlayer.config.Pronoun ? sourcePlayer.config.Pronoun : 'they'
 				}
 			};
@@ -1311,10 +1312,10 @@ module.exports = {
 		}
 
 		if(pings && fusedPlayer1.config.Ping) {
-			pings.push(this.getPings(fusedPlayer1));
+			pings.push(await this.getPings(fusedPlayer1));
 		}
 		if(pings && fusedPlayer2.config.Ping) {
-			pings.push(this.getPings(fusedPlayer2));
+			pings.push(await this.getPings(fusedPlayer2));
 		}
 	},
 	// Establish a character as a new Nemesis.
@@ -1590,48 +1591,39 @@ module.exports = {
 		let defeatedState;
 		switch(plantItem.type) {
 			case enums.Items.Flower:
-				// Flower
-				defeatedState = target.status.find(s => s.type == enums.Statuses.Dead);
+				const defeatedState = await this.healPlayer(target, 6 * hour);
 				if(defeatedState) {
-					defeatedState.endTime -= 6 * hour;
-					if(defeatedState.endTime < now) {
-						await sql.deleteStatus(channel, target.id, enums.Statuses.Dead);
-						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
-					} else {
-						await sql.setStatus(defeatedState);
-						const duration = defeatedState.endTime - now;
-						output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+					const duration = defeatedState.endTime - now;
+					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+				} else {
+					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
+					if(player.config.AutoTrain) {
+						output += `\n**${player.name}** has started training.`;
 					}
 				}
 				break;
-			case 2:
-				// Rose
-				defeatedState = target.status.find(s => s.type == enums.Statuses.Dead);
+			case enums.Items.Rose:
+				const defeatedState = await this.healPlayer(target, 12 * hour);
 				if(defeatedState) {
-					defeatedState.endTime -= 12 * hour;
-					if(defeatedState.endTime < now) {
-						await sql.deleteStatus(channel, target.id, enums.Statuses.Dead);
-						output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
-					} else {
-						await sql.setStatus(defeatedState);
-						const duration = defeatedState.endTime - now;
-						output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+					const duration = defeatedState.endTime - now;
+					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+				} else {
+					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
+					if(player.config.AutoTrain) {
+						output += `\n**${player.name}** has started training.`;
 					}
 				}
 				break;
-			case 3:
-				// Carrot
+			case enums.Items.Carrot:
 				await sql.addStatus(channel, target.id, enums.Statuses.Carrot, hour * 6);
 				output = `**${target.name}** eats the carrot, and ${this.their(target.config.Pronoun)} senses feel sharper!`;
 				break;
-			case 4:
-				// Bean
+			case enums.Items.Bean:
 				await sql.addStatus(channel, target.id, enums.Statuses.Bean, hour);
 				const levelBoost = this.getPowerLevel(target) * .12;
 				output = `**${target.name}** eats the bean, and ${this.their(target.config.Pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
-			case 5:
-				// Sedge
+			case enums.Items.Sedge:
 				output = await this.water(channel, null, 2 * hour);
 				let garden = await sql.getGarden(channel);
 				const expansion = (Math.random() * 15 + 15) * 5 / (100 * (3 + garden.growthLevel));
@@ -1644,7 +1636,7 @@ module.exports = {
 				output += `\nYour plants now take ${rate}% the usual time to grow.`;
 				await sql.setGarden(garden);
 				break;
-			case 6:
+			case enums.Items.Fern:
 				// Fern
 				await sql.addStatus(channel, target.id, enums.Statuses.Fern, hour * 12);
 				output = `**${target.name}** eats the fern, and ${this.their(target.config.Pronoun)} power is hidden!`;
@@ -2023,7 +2015,7 @@ module.exports = {
 						const defeatedState = p.status.find(s => s.type == enums.Statuses.Dead);
 						if(defeatedState) {
 							output += `\n${p.name} is revived!`;
-							await sql.deleteStatus(channel, p.id, enums.Statuses.Dead);
+							await this.healPlayer(p);
 							p.level *= 1.2;
 							await sql.setPlayer(p);
 						}
@@ -2034,7 +2026,7 @@ module.exports = {
 				output += '\nNo matter how great of an injury you suffer, you will always swiftly return!';
 				const defeatedState = player.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeatedState) {
-					await sql.deleteStatus(channel, player.id, enums.Statuses.Dead);
+					await this.healPlayer(player);
 				}
 				await sql.addStatus(channel, player.id, enums.Statuses.ImmortalityWish);
 				break;
@@ -2240,7 +2232,12 @@ module.exports = {
 				case enums.Statuses.Dead:
 				    // Death
 					messages.push(`**${player.name}** is ready to fight.`);
-					await sql.addStatus(channel, player.id, enums.Statuses.Ready);
+					if(player.config.AutoTrain) {
+						messages.push(`**${player.name}** has begun training.`);
+						await sql.addStatus(channel, player.id, enums.Statuses.Training);
+					} else {
+						await sql.addStatus(channel, player.id, enums.Statuses.Ready);
+					}
 					if(pings && player.config.Ping) pings.push(await this.getPings(player));
 					break;
 				case enums.Statuses.Journey:
@@ -2286,7 +2283,7 @@ module.exports = {
 					messages.push(`**${player.name}** calms down from ${this.their(player.config.Pronoun)} battle frenzy.`);
 					break;
 				case enums.Statuses.Cooldown:
-					//Cooldowns
+					// Cooldowns
 					if(player && player.npc) {
 						switch(status.rating) {
 							case enums.Cooldowns.Attack:
@@ -2300,13 +2297,7 @@ module.exports = {
 									let target = players[Math.floor(Math.random() * players.length)];
 									messages = messages.concat(await this.attack(channel, player.username, target.name));
 								}
-								switch(player.npc) {
-									case enums.NpcTypes.Zorbmaster:
-										await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 2 * hour, enums.Cooldowns.Attack);
-										break;
-									default:
-										await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 3 * hour, enums.Cooldowns.Attack);
-								}
+								await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 3 * hour, enums.Cooldowns.Attack);
 								break;
 							case enums.Cooldowns.Destroy:
 								// Cast destroy
@@ -2414,10 +2405,13 @@ module.exports = {
 			// Update the config
 			switch(configFlag.toLowerCase()) {
 				case 'alwaysprivate':
-					player.config.AlwaysPrivate = this.readConfigBoolean(value);
+					player.config.AlwaysPrivate = this.readConfigBoolean(value, player.config.AlwaysPrivate);
 					break;
 				case 'ping':
-					player.config.Ping = this.readConfigBoolean(value);
+					player.config.Ping = this.readConfigBoolean(value, player.config.Ping);
+					break;
+				case 'autotrain':
+					player.config.AutoTrain = this.readConfigBoolean(value, player.config.autoTrain);
 					break;
 				case 'pronoun':
 					if(value.toLowerCase() == 'he') {
@@ -2427,7 +2421,6 @@ module.exports = {
 					} else {
 						player.config.Pronoun = 'they';
 					}
-					player.config.AlwaysPrivate = this.readConfigBoolean(value, player.config.AlwaysPrivate);
 					break;
 			}
 		}
@@ -2442,6 +2435,7 @@ module.exports = {
 			.setColor(0x00AE86);
 		let output = `AlwaysPrivate: ${config.AlwaysPrivate ? 'On' : 'Off'}\n`;
 		output += `Ping: ${config.Ping ? 'On' : 'Off'}\n`;
+		output += `AutoTrain: ${config.AutoTrain ? 'On' : 'Off'}\n`;
 		output += `Pronoun: ${config.Pronoun}`;
 		embed.setDescription(output);
 
@@ -2775,7 +2769,7 @@ module.exports = {
 			case enums.NpcTypes.Zorbmaster:
 				baseName = 'Zorbmaster';
 				await this.addHeat(world, 100);
-				npc.level = this.newPowerLevel(world.heat) * 20;
+				npc.level = this.newPowerLevel(world.heat) * 10;
 				break;
 			case enums.NpcTypes.Zlower:
 				baseName = 'Zlower';
@@ -2874,7 +2868,7 @@ module.exports = {
 		let cast = [player];
 		if(targetName) cast.push(target);
 
-		let remainingPlayers = players.filter(p => p.id != player.id && (!target || p.id != target.id));
+		let remainingPlayers = players.filter(p => p.id != player.id && (!target || p.id != target.id) && !this.isFusionPart(p));
 		this.shuffle(remainingPlayers);
 		while(cast.length < playerCount) {
 			cast.push(remainingPlayers[0]);
@@ -2899,14 +2893,7 @@ module.exports = {
 		let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 		if(defeated) {
 			// Remove 10 minutes of defeated time
-			let remaining = defeated.endTime - now;
-			let reduction = 10 * 60 * 1000;
-			if(remaining < reduction) {
-				await sql.deleteStatusById(channel, defeated.id);
-			} else {
-				defeated.endTime -= reduction;
-				await sql.setStatus(defeated);
-			}
+			await this.healPlayer(player, 10 * 60 * 1000);
 		}
 		await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Action);
 
@@ -3181,6 +3168,30 @@ module.exports = {
 			return ` It's time for the tournament finals!`;
 		} else {
 			return ` It's time for the next round of the tournament!`;
+		}
+	},
+	async healPlayer(player) {
+		const now = new Date().getTime();
+		let defeatedState = player.status.find(s => s.type == enums.Statuses.Dead);
+		if(defeatedState) {
+			const duration = defeatedState.endTime - now;
+			if(amount && duration > amount) {
+				// Reduce timer
+				defeatedState.endTime -= amount;
+				await sql.setStatus(defeatedState);
+				return defeatedState;
+			} else {
+				// Revive
+				await sql.deleteStatusById(channel, defeated.id);
+
+				if(player.config.AutoTrain) {
+					await sql.deleteStatus(channel, player.id, enums.Statuses.Ready);
+					await sql.addStatus(channel, player.id, enums.Statuses.Training);
+				} else {
+					await sql.addStatus(channel, player.id, enums.Statuses.Ready);
+				}
+				return null;
+			}
 		}
 	}
 }

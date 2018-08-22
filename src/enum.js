@@ -184,15 +184,18 @@ module.exports = {
         AlwaysPrivate: 'AlwaysPrivate',
         Ping: 'Ping',
         Pronoun: 'Pronoun',
+        AutoTrain: 'AutoTrain',
         Defaults: {
             AlwaysPrivate: false,
             Ping: false,
-            Pronoun: 'they'
+            Pronoun: 'they',
+            AutoTrain: false
         },
         Type: {
             AlwaysPrivate: 'bool',
             Ping: 'bool',
-            Pronoun: 'text'
+            Pronoun: 'text',
+            AutoTrain: 'bool'
         }
     },
     FightSummaries: {
