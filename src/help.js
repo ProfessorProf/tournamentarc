@@ -14,7 +14,7 @@ module.exports = {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
                 .addField('!help info', 'Help with informational commands: !check, !scan, !roster, !episode, !graveyard, !history.')
-                .addField('!help actions', 'Help with commands related to world actions: !search, !empower, !overdrive.')
+                .addField('!help actions', 'Help with commands related to world actions: !search, !empower, !overdrive, !filler.')
                 .addField('!help garden', 'Help with commands related to the garden: !garden, !expand, !water, !plant, !pick, !use.')
                 .addField('!help battle', 'Help with commands related to combat: !fight, !unfight, !taunt, !train, !journey.')
                 .addField('!help nemesis', 'Help with commands related to the Nemesis: !nemesis, !recruit, !exile, !attack, !destroy, !burn, !energize, !revive.')

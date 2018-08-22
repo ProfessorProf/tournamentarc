@@ -282,6 +282,7 @@ module.exports = {
 	},
 	// Add Offers, Statuses and Items to a player and return it as a player object.
     async getPlayerInternal(row) {
+		const now = new Date().getTime();
         const offerRows = await sql.all(`SELECT o.*, p.Name FROM Offers o 
 			LEFT JOIN Players p ON o.Player_ID = p.ID
 			WHERE o.Target_ID = $id OR (o.Target_ID IS NULL AND o.Player_ID <> $id AND o.Channel = $channel)`, {$id: row.ID, $channel: row.Channel});
@@ -300,8 +301,8 @@ module.exports = {
 			channel: row.Channel,
 			level: row.Power_Level,
 			glory: row.Glory,
-			lastActive: row.Last_Active,
-			lastFought: row.Last_Fought,
+			lastActive: row.NPC ? now : row.Last_Active,
+			lastFought: row.NPC ? now : row.Last_Fought,
 			gardenLevel: row.Garden_Level,
 			actionLevel: row.Action_Level,
 			overdriveCount: row.Overdrive_Count,
