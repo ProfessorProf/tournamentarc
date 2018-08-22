@@ -36,6 +36,11 @@ module.exports = {
 			errors.push(`A new universe will be born in ${tools.getTimeString(duration)}.`);
 			return errors;
 		}
+
+		if(cmd == 'research') {
+			cmd = 'expand';
+			targetName = 'research';
+		}
 		
 		switch(cmd) {
 			case 'reg':

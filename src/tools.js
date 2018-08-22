@@ -280,7 +280,7 @@ module.exports = {
 		let rows = [];
 		for(const i in players) {
 			let p = players[i];
-			if (p.fusionId && p.fusionId != p.id) {
+			if (this.isFusionPart(p)) {
 				continue;
 			}
 			if(p.lastActive + 24 * hour < now) {
@@ -392,7 +392,7 @@ module.exports = {
 		}
 		for(const i in players) {
 			let p = players[i];
-			if (p.fusionId && p.fusionId == p.id) {
+			if (this.isFusionPart(p)) {
 				continue;
 			}
 
@@ -818,9 +818,11 @@ module.exports = {
 			output += `\n${loser.name} loses ${gloryPenalty} Glory.`
 		}
 		
-		if(winner.isNemesis || winner.npc == enums.NpcTypes.Zorbmaster) {
-			// Longer KO, but the Nemesis is weakened
-			hours = 12;
+		if(winner.isNemesis || winner.npc) {
+			// Weaken the enemy
+			if(winner.isNemesis || winner.npc == enums.NpcTypes.Zorbmaster) {
+				hours = 12;
+			}
 			let maxPowerLoss = 0.03;
 			if(loserSkill < 0.8) maxPowerLoss = 0.015;
 			else if(loserSkill > 1.6) maxPowerLoss = 0.06;
@@ -1282,7 +1284,7 @@ module.exports = {
 		}
 
 		// Split up statuses
-		for(const status of fusionPlayer.statuses) {
+		for(const status of fusionPlayer.status) {
 			if(status.type != enums.Statuses.Fused) {
 				await sql.addStatus(channel, fusedPlayer1.id, status.type, (status.endTime - now) / 2, status.rating);
 				await sql.deleteStatusById(channel, status.id);
@@ -1362,6 +1364,10 @@ module.exports = {
 	// Check whether or not a player is a fusion.
     isFusion(player) {
         return player && player.fusionNames && player.fusionNames.length == 2;
+	},
+	// Check whether or not a player is a part of a fusion.
+    isFusionPart(player) {
+        return player && player.fusionIDs.length == 0 && player.fusionId;
 	},
 	// Generates a new power level based on the current Heat.
     newPowerLevel(heat) {
@@ -2116,7 +2122,8 @@ module.exports = {
 		let activePlayers = 0;
 		for(const i in players) {
 			const p = players[i];
-			if(p.fusionNames && p.fusionNames.length == 1) continue;
+			if(this.isFusionPart(p)) continue;
+			if(p.npc) continue;
 			
 			if(p.lastActive > now) {
 				p.lastActive = now;
@@ -2275,7 +2282,7 @@ module.exports = {
 								const players = (await sql.getPlayers(channel)).filter(p => 
 									!p.status.find(s => s.type == enums.Statuses.Dead) && 
 									!p.status.find(s => s.type == enums.Statuses.Journey) && 
-									p.fusionIDs.length != 1 &&
+									!this.isFusionPart(p) &&
 									!p.npc);
 								if(players.length > 0) {
 									let target = players[Math.floor(Math.random() * players.length)];
