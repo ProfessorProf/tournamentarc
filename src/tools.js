@@ -1598,7 +1598,7 @@ module.exports = {
 				} else {
 					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					if(player.config.AutoTrain) {
-						output += `\n**${player.name}** has started training.`;
+						output += `\n**${target.name}** has started training.`;
 					}
 				}
 				break;
@@ -1610,7 +1610,7 @@ module.exports = {
 				} else {
 					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
 					if(player.config.AutoTrain) {
-						output += `\n**${player.name}** has started training.`;
+						output += `\n**${target.name}** has started training.`;
 					}
 				}
 				break;
@@ -2234,6 +2234,7 @@ module.exports = {
 					messages.push(`**${player.name}** is ready to fight.`);
 					if(player.config.AutoTrain) {
 						messages.push(`**${player.name}** has begun training.`);
+						await sql.deleteStatus(channel, player.id, enums.Statuses.Ready);
 						await sql.addStatus(channel, player.id, enums.Statuses.Training);
 					} else {
 						await sql.addStatus(channel, player.id, enums.Statuses.Ready);
@@ -2297,12 +2298,10 @@ module.exports = {
 									let target = players[Math.floor(Math.random() * players.length)];
 									messages = messages.concat(await this.attack(channel, player.username, target.name));
 								}
-								await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 3 * hour, enums.Cooldowns.Attack);
 								break;
 							case enums.Cooldowns.Destroy:
 								// Cast destroy
 								messages.push(await this.destroy(channel, player.username));
-								await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 18 * hour, enums.Cooldowns.Destroy);
 								break;
 							case enums.Cooldowns.Search:
 								// Search for orbs
