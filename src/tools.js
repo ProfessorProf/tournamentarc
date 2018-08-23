@@ -3183,7 +3183,7 @@ module.exports = {
 				return defeatedState;
 			} else {
 				// Revive
-				await sql.deleteStatusById(channel, defeated.id);
+				await sql.deleteStatusById(channel, defeatedState.id);
 
 				if(player.config.AutoTrain) {
 					await sql.deleteStatus(channel, player.id, enums.Statuses.Ready);
