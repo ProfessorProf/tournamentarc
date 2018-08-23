@@ -821,7 +821,7 @@ module.exports = {
 		if(winner.isNemesis || winner.npc) {
 			// Weaken the enemy
 			if(winner.isNemesis || winner.npc == enums.NpcTypes.Zorbmaster) {
-				hours = 12;
+				hours = Math.max(hours, 6);
 			}
 			let maxPowerLoss = 0.03;
 			if(loserSkill < 0.8) maxPowerLoss = 0.015;
