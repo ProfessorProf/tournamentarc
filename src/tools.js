@@ -3172,6 +3172,7 @@ module.exports = {
 	},
 	async healPlayer(player, amount) {
 		const now = new Date().getTime();
+		const channel = player.channel;
 		let defeatedState = player.status.find(s => s.type == enums.Statuses.Dead);
 		if(defeatedState) {
 			const duration = defeatedState.endTime - now;
