@@ -2768,7 +2768,7 @@ module.exports = {
 			case enums.NpcTypes.Zorbmaster:
 				baseName = 'Zorbmaster';
 				await this.addHeat(world, 100);
-				npc.level = this.newPowerLevel(world.heat) * 10;
+				npc.level = this.newPowerLevel(world.heat) * 7;
 				break;
 			case enums.NpcTypes.Zlower:
 				baseName = 'Zlower';
@@ -2802,17 +2802,8 @@ module.exports = {
 
 		// Initial status
 		switch(type) {
-			case enums.NpcTypes.Zorb:
-				await sql.addStatus(channel, id, enums.Statuses.Cooldown, fiveMin, enums.Cooldowns.Attack);
-				break;
 			case enums.NpcTypes.Zorbmaster:
-				await sql.addStatus(channel, id, enums.Statuses.Cooldown, fiveMin, enums.Cooldowns.Attack);
-				await sql.addStatus(channel, id, enums.Statuses.Cooldown, 12 * hour, enums.Cooldowns.Destroy);
-				if(world.lostOrbs) {
-					world.lostOrbs--;
-					await sql.addItems(channel, id, enums.Items.Orb, 1);
-					await sql.setWorld(world);
-				}
+				await sql.addStatus(channel, id, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.Destroy);
 				break;
 			case enums.NpcTypes.Zlower:
 				await sql.addStatus(channel, id, enums.Statuses.Cooldown, fiveMin, enums.Cooldowns.Empower);
@@ -2827,6 +2818,51 @@ module.exports = {
 				await sql.setUnderling(channel, id, true);
 				break;
 		}
+
+		// Item drops
+		const roll = Math.random();
+		let plants = 0;
+		let orbs = 0;
+		switch(type) {
+			case enums.NpcTypes.Zorb:
+				if(roll < 0.1 && world.lostOrbs > 0) {
+					orbs++;
+				}
+				if(roll < 0.3) {
+					plants++;
+				}
+				if(roll < 0.6) {
+					plants++;
+				}
+				break;
+			case enums.NpcTypes.Zorbmaster:
+				orbs++;
+				plants++;
+				if(roll < 0.1 && world.lostOrbs > 0) {
+					orbs++;
+				}
+				if(roll < 0.3) {
+					plants++;
+				}
+				if(roll < 0.5) {
+					plants++;
+				}
+				if(roll < 0.7) {
+					plants++;
+				}
+				break;
+		}
+		for(let i = 0; i < plants; i++) {
+			const plantType = Math.floor(Math.random() % 6) + 1;
+			await sql.addItems(channel, id, plantType, 1);
+		}
+		if(orbs > world.lostOrbs) {
+			orbs = world.lostOrbs;
+		}
+		await sql.addItems(channel, id, enums.Items.Orb, orbs);
+		world.lostOrbs -= orbs;
+
+		await sql.setWorld(world);
 
 		return npc;
 	},

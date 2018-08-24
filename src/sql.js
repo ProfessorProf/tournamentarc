@@ -473,10 +473,6 @@ module.exports = {
 	async deleteStatusById(channel, id) {
 		const row = await sql.get(`SELECT * FROM Status WHERE ID = $id`, {$id: id});
 		await sql.run(`DELETE FROM Status WHERE ID = $id`, {$id: id});
-		if(row && row.Type == 0) {
-			// Ending a KO status = become capable of training
-			await this.addStatus(channel, row.Player_ID, 5);
-		}
 	},
 	// Delete a Player and all associated items/statuses.
 	async deletePlayer(playerId) {
