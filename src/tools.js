@@ -2155,7 +2155,7 @@ module.exports = {
 					if(orbs) {
 						messages.push(`${p.name} must fight someone in the next hour or lose an orb.`);
 						if(p.config.Ping) {
-							pings.push(p.userId);
+							pings.push(this.getPings(p));
 						}
 					}
 				}
