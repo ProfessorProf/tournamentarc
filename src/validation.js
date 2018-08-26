@@ -403,7 +403,7 @@ module.exports = {
 					if((plantType == -1 || !plantKnown) && darkPlantType == -1 && targetName) {
 						errors.push("You've never heard of that plant.");
 					}
-					let plantCount = garden.plants.filter(p => p).length;
+					let plantCount = garden.plants.filter(p => p && enums.Items.Type[p.type] != enums.ItemTypes.DarkPlant).length;
 					if(plantType != -1 && darkPlantType == -1 && plantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
 					}
@@ -1090,15 +1090,6 @@ module.exports = {
 				break;
 			case 'fern':
 				plantType = 6;
-				break;
-			case 'zlower':
-				plantType = 7;
-				break;
-			case 'zarrot':
-				plantType = 8;
-				break;
-			case 'zedge':
-				plantType = 9;
 				break;
 			default:
 				plantType = -1;
