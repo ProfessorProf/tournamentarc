@@ -2475,7 +2475,7 @@ module.exports = {
 		return level;
 	},
 	readConfigBoolean(value, oldValue) {
-		const v = value.toLowerCase();
+		const v = value ? value.toLowerCase() : null;
 		if(v == 'off' || v == '0' || v == 'false') {
 			return false;
 		} else if(v == 'on' || v == '1' || v == 'true') {
@@ -2534,7 +2534,7 @@ module.exports = {
 		const existingOrbs = target.items.find(i => i.type == enums.Items.Orb);
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
-		} else if(!existingOrbs == existingOrbs.count == 0) {
+		} else if(!existingOrbs && existingOrbs.count == 0) {
 			player.lastFought = new Date().getTime();
 			await sql.setPlayer(player);
 		}

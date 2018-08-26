@@ -404,7 +404,7 @@ module.exports = {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p).length;
-					if(plantType != -1 && plantCount >= garden.slots) {
+					if(plantType != -1 && darkPlantType == -1 && plantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
 					}
 					if(darkPlantType != -1 && garden.plants.find(p => p.slot == 99)) {
@@ -1099,6 +1099,7 @@ module.exports = {
 				break;
 			case 'zedge':
 				plantType = 9;
+				break;
 			default:
 				plantType = -1;
 				break;
