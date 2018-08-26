@@ -2534,6 +2534,9 @@ module.exports = {
 		const existingOrbs = target.items.find(i => i.type == enums.Items.Orb);
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
+		} else if(!existingOrbs == existingOrbs.count == 0) {
+			player.lastFought = new Date().getTime();
+			await sql.setPlayer(player);
 		}
 
 		return output;
