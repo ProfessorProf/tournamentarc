@@ -337,7 +337,7 @@ module.exports = {
 								if(target) {
 									this.validateAnnihilation(errors, target);
 									this.validateJourney(errors, target);
-									if(target.id == player.id && enums.Items.CanUseOnSelf[plantType]) {
+									if(target.id == player.id && !enums.Items.CanUseOnSelf[plantType]) {
 										errors.push("You can't use this plant on yourself.");
 									}
 									let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
