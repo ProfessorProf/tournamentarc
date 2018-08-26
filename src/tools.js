@@ -1643,7 +1643,7 @@ module.exports = {
 				break;
 		}
 
-		if(target && target.config.Ping) {
+		if(target && target.config.Ping && target.id != player.id) {
 			output += '\n' + await this.getPings(target);
 		}
 		await sql.addItems(channel, player.id, plantItem.type, -1);
