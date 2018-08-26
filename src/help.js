@@ -315,7 +315,7 @@ Rank ??? 1000 Glory
                     "Modifiers to the chance of finding something:\n" +
                     "Each Action Level increases chances by 1 percentage point.\n" +
                     "If you've eaten a carrot, your chances are tripled.\n" +
-                    "If you're a Henchman, your chances are doubled.\n" +
+                    "If you're an Underling, your chances are doubled.\n" +
                     "If the Nemesis is at large, your chances are doubled.\n" +
                     "Requirements: Must be registered. Must not have used any world actions in the past hour.");
                 break;

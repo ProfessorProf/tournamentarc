@@ -32,7 +32,7 @@ module.exports = {
 			embed.setDescription('MONSTER');
 		} else if(player.isUnderling) {
 			const energyPercent = Math.max(100 - 20 * player.underlingDefeats, 0)
-			embed.setDescription(`HENCHMAN\nProtecting the Nemesis at ${energyPercent}% power`);
+			embed.setDescription(`UNDERLING\nProtecting the Nemesis at ${energyPercent}% power`);
 		}
 		
 		let stats = '';
@@ -337,7 +337,7 @@ module.exports = {
 				level += ' [NEMESIS]';
 			}
 			if(p.isUnderling) {
-				level += ' [HENCHMAN]';
+				level += ' [UNDERLING]';
 			}
 			if(this.isFusion(p)) {
 				level += ' [FUSION]';
@@ -988,7 +988,7 @@ module.exports = {
 		if(targetName) {
 			let target = await sql.getPlayer(channel, targetName);
 			// Send an offer
-			embed.setTitle('HENCHMAN RECRUITMENT')
+			embed.setTitle('UNDERLING RECRUITMENT')
 				.setColor(0xff0000)
 				.setDescription(`**${player.name}** wishes for **${target.name}** to join ${this.their(player.config.Pronoun)} army of evil! ` +
 				`If you join, you'll become more powerful, and your power will make the Nemesis stronger. ` +
@@ -997,7 +997,7 @@ module.exports = {
 			return {embed: embed};
 		} else {
 			await sql.addOffer(player, null, enums.OfferTypes.Recruit);
-			embed.setTitle('HENCHMAN RECRUITMENT')
+			embed.setTitle('UNDERLING RECRUITMENT')
 				.setColor(0xff0000)
 				.setDescription(`**${player.name}** wishes for anyone to join ${this.their(player.config.Pronoun)} army of evil! ` +
 				`If you join, you'll become more powerful, and your power will make the Nemesis stronger. ` +

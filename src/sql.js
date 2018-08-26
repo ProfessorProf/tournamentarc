@@ -480,7 +480,7 @@ module.exports = {
 		await sql.run(`DELETE FROM Players WHERE ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId`, {$playerId: playerId});
-		await sql.run(`DELETE FROM Henchmen WHERE Player_ID = $playerId`, {$playerId: playerId});
+		await sql.run(`DELETE FROM Underlings WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
 	},
 	// Delete a Plant.
