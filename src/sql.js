@@ -421,6 +421,7 @@ module.exports = {
 	},
 	// Gives a new item to a player
 	async addItems(channel, playerId, itemId, count) {
+		if(count == 0) return;
 		const existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
 			{$playerId: playerId, $itemId: itemId});
 		if(existingItem) {

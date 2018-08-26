@@ -1186,7 +1186,7 @@ module.exports = {
 				wishFlag: false,
 				config: {
 					alwaysPrivate: sourcePlayer.config.alwaysPrivate && targetPlayer.config.alwaysPrivate,
-					ping: sourceplayer.config.ping && targetPlayer.config.ping,
+					ping: sourcePlayer.config.ping && targetPlayer.config.ping,
 					AutoTrain: sourcePlayer.config.AutoTrain && targetPlayer.config.AutoTrain,
 					pronoun: sourcePlayer.config.Pronoun == targetPlayer.config.Pronoun ? sourcePlayer.config.Pronoun : 'they'
 				}
