@@ -1267,6 +1267,11 @@ module.exports = {
 		fusedPlayer1.glory += gloryDiff;
 		fusedPlayer2.glory += gloryDiff;
 
+		fusedPlayer1.lastActive = fusionPlayer.lastActive;
+		fusedPlayer2.lastActive = fusionPlayer.lastActive;
+		fusedPlayer1.lastFought = fusionPlayer.lastFought;
+		fusedPlayer2.lastFought = fusionPlayer.lastFought;
+
 		await sql.setPlayer(fusedPlayer1);
 		await sql.setPlayer(fusedPlayer2);
 
@@ -1300,6 +1305,7 @@ module.exports = {
 		for(const status of fusionPlayer.status) {
 			if(status.type != enums.Statuses.Fused) {
 				await sql.addStatus(channel, fusedPlayer1.id, status.type, (status.endTime - now) / 2, status.rating);
+				await sql.addStatus(channel, fusedPlayer2.id, status.type, (status.endTime - now) / 2, status.rating);
 				await sql.deleteStatusById(channel, status.id);
 			}
 		}
