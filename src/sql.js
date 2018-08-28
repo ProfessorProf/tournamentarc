@@ -6,7 +6,7 @@ const hour = (60 * 60 * 1000);
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
-	Lost_Orbs INTEGER, Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER);
+	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER);
 CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
@@ -47,7 +47,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS Config_PlayerKey ON Config(Player_ID, Key);
 const newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
 DELETE FROM Gardens WHERE Channel = $channel;
 DELETE FROM Items WHERE Channel = $channel;
-INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Lost_Orbs, Last_Wish, Start_Time, Episode) VALUES ($channel, 0, 0, 0, 7, 0, $now, 1);
+INSERT OR REPLACE INTO Worlds (Channel, Heat, Resets, Max_Population, Last_Wish, Start_Time, Episode) VALUES ($channel, 0, 0, 0, 0, $now, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (0, $channel, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (1, $channel, 1);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (2, $channel, 0);
@@ -133,13 +133,15 @@ module.exports = {
 		const row = await sql.get(`SELECT * FROM Worlds WHERE Channel = $channel`, {$channel: channel});
 		const statusRows = await sql.all(`SELECT * FROM Status WHERE Channel = $channel AND Type = $type AND Player_ID IS NULL`, 
 			{$channel: channel, $type: enums.Statuses.Cooldown});
+		const orbRows = await sql.get(`SELECT SUM(Count) as Count FROM HeldItems WHERE Channel = $channel AND Item_ID = $type`,
+			{$channel: channel, $type: enums.Items.Orb});
 		if(row) {
 			const world = {
 				channel: channel,
 				heat: row.Heat,
 				resets: row.Resets,
 				maxPopulation: row.Max_Population,
-				lostOrbs: row.Lost_Orbs,
+				lostOrbs: orbRows ? 7 - orbRows.Count : 7,
 				lastWish: row.Last_Wish,
 				lastUpdate: row.Last_Update,
 				startTime: row.Start_Time,
@@ -157,12 +159,11 @@ module.exports = {
 	},
 	async setWorld(world) {
 		await sql.run(`UPDATE Worlds SET Heat = $heat, Resets = $resets, Max_Population = $maxPopulation, 
-			Lost_Orbs = $lostOrbs, Last_Wish = $lastWish, Start_Time = $startTime WHERE Channel = $channel`,
+			Last_Wish = $lastWish, Start_Time = $startTime WHERE Channel = $channel`,
 		{
 			$heat: world.heat,
 			$resets: world.resets,
 			$maxPopulation: world.maxPopulation,
-			$lostOrbs: world.lostOrbs,
 			$lastWish: world.lastWish,
 			$channel: world.channel,
 			$startTime: world.startTime
@@ -461,11 +462,7 @@ module.exports = {
 		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId AND Type = $type`, {$playerId: playerId, $type: type});
 	},
 	// Delete all Status for a player.
-	async annihilatePlayer(channel, playerId) {
-		const orbs = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = 0`, {$playerId: playerId});
-		if(orbs) {
-			await sql.get(`UPDATE Worlds SET Lost_Orbs = Lost_Orbs + $orbs WHERE Channel = $channel`, {$channel: channel, $orbs: orbs.Count});
-		}
+	async annihilatePlayer(playerId) {
 		await sql.run(`DELETE FROM Status WHERE Player_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
 		await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId`, {$playerId: playerId});
@@ -834,7 +831,6 @@ module.exports = {
 	},
 	async scatterOrbs(channel) {
 		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel AND Item_ID = 0`, {$channel: channel});
-		await sql.run(`UPDATE Worlds SET Lost_Orbs = 7 WHERE Channel = $channel`, {$channel: channel});
 	},
 	async getEpisode(channel, episode) {
 		return await sql.get(`SELECT ID as id, Air_Date as airDate, Summary as summary FROM Episodes WHERE ID = $episode AND Channel = $channel`,

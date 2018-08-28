@@ -907,7 +907,7 @@ module.exports = {
 			// Annihilate the winner
 			output += `\n${winner.name} will be remembered fondly for ${this.their(winner.config.pronoun)} brave sacrifice...`;
 			winner.level = 0;
-			await sql.annihilatePlayer(winner.channel, winner.id);
+			await sql.annihilatePlayer(winner.id);
 			await sql.addStatus(winner.channel, winner.id, enums.Statuses.Annihilation);
 
 			if(loser.isNemesis) {
@@ -919,7 +919,7 @@ module.exports = {
 			// Annihilate the loser
 			output += `\n${loser.name} gave ${this.their(loser.config.pronoun)} life, but it still wasn't enough...`;
 			loser.level = 0;
-			await sql.annihilatePlayer(loser.channel, loser.id);
+			await sql.annihilatePlayer(loser.id);
 			await sql.addStatus(loser.channel, loser.id, enums.Statuses.Annihilation);
 		}
         
@@ -1113,9 +1113,6 @@ module.exports = {
 				// Their orbs are scattered
 				output += ` ${orbs.count} ${orbs.count == 1 ? 'orb is' : 'orbs are'} lost in the depths of space!`;
 				await sql.addItems(channel, target.id, enums.Items.Orb, -orbs.count);
-				let world = await sql.getWorld(channel);
-				world.lostOrbs += orbs.count;
-				await sql.setWorld(world);
 			}
 			output += '\n';
 		}
@@ -1868,7 +1865,6 @@ module.exports = {
 		if(roll < searchChance) {
 			console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 			// They found an orb!
-			world.lostOrbs--;
 			if(player.npc) {
 				output.push(`${player.name} finds a magic orb, and delivers it to the Nemesis!`);
 				await sql.addItems(channel, nemesis.id, enums.Items.Orb, 1);
@@ -2151,7 +2147,6 @@ module.exports = {
 					let orbs = p.items.find(i => i.type == enums.Statuses.Dead);
 					if(orbs) {
 						await sql.addItems(channel, p.id, enums.Items.Orb, -1);
-						world.lostOrbs++;
 						messages.push(`${p.name} has gone for too long without fighting; one of their orbs vanishes.`);
 					}
 					p.lastFought += 24 * hour;
@@ -2175,7 +2170,6 @@ module.exports = {
 				console.log(`${p.name} logged idle; last activity recorded at ${new Date(p.lastActive).toLocaleString('en-US')}`);
 				if(orbs) {
 					await sql.addItems(channel, p.id, enums.Items.Orb, -orbs.count);
-					world.lostOrbs += orbs.count;
 					messages.push(`${p.name} has been idle for too long; ` + 
 						`${this.their(p.config.Pronoun)} ${orbs.count} ${orbs.count > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
 				}
@@ -2540,7 +2534,7 @@ module.exports = {
 		const existingOrbs = target.items.find(i => i.type == enums.Items.Orb);
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
-		} else if(!existingOrbs && existingOrbs.count == 0) {
+		} else if(!existingOrbs || existingOrbs.count == 0) {
 			player.lastFought = new Date().getTime();
 			await sql.setPlayer(player);
 		}
@@ -2813,6 +2807,10 @@ module.exports = {
 		switch(type) {
 			case enums.NpcTypes.Zorbmaster:
 				await sql.addStatus(channel, id, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.Destroy);
+				if(world.lostOrbs) {
+					await sql.addItems(channel, id, enums.Items.Orb, 1);
+					await sql.setWorld(world);
+				}
 				break;
 			case enums.NpcTypes.Zlower:
 				await sql.addStatus(channel, id, enums.Statuses.Cooldown, fiveMin, enums.Cooldowns.Empower);
@@ -2869,7 +2867,6 @@ module.exports = {
 			orbs = world.lostOrbs;
 		}
 		await sql.addItems(channel, id, enums.Items.Orb, orbs);
-		world.lostOrbs -= orbs;
 
 		await sql.setWorld(world);
 
