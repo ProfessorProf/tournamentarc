@@ -424,8 +424,11 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
-					if(!targetName || (targetName != 'growth' && targetName != 'size' && targetName != 'research')) {
-						errors.push("Your options are: `!expand growth`, `!expand size`, or `!expand research`.");
+					if(targetName) {
+						let expandType = targetName.toLowerCase();
+						if(expandType != 'growth' && expandType != 'size' && expandType != 'research') {
+							errors.push("Your options are: `!expand growth`, `!expand size`, or `!expand research`.");
+						}
 					}
 					if(glory < 50) {
 						errors.push(`**${player.name}** must be at least Rank C to expand the garden.`);
@@ -758,11 +761,6 @@ module.exports = {
 					this.validateAnnihilation(errors, target);
 					this.validateJourney(errors, target);
 					this.validateNotNpc(errors, target);
-					let underlings = await sql.getUnderlings(channel);
-					let maxUnderlings = Math.floor(world.maxPopulation / 5) - 1;
-					if(underlings.length >= maxUnderlings) {
-						errors.push("You can't recruit more underlings.");
-					}
 					if(target.isUnderling) {
 						errors.push(`${target.name} already works for you.`);
 					}
@@ -775,6 +773,13 @@ module.exports = {
 					if(target.npc) {
 						errors.push("You can't recruit NPCs.");
 					}
+				}
+				const underlingIds = await sql.getUnderlings(channel);
+				const players = await sql.getPlayers(channel);
+				const underlings = players.filter(p => underlingIds.find(u => u.id == p.id) && !p.npc);
+				let maxUnderlings = Math.floor(world.maxPopulation / 5) - 1;
+				if(underlings.length >= maxUnderlings) {
+					errors.push("You can't recruit more underlings.");
 				}
 				break;
 			case 'join':
@@ -792,8 +797,10 @@ module.exports = {
 						if(!player.offers.find(o => o.type == enums.OfferTypes.Recruit)) {
 							errors.push("The Nemesis needs to \`!recruit\` you first.");
 						}
-						let underlings = await sql.getUnderlings(channel);
-						let maxUnderlings = Math.floor(world.maxPopulation / 5);
+						const underlingIds = await sql.getUnderlings(channel);
+						const players = await sql.getPlayers(channel);
+						const underlings = players.filter(p => underlingIds.find(u => u.id == p.id) && !p.npc);
+						const maxUnderlings = Math.floor(world.maxPopulation / 5);
 						if(underlings.length >= maxUnderlings) {
 							errors.push("The Nemesis already has too many underlings.");
 						}

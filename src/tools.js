@@ -1078,7 +1078,8 @@ module.exports = {
 		for(const i in players) {
 			let p = players[i];
 			if(p && p.username != name && !p.status.find(s => s.type == enums.Statuses.Dead) && 
-				!p.status.find(s => s.type == enums.Statuses.Annihilation)) {
+				!p.status.find(s => s.type == enums.Statuses.Annihilation) &&
+				!p.isUnderling) {
 				targetPlayers.push(p);
 			}
 		}
@@ -1354,11 +1355,11 @@ module.exports = {
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
 			player.level = this.newPowerLevel(world.heat) * 4;
-			nemesis.type = enums.Statuses.FirstForm;
+			nemesis.type = enums.NemesisTypes.FirstForm;
 		} else {
 			// A normal Nemesis
 			player.level = this.newPowerLevel(world.heat) * 10;
-			nemesis.type = enums.Statuses.Basic;
+			nemesis.type = enums.NemesisTypes.Basic;
 		}
 		player.level *= Math.max(10, world.maxPopulation) / 10;
 		nemesis.basePower = player.level;
