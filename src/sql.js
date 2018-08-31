@@ -344,6 +344,8 @@ module.exports = {
 			fusionIDs: []
 		};
 
+		player.idle = player.lastActive < now - 24 * hour;
+
 		for(var i in enums.Configs) {
 			if(i == 'Defaults' || i == 'Type') continue;
 			var configValue = configRows.find(row => row.Key == i);

@@ -2047,9 +2047,10 @@ module.exports = {
 				break;
 			case 'snap':
 				output += `${player.name} snaps ${this.their(player.config.pronoun)} fingers, and half of the universe perishes!\n`;
-				this.shuffle(players);
-				for(var i = 0; i < players.length / 2; i++) {
-					let target = players[i];
+				let snapPlayers = players.filter(p => !p.idle);
+				this.shuffle(snapPlayers);
+				for(var i = 0; i < snapPlayers.length / 2; i++) {
+					let target = snapPlayers[i];
 					await this.completeTraining(target);
 							
 					if(target.npc) {
