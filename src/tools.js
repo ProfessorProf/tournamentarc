@@ -1079,7 +1079,7 @@ module.exports = {
 			let p = players[i];
 			if(p && p.username != name && !p.status.find(s => s.type == enums.Statuses.Dead) && 
 				!p.status.find(s => s.type == enums.Statuses.Annihilation) &&
-				!p.isUnderling) {
+				(!p.isUnderling || !player.isNemesis)) {
 				targetPlayers.push(p);
 			}
 		}
