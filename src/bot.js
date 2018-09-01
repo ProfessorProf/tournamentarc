@@ -323,7 +323,10 @@ async function handleMessage(message) {
 			await sql.clone(channel, name, targetName);
 			break;
 		case 'ending':
-			outputMessage.print.push(await tools.ending(channel));
+			output.messages = await tools.ending(channel);
+			break;
+		case 'test':
+			output.messages = await tools.testMethod(channel, name, args[0]);
 			break;
 	}
 

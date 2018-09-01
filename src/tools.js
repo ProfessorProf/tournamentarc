@@ -1388,8 +1388,7 @@ module.exports = {
 	},
 	// Generates a new power level based on the current Heat.
     newPowerLevel(heat) {
-        const base = Math.ceil((1 + Math.random()) * 100);
-        let level = Math.pow(base, 1 + heat / 1000);
+        let level = Math.pow(150, 1 + heat / 1000) * (1 + Math.random() * 3);
         if(level > 1000000000000000000) level = 1000000000000000000; // JS craps out if we go higher than this
         return level;
 	},
@@ -2537,8 +2536,8 @@ module.exports = {
 		if(existingOrbs && existingOrbs.count == 6) {
 			output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
 		} else if(!existingOrbs || existingOrbs.count == 0) {
-			player.lastFought = new Date().getTime();
-			await sql.setPlayer(player);
+			target.lastFought = new Date().getTime();
+			await sql.setPlayer(target);
 		}
 
 		return output;
@@ -3237,5 +3236,16 @@ module.exports = {
 				return null;
 			}
 		}
+	},
+	async testMethod(channel, name, target) {
+		let output = '';
+		let world = await sql.getWorld(channel);
+		let heat = parseInt(target);
+		if(heat != heat) heat = world.heat;
+		for(let i = 0; i < 10; i++) {
+			let level = this.newPowerLevel(heat);
+			output += numeral(level.toPrecision(2)).format('0,0') + '\n';
+		}
+		return output;
 	}
 }
