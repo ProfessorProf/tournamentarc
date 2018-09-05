@@ -261,7 +261,7 @@ async function handleMessage(message) {
 			break;
 		case 'scores':
 			output.messages = await tools.displayScores(channel);
-			outputMessage.informational = true;
+			output.informational = true;
 			break;
 		case 'fuse':
 			output.messages = await tools.fuse(channel, name, targetName, args[1]);
