@@ -1852,13 +1852,14 @@ module.exports = {
 		let output = [];
 
 		const effectiveTime = Math.min(now - world.lastWish, hour * 72);
-		let searchModifier = effectiveTime / (hour * 72);
-		searchModifier *= 10 / Math.max(world.maxPopulation, 10)
-		if(player.status.find(s => s.type == enums.Statuses.Carrot)) searchModifier *= 3;
-		if(player.isUnderling) searchModifier *= 2;
-		if(nemesis && nemesis.id) searchModifier *= 2;
-		let searchChance = (0.03 + 0.01 * player.actionLevel) * searchModifier;
-		searchModifier = 0;
+		let searchMultiplier = effectiveTime / (hour * 72);
+		let searchBonus = 0;
+		searchMultiplier *= 10 / Math.max(world.maxPopulation, 10);
+		if(player.status.find(s => s.type == enums.Statuses.Carrot)) searchBonus += 5;
+		if(player.isUnderling) searchBonus += 5;
+		if(nemesis && nemesis.id) searchBonus += 5;
+		searchBonus += player.actionLevel;
+		let searchChance = (0.03 + searchBonus) * searchMultiplier;
 		if(world.lostOrbs == 0) searchChance = 0;
 
 		let roll = Math.random();
@@ -2211,8 +2212,7 @@ module.exports = {
 	},
 	async endWorld(channel) {
 		const players = await sql.getPlayers(channel);
-		for(const i in players) {
-			let p = players[i];
+		for(const p of players) {
 			if(this.isFusion(p)) {
 				this.breakFusion(channel, p.id, p.fusionIDs[0], p.fusionIDs[1]);
 			}
@@ -2221,6 +2221,7 @@ module.exports = {
 	},
 	async deleteExpired(channel, pings) {
 		let expired = await sql.getExpired(channel);
+		const nemesis = await sql.getNemesis(channel);
 		const now = new Date().getTime();		
 		let messages = [];
 
@@ -2247,14 +2248,18 @@ module.exports = {
 					const storedTrainingTime = status.rating;
 					const journeyTime = status.endTime - status.startTime;
 					const journeyEffect = Math.random() + 0.8;
+					if(nemesis) {
+						// Journeys that end during a Nemesis reign are amazing
+						journeyEffect += 1.0;
+					}
 					const time = journeyTime * journeyEffect + storedTrainingTime;
 					await this.completeTraining(player, time);
 					if(journeyEffect < 1) {
 						messages.push(`**${player.name}** returns from a rough training journey!`);
 					} else if(journeyEffect < 1.5) {
 						messages.push(`**${player.name}** returns from an ordinary training journey!`);
-					} else {
-						messages.push(`**${player.name}** returns from an amazing training journey!`);
+					} else if(journeyEffect < 2.0) {
+						messages.push(`**${player.name}** returns from a **legendary** training journey!`);
 					}
 					await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 12 * hour, enums.Cooldowns.Journey);
 					await sql.setPlayer(player);
@@ -2311,7 +2316,6 @@ module.exports = {
 								break;
 							case enums.Cooldowns.Empower:
 								// Empower the Nemesis
-								const nemesis = await sql.getNemesis(channel);
 								const nemesisPlayer = await sql.getPlayerById(nemesis.id);
 								messages.push(await this.empower(channel, player.username, nemesisPlayer.name));
 								await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 1 * hour, enums.Cooldowns.Empower);

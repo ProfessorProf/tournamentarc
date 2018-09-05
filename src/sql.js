@@ -829,7 +829,6 @@ module.exports = {
 		await sql.run(`UPDATE Worlds SET Start_Time = NULL WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Offers WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE Status SET EndTime = $now - 1 WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`UPDATE Nemesis SET Ruin_Time = NULL WHERE CHannel = $channel`, {$channel: channel});
 	},
 	async scatterOrbs(channel) {
 		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel AND Item_ID = 0`, {$channel: channel});
