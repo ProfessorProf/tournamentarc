@@ -107,7 +107,7 @@ async function handleMessage(message) {
 		}
 	}
 	const now = new Date().getTime();
-	let name = message.author.username;
+	let username = message.author.username;
 	let args = message.content.substring(1).split(' ');
 	let cmd = args[0].toLowerCase();
 	args = args.splice(1);
@@ -121,7 +121,7 @@ async function handleMessage(message) {
 		informational: false
 	};
 
-	if(debugMode && cmd.substring(0,2) == '!!') {
+	if(cmd.substring(0,2) == '!!' && username == auth.admin) {
 		overrideErrors = true;
 		cmd = cmd.substring(2);
 	}
@@ -131,8 +131,8 @@ async function handleMessage(message) {
 		cmd = cmd.substring(1);
 	}
 
-	if(cmd == 'as' && name == auth.admin && debugMode) {
-		name = args[0];
+	if(cmd == 'as' && username == auth.admin) {
+		username = args[0];
 		cmd = args[1].toLowerCase();
 		args = args.splice(2);
 	}
@@ -148,7 +148,7 @@ async function handleMessage(message) {
 		message.channel.send('Initialization complete.');
 		const endTime = new Date().getTime();
 		const duration = (endTime - now) / 1000;
-		console.log(`${channel}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
+		console.log(`${channel}: Command "${message.content}" completed for player ${username} in ${duration} seconds`);
 		return;
 	}
 
@@ -167,7 +167,16 @@ async function handleMessage(message) {
 		if(update.abort) return;
 	}
 
-	const errors = await validation.validate(channel, name, cmd, args);
+	let targetName;
+	if(cmd == 'use' || cmd == 'give') {
+		targetName = args.length > 1 ? args[1] : null;
+	} else {
+		targetName = args.length > 0 ? args[0] : null;
+	}
+	let player = await sql.getPlayerByUsername(channel, username);
+	let target = await sql.getPlayer(channel, targetName);
+	
+	const errors = await validation.validate(channel, player, target, cmd, args);
 	if(errors) {
 		if(overrideErrors) {
 			errors.push('(Override Errors)');
@@ -180,14 +189,18 @@ async function handleMessage(message) {
 			return;
 		}
 	}
+
+	// Check if the user has AlwaysPrivate enabled
+	if(player && player.config && player.config.AlwaysPrivate) {
+		output.private = !output.private;
+	}
 	
-	const targetName = args[0];
 	switch(cmd) {
 		case 'reg':
-			output.messages = await tools.registerPlayer(channel, name, message.author.id, targetName);
+			output.messages = await tools.registerPlayer(channel, username, message.author.id, args[0]);
 			break;
 		case 'check':
-			output.messages = await tools.getPlayerDescription(channel, name);
+			output.messages = await tools.getPlayerDescription(player, output.private);
 			output.informational = true;
 			break;
 		case 'roster':
@@ -195,94 +208,94 @@ async function handleMessage(message) {
 			output.informational = true;
 			break;
 		case 'scan':
-			output.messages = await tools.scoutPlayer(channel, targetName);
+			output.messages = await tools.scoutPlayer(target);
 			output.informational = true;
 			break;
 		case 'fight':
-			output.messages = await tools.tryFight(channel, name, targetName);
+			output.messages = await tools.tryFight(player, target);
 			break;
 		case 'unfight':
-			output.messages = await tools.unfight(channel, name);
+			output.messages = await tools.unfight(player);
 			break;
 		case 'garden':
 			output.messages = await tools.displayGarden(channel);
 			output.informational = true;
 			break;
 		case 'plant':
-			output.messages = await tools.plant(channel, name, targetName);
+			output.messages = await tools.plant(player, args[0]);
 			break;
 		case 'water':
-			output.messages = await tools.water(channel, name);
+			output.messages = await tools.water(channel, player);
 			break;
 		case 'pick':
-			output.messages = await tools.pick(channel, name, targetName);
+			output.messages = await tools.pick(player, args[0]);
 			break;
 		case 'use':
-			output.messages = await tools.useItem(channel, name, args[0], args[1]);
+			output.messages = await tools.useItem(player, target, args[0]);
 			break;
 		case 'expand':
-			output.messages = await tools.expand(channel, name, args[0]);
+			output.messages = await tools.expand(player, args[0]);
 			break;
 		case 'nemesis':
-			output.messages = await tools.setNemesis(channel, name);
+			output.messages = await tools.setNemesis(player);
 			break;
 		case 'attack':
-			output.messages = await tools.attack(channel, name, targetName);
+			output.messages = await tools.attack(player, target);
 			break;
 		case 'destroy':
-			output.messages = await tools.destroy(channel, name);
+			output.messages = await tools.destroy(player);
 			break;
 		case 'burn':
 			output.messages = await tools.burn(channel);
 			break;
 		case 'recruit':
-			output.messages = await tools.recruit(channel, targetName);
+			output.messages = await tools.recruit(channel, target);
 			break;
 		case 'join':
-			output.messages = await tools.joinNemesis(channel, name);
+			output.messages = await tools.joinNemesis(player);
 			break;
 		case 'exile':
-			output.messages = await tools.exile(channel, targetName);
+			output.messages = await tools.exile(target);
 			break;
 		case 'energize':
-			output.messages = await tools.energize(channel, targetName);
+			output.messages = await tools.energize(target);
 			break;
 		case 'revive':
-			output.messages = await tools.revive(channel, targetName);
+			output.messages = await tools.revive(target);
 			break;
 		case 'train':
-			output.messages = await tools.train(channel, name);
+			output.messages = await tools.train(player);
 			break;
 		case 'reset':
 			output.messages = await tools.resetData(channel);
 			break;
 		case 'search':
-			output.messages = await tools.search(channel, name);
+			output.messages = await tools.search(player);
 			break;
 		case 'scores':
 			output.messages = await tools.displayScores(channel);
 			output.informational = true;
 			break;
 		case 'fuse':
-			output.messages = await tools.fuse(channel, name, targetName, args[1]);
+			output.messages = await tools.fuse(player, target, args[1]);
 			break;
 		case 'wish':
-			output.messages = await tools.wish(channel, name, args[0]);
+			output.messages = await tools.wish(player, args[0]);
 			break;
 		case 'research':
-			output.messages = await tools.expand(channel, name, 'research');
+			output.messages = await tools.expand(player, 'research');
 			break;
 		case 'overdrive':
-			output.messages = await tools.overdrive(channel, name);
+			output.messages = await tools.overdrive(player);
 			break;
 		case 'empower':
-			output.messages = await tools.empower(channel, name, targetName);
+			output.messages = await tools.empower(player, targetName);
 			break;
 		case 'give':
-			output.messages = await tools.give(channel, name, args[0]);
+			output.messages = await tools.give(player, target, args[1]);
 			break;
 		case 'history':
-			output.messages = await tools.history(channel, name, targetName);
+			output.messages = await tools.history(player, target);
 			output.informational = true;
 			break;
 		case 'graveyard':
@@ -294,33 +307,33 @@ async function handleMessage(message) {
 			output.informational = true;
 			break;
 		case 'taunt':
-			output.messages = await tools.taunt(channel, name, targetName);
+			output.messages = await tools.taunt(player, target);
 			break;
 		case 'journey':
-			output.messages = await tools.startJourney(channel, name, args[0]);
+			output.messages = await tools.startJourney(player, args[0]);
 			break;
 		case 'selfdestruct':
-			output.messages = await tools.selfDestruct(channel, name, targetName);
+			output.messages = await tools.selfDestruct(player, target);
 			break;
 		case 'filler':
-			output.messages = await tools.filler(channel, name, targetName);
+			output.messages = await tools.filler(player, target);
 			break;
 		case 'episode':
 			output.messages = await tools.getEpisode(channel, args[0]);
 			break;
 		case 'config':
-			output.messages = await tools.config(channel, name, args[0], args[1]);
+			output.messages = await tools.config(player, args[0], args[1]);
 			output.informational = true;
 			break;
 		case 'help':
-			output.messages = await help.showHelp(channel, name, args[0]);
+			output.messages = await help.showHelp(player, args[0]);
 			output.informational = true;
 			break;
 		case 'debug':
 			await sql.execute(args.join(' '));
 			break;
 		case 'clone':
-			await sql.clone(channel, name, targetName);
+			await sql.clone(player, args[0]);
 			break;
 		case 'ending':
 			output.messages = await tools.ending(channel);
@@ -328,14 +341,13 @@ async function handleMessage(message) {
 		case 'test':
 			output.messages = await tools.testMethod(channel, name, args[0]);
 			break;
+		case 'test':
+			output.messages = await tools.testCode(player, args[0]);
+			break;
 	}
 
-	if(output.informational) {
-		let player = await sql.getPlayerByUsername(channel, name);
-		// Check if the user has AlwaysPrivate enabled
-		if(player && player.config && player.config.AlwaysPrivate) {
-			output.private = !output.private;
-		}
+	if(!output.informational) {
+		output.private = false;
 	}
 	// Display the output
 	if(output.messages && !Array.isArray(output.messages)) {
@@ -353,10 +365,10 @@ async function handleMessage(message) {
 			}
 		}
 	}
-	await sql.playerActivity(channel, name);
+	await sql.playerActivity(channel, username);
 	const endTime = new Date();
 	const duration = (endTime.getTime() - now) / 1000;
-	console.log(`(${channel}) ${endTime.toLocaleString("en-US")}: Command "${message.content}" completed for player ${name} in ${duration} seconds`);
+	console.log(`(${channel}) ${endTime.toLocaleString("en-US")}: Command "${message.content}" completed for ${username} in ${duration} seconds`);
 }
 
 client.login(auth.token);

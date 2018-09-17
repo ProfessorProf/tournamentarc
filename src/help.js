@@ -4,12 +4,11 @@ const enums = require('./enum.js');
 
 // Logic for displaying help topics.
 module.exports = {
-    async showHelp(channel, username, topic) {
+    async showHelp(player, topic) {
         let output = new Discord.RichEmbed();
         output.setTitle('Help!')
             .setColor(0x00AE86);
 
-        const player = await sql.getPlayerByUsername(channel, username);
         if(!topic) {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
@@ -94,7 +93,7 @@ Rank ??? 1000 Glory
                         output.addField('Zarrot (3 hours)', 'Dark plant available only to the Nemesis. Spawns three plant underlings that periodically search for orbs.')
                         output.addField('Zedge (3 hours)', 'Dark plant available only to the Nemesis. Spawns a plant underling that periodically decays all plants in the garden.')
                     } else {
-                        let garden = await sql.getGarden(channel);
+                        let garden = await sql.getGarden(player.channel);
                         let plants = garden.plantTypes.filter(t => t.known);
                         for(const i in plants) {
                             let p = plants[i];

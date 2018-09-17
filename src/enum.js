@@ -10,6 +10,8 @@ module.exports = {
         Zlower: 7,
         Zarrot: 8,
         Zedge: 9,
+        Gourd: 10,
+        Peach: 11,
         Name: {
             0: 'orb',
             1: 'flower',
@@ -20,7 +22,9 @@ module.exports = {
             6: 'fern',
             7: 'zlower',
             8: 'zarrot',
-            9: 'zedge'
+            9: 'zedge',
+            10: 'gourd',
+            11: 'peach'
         },
         Type: {
             0: 0,
@@ -32,7 +36,9 @@ module.exports = {
             6: 1,
             7: 2,
             8: 2,
-            9: 2
+            9: 2,
+            10: 1,
+            11: 1
         },
         GrowTime: {
             1: 18,
@@ -43,19 +49,18 @@ module.exports = {
             6: 12,
             7: 3,
             8: 3,
-            9: 3
+            9: 3,
+            10: 18,
+            11: 36
         },
         NeedsTarget: {
             1: true,
             2: true,
             3: true,
             4: true,
-            6: true
-        },
-        CanUseOnSelf: {
-            3: true,
-            4: true,
-            6: true
+            6: true,
+            10: true,
+            11: true
         }
     },
     ItemTypes: {
@@ -81,7 +86,7 @@ module.exports = {
         Fern: 8,
         Fused: 9,
         PowerWish: 10,
-        ImmortalityWish: 11,
+        Immortal: 11,
         Berserk: 12,
         Cooldown: 13,
         SelfDestruct: 14,
@@ -105,18 +110,6 @@ module.exports = {
             14: 'Self Destruct',
             15: 'Annihilation',
             16: 'Training Complete'
-        },
-        Ends: {
-            0: true,
-            1: true,
-            3: true,
-            4: true,
-            6: true,
-            7: true,
-            8: true,
-            9: true,
-            12: true,
-            13: true
         },
         Priority: {
             0: 600,
@@ -166,6 +159,8 @@ module.exports = {
         Ruin: 12,
         Journey: 13,
         NextRound: 14,
+        HotSpringEvent: 15,
+        DojoEvent: 16,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',
@@ -178,7 +173,7 @@ module.exports = {
             8: 'Auto-Empower',
             9: 'Drain Garden',
             13: 'Journey'
-        }
+        },
     },
     Configs: {
         AlwaysPrivate: 'AlwaysPrivate',

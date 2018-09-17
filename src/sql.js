@@ -11,15 +11,15 @@ CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER,
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
 	Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
-	NPC INTEGER);
+	NPC INTEGER, Latent_Power REAL, Base_Latent_Power REAL);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Status (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Type INTEGER,
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
-CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID INTEGER, Count INTEGER);
+CREATE TABLE IF NOT EXISTS HeldItems (Channel TEXT, Player_ID INTEGER, Item_ID INTEGER, Count INTEGER, Decay_Time INTEGER);
 CREATE TABLE IF NOT EXISTS Items (ID INTEGER, Channel TEXT, Known INTEGER);
 CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Extra TEXT, Expires INTEGER);
 CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Size_Level REAL, Growth_Level REAL, Research_Level REAL);
-CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER, Slot INTEGER);
+CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER, Slot INTEGER, Planter_ID INTEGER);
 CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Start_Time INTEGER, Nemesis_Type INTEGER, Last_Ruin_Update INTEGER, Base_Power REAL);
 CREATE TABLE IF NOT EXISTS Underlings (Channel TEXT, Player_ID INTEGER, Defeats INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Episode INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
@@ -417,10 +417,10 @@ module.exports = {
 			});
 	},
 	// Start a new plant.
-	async addPlant(channel, plantType, slot) {
+	async addPlant(player, plantType, slot) {
 		const now = new Date().getTime();
-		await sql.run(`INSERT INTO Plants (Channel, Plant_Type, StartTime, Slot) VALUES ($channel, $type, $startTime, $slot)`, 
-			{$channel: channel, $type: plantType, $startTime: now, $slot: slot});
+		await sql.run(`INSERT INTO Plants (Channel, Planter_ID, Plant_Type, StartTime, Slot) VALUES ($channel, $planterId, $type, $startTime, $slot)`, 
+			{$channel: player.channel, $planterId: player.id, $type: plantType, $startTime: now, $slot: slot});
 	},
 	// Gives a new item to a player
 	async addItems(channel, playerId, itemId, count) {
@@ -549,6 +549,7 @@ module.exports = {
 			};
 			garden.plants = plantRows.map(p => { return {
 				id: p.ID,
+				planterId: p.Planter_ID,
 				slot: p.Slot,
 				type: p.Plant_Type,
 				name: enums.Items.Name[p.Plant_Type],
@@ -609,7 +610,7 @@ module.exports = {
 		const offerRows = await sql.all(`SELECT * FROM Offers
 			WHERE Channel = $channel AND Expires < $fivemins`, {$channel: channel, $fivemins: now - (5 * 60 * 1000)});
 		const statusRows = (await sql.all(`SELECT * FROM Status
-			WHERE Channel = $channel`, {$channel: channel})).filter(row => enums.Statuses.Ends[row.Type] && row.EndTime < now);
+			WHERE Channel = $channel`, {$channel: channel})).filter(row => row.EndTime && row.EndTime < now);
 		
 		return {
 			offers: offerRows.map(o => { return {
@@ -673,11 +674,14 @@ module.exports = {
 		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
 		console.log(`Channel ${channel} initialized`);
 	},
-	async clone(channel, name, targetName) {
-		let player = await this.getPlayerByUsername(channel, name);
+	async clone(player, targetName) {
+		const name = player.name;
+		const username = player.username;
 		player.name = targetName;
 		player.username = targetName;
 		await this.addPlayer(player);
+		player.name = name;
+		player.username = username;
 	},
 	// THIS IS HIGHLY DESTRUCTIVE. ONLY RUN WITH BACKUP DATA YOU ARE PREPARED TO LOSE.
 	async importChannel(channel, importChannel) {
@@ -721,9 +725,9 @@ module.exports = {
 		const now = new Date().getTime();
 		await sql.run(`UPDATE Worlds SET Last_Update = $now WHERE Channel = $channel`, {$now: now, $channel: channel});
 	},
-	async playerActivity(channel, username) {
+	async playerActivity(channel, name) {
+		let player = await this.getPlayerByUsername(channel, name);
 		const now = new Date().getTime();
-		const player = await this.getPlayerByUsername(channel, username);
 		if(!player) return;
 		player.lastActive = now;
 		await this.setPlayer(player);

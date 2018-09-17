@@ -7,16 +7,8 @@ let hour = (60 * 60 * 1000);
 
 module.exports = {
     // Returns an error string if the command is illegal
-    async validate(channel, name, cmd, args) {
+    async validate(channel, player, target, cmd, args) {
 		let world = await sql.getWorld(channel);
-		let player = await sql.getPlayerByUsername(channel, name);
-		let targetName;
-		if(cmd == 'use') {
-			targetName = args.length > 1 ? args[1] : null;
-		} else {
-			targetName = args.length > 0 ? args[0] : null;
-		}
-		let target = await sql.getPlayer(channel, targetName);
 		let nemesis = await sql.getNemesis(channel)
 		let garden = await sql.getGarden(channel)
 		let glory = player ? player.glory : 0;
@@ -39,7 +31,7 @@ module.exports = {
 
 		if(cmd == 'research') {
 			cmd = 'expand';
-			targetName = 'research';
+			args[0] = 'research';
 		}
 		
 		switch(cmd) {
@@ -48,14 +40,15 @@ module.exports = {
 				// - Player must not already be registered
 				// - Name must not be taken
 				// - Name must not contain spaces
+				const regName = args[0];
 				if(player) {
 					errors.push('You have already registered!');
 				}
-				if(!targetName) {
+				if(!regName) {
 					errors.push('You must specify a character name.');
 				}
-				if(targetName && (targetName.startsWith('Zorb') || targetName.startsWith('Zedge') ||
-					targetName.startsWith('Zlower') || targetName.startsWith('Zarrot'))) {
+				if(regName && (regName.startsWith('Zorb') || regName.startsWith('Zedge') ||
+					regName.startsWith('Zlower') || regName.startsWith('Zarrot'))) {
 					errors.push('Invalid name.');
 				}
 				if(args.length > 1) {
@@ -81,7 +74,7 @@ module.exports = {
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
 						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push('**' + player.name + '** cannot fight for another ' + timeString + '.');
+						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
 					}
 					if(target) {
 						this.validateAnnihilation(errors, target);
@@ -92,10 +85,10 @@ module.exports = {
 						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
-							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
+							errors.push(`**${target.name}** cannot fight for another ${timeString}.`);
 						}
-					} else if(targetName) {
-						errors.push('The player "' + targetName + '" could not be found.');
+					} else if(args.length > 0) {
+						errors.push(`The player "${args[0]}" could not be found.`);
 					}
 				}
 				break;
@@ -233,8 +226,8 @@ module.exports = {
 					if(orbs && orbs.count > 0) {
 						errors.push("You can't take orbs with you on a journey.");
 					}
-					const hours = parseInt(targetName);
-					if(!targetName || hours != hours) {
+					const hours = args.length > 0 ? parseInt(args[0]) : 0;
+					if(!hours || hours != hours) {
 						errors.push(`Must specify the number of hours.`);
 					} else {
 						if(hours < 2) {
@@ -251,7 +244,7 @@ module.exports = {
 			case 'test':
 				// !clone validation rules:
 				// - Must be admin
-				if(name != auth.admin) {
+				if(player.username != auth.admin) {
 					errors.push('Only the game master can use debug commands.');
 				}
 				break;
@@ -263,11 +256,11 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
-					if(targetName) {
+					if(args[0]) {
 						const knownPlants = garden.plantTypes.filter(t => t.known);
-						const plantType = this.getPlantType(targetName);
+						const plantType = this.getPlantType(args[0]);
 						const plantKnown = knownPlants.find(p => p.id == plantType);
-						const darkPlantType = this.getDarkPlantType(targetName);
+						const darkPlantType = this.getDarkPlantType(args[0]);
 						if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
 							errors.push("That plant was sealed away thousands of years ago.");
 						}
@@ -378,18 +371,17 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
-					this.validateGardenTime(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known);
-					const plantType = this.getPlantType(targetName);
+					const plantType = this.getPlantType(args[0]);
 					const plantKnown = knownPlants.find(p => p.id == plantType);
-					const darkPlantType = this.getDarkPlantType(targetName);
+					const darkPlantType = this.getDarkPlantType(args[0]);
 					if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
 						errors.push("That plant was sealed away thousands of years ago.");
 					}
 					if(plantType != -1 && darkPlantType == -1 && player.isNemesis) {
 						errors.push("You have no need of such a pathetic plant.");
 					}
-					if((plantType == -1 || !plantKnown) && darkPlantType == -1 && targetName) {
+					if((plantType == -1 || !plantKnown) && darkPlantType == -1 && args[0]) {
 						errors.push("You've never heard of that plant.");
 					}
 					let plantCount = garden.plants.filter(p => p && enums.Items.Type[p.type] != enums.ItemTypes.DarkPlant).length;
@@ -413,8 +405,8 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
-					if(targetName) {
-						let expandType = targetName.toLowerCase();
+					if(args.length > 0) {
+						let expandType = args[0].toLowerCase();
 						if(expandType != 'growth' && expandType != 'size' && expandType != 'research') {
 							errors.push("Your options are: `!expand growth`, `!expand size`, or `!expand research`.");
 						}
@@ -699,29 +691,33 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateAnnihilation(errors, player);
+					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					if(!player.items.find(i => i.type == enums.Items.Orb)) {
-						errors.push("You don't have any orbs to give!");
+					let item = player.items.find(i => enums.Items.Name[i.type] == plantType.toLowerCase());
+					if(!item) {
+						errors.push("You don't have any of that item!");
 					}
 					if(target) {
 						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(player.name == target.name) {
-							errors.push("You can't give yourself orbs!");
+							errors.push("You can't give items to yourself!");
 						}
 						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
-							errors.push(`**${target.name}** cannot take orbs for another ${timeString}`);
+							errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
 						}
-						if(!player.isUnderling && !player.wishFlag) {
-							errors.push('In order to give orbs, you must either be an underling or have already used up your wish.');
-						}
-						if(player.isUnderling && !target.isNemesis) {
-							errors.push('A underling can only give orbs to the Nemesis.');
-						}
-						if(target.wishFlag) {
-							errors.push("That person doesn't need any orbs.");
+						if(item.type == enums.Items.Orb) {
+							if(!player.isUnderling && !player.wishFlag) {
+								errors.push('In order to give orbs, you must either be an underling or have already used up your wish.');
+							}
+							if(player.isUnderling && !target.isNemesis) {
+								errors.push('A underling can only give orbs to the Nemesis.');
+							}
+							if(target.wishFlag) {
+								errors.push("That person doesn't need any orbs.");
+							}
 						}
 					} else {
 						errors.push('Must specify a valid target.');
@@ -733,7 +729,7 @@ module.exports = {
 				// - Must be registered
 				// - Must specify a valid target
 				this.validatePlayerRegistered(errors, player);
-				if(player && targetName && !target) {
+				if(player && args.length > 0 && !target) {
 					errors.push('Must specify a valid target.');
 				}
 				break;
@@ -981,10 +977,10 @@ module.exports = {
 				}
 				break;
 			case 'tournament':
-				if(targetName) {
+				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
 					const tournament = await sql.getTournament(channel);
-					switch(targetName) {
+					switch(args[0]) {
 						case 'single':
 						case 'royale':
 							const players = await sql.getPlayers(channel);
