@@ -38,7 +38,7 @@ module.exports = {
             8: 2,
             9: 2,
             10: 1,
-            11: 1
+            11: 3
         },
         GrowTime: {
             1: 18,
@@ -66,7 +66,13 @@ module.exports = {
     ItemTypes: {
         Orb: 0,
         Plant: 1,
-        DarkPlant: 2
+        DarkPlant: 2,
+        SuperPlant: 3,
+        IsPlantType: {
+            1: true,
+            2: true,
+            3: true
+        },
     },
     OfferTypes: {
         Fight: 0,
@@ -161,6 +167,7 @@ module.exports = {
         NextRound: 14,
         HotSpringEvent: 15,
         DojoEvent: 16,
+        GuruEvent: 17,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',
@@ -174,6 +181,16 @@ module.exports = {
             9: 'Drain Garden',
             13: 'Journey'
         },
+        IsEvent: {
+            15: true,
+            16: true,
+            17: true
+        }
+    },
+    Events: {
+        HotSpring: 15,
+        Dojo: 16,
+        Guru: 17
     },
     Configs: {
         AlwaysPrivate: 'AlwaysPrivate',

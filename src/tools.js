@@ -72,6 +72,8 @@ module.exports = {
 				stats += '?';
 			}
 		}
+		const latentPower = Math.floor(player.latentPower * 100);
+		stats += `\nLatent Power: ${latentPower}%`;
 		if(player.gardenLevel >= 1) {
 			stats += '\nGardening Level: ' + Math.floor(player.gardenLevel);
 		}
@@ -124,7 +126,11 @@ module.exports = {
 						statuses.push(`Blessed with power`);
 						break;
 					case enums.Statuses.Immortal:
-						statuses.push(`Immortal`);
+						if(s.endTime) {
+							statuses.push(`Immortal (${this.getTimeString(s.endTime - now)} remaining)`);
+						} else {
+							statuses.push(`Immortal`);
+						}
 						break;
 					case enums.Statuses.Berserk:
 						statuses.push(`Berserk (${this.getTimeString(s.endTime - now)} remaining)`);
@@ -144,9 +150,13 @@ module.exports = {
 		if(cooldowns.length > 0) {
 			embed.addField('Cooldowns', cooldowns.join('\n'));
 		}
-		const items = player.items.map(i => { 
-			let name = enums.Items.Name[i.type].replace(/^\w/, c => c.toUpperCase());
-			return `${name} (${i.count} held)`;
+		const items = player.items.map(i => {
+			const name = enums.Items.Name[i.type].replace(/^\w/, c => c.toUpperCase());
+			if(i.decay && i.decay - 24 * hour < now) {
+				return `${name} (${i.count} held) (decays in ${this.getTimeString(i.decay - now)})`;
+			} else {
+				return `${name} (${i.count} held)`;
+			}
 		});
 		if(items.length > 0) {
 			embed.addField('Inventory', items.join('\n'));
@@ -568,6 +578,7 @@ module.exports = {
 		}
 		this.addHeat(world, hours);
 		let newPowerLevel = this.newPowerLevel(world.heat);
+		newPowerLevel *= (1 + player.latentPower * 0.5);
 		if (this.isFusion(player)) {
 			newPowerLevel *= 1.3;
 		}
@@ -1617,9 +1628,25 @@ module.exports = {
 				await sql.setGarden(garden);
 				break;
 			case enums.Items.Fern:
-				// Fern
 				await sql.addStatus(channel, target.id, enums.Statuses.Fern, hour * 12);
 				output = `**${target.name}** eats the fern, and ${this.their(target.config.Pronoun)} power is hidden!`;
+				break;
+			case enums.Items.Gourd:
+				let journey = player.status.find(s => s.type == enums.Statuses.Journey);
+				let training = player.status.find(s => s.type == enums.Statuses.Training);
+				if(journey) {
+					journey.startTime -= settings.GourdHours * hour;
+					await sql.setStatus(journey);
+					output = `**${target.name}** eats the gourd, and ${this.their(target.config.Pronoun)} training becomes more potent!`;
+				} else if(training) {
+					training.startTime -= settings.GourdHours * hour;
+					await sql.setStatus(training);
+					output = `**${target.name}** eats the gourd, and ${this.their(target.config.Pronoun)} training becomes more potent!`;
+				}
+				break;
+			case enums.Items.Peach:
+				await sql.addStatus(channel, target.id, enums.Statuses.Immortal, hour * 6);
+				output = `**${target.name}** eats the celestial peach, and ${this.their(target.config.Pronoun)} life force overflows!`;
 				break;
 		}
 
@@ -1663,7 +1690,7 @@ module.exports = {
 				}
 				garden.sizeLevel += expansion;
 				console.log(`${player.name} advanced garden size by ${Math.floor(expansion * 100) / 100}, modifier was ${modifier}`);
-				if(Math.floor(garden.sizeLevel) > Math.floor(garden.sizeLevel - expansion)) {
+				if(Math.floor(garden.sizeLevel) > Math.floor(garden.sizeLevel - expansion) && garden.sizeLevel <= 5) {
 					// Level up!
 					output += '\nThe garden now has an additional slot!'
 					if(garden.sizeLevel >= 5) {
@@ -1685,13 +1712,18 @@ module.exports = {
 				if(Math.floor(garden.researchLevel) > Math.floor(garden.researchLevel - expansion)) {
 					// Level up!
 					let unknownPlants = garden.plantTypes.filter(t => !t.known && enums.Items.Type[t.id] == enums.ItemTypes.Plant);
+					let unknownSuperPlants = garden.plantTypes.filter(t => !t.known && enums.Items.Type[t.id] == enums.ItemTypes.SuperPlant);
 					if(unknownPlants.length > 0) {
 						let newPlant = unknownPlants[Math.floor(Math.random() * unknownPlants.length)];
 						output += `\nResearch level increased! New plant "${enums.Items.Name[newPlant.id]}" can now be planted in the garden.`;
-						if(unknownPlants.length == 1) {
-							output += `\nThere are no other plants for you to discover, but increasing this level further will make it easier to level up Growth and Size.`;
-						}
 						await sql.researchPlant(player.channel, newPlant.id);
+					} else if(unknownSuperPlants > 0) {
+						let newPlant = unknownSuperPlants[Math.floor(Math.random() * unknownSuperPlants.length)];
+						output += `\nResearch level increased! New plant "${enums.Items.Name[newPlant.id]}" can now be planted in the garden.`;
+						await sql.researchPlant(player.channel, newPlant.id);
+					}
+					if(unknownPlants.length + unknownSuperPlants.length == 1) {
+						output += `\nThere are no other plants for you to discover, but increasing this level further will make it easier to level up Growth and Size.`;
 					}
 				}
 				break;
@@ -1822,26 +1854,66 @@ module.exports = {
 		let output = [];
 
 		const effectiveTime = Math.min(now - world.lastWish, hour * 72);
-		let searchMultiplier = effectiveTime / (hour * 72);
-		let searchBonus = 0;
-		searchMultiplier *= 10 / Math.max(world.maxPopulation, 10);
-		if(player.status.find(s => s.type == enums.Statuses.Carrot)) searchBonus += 5;
-		if(player.isUnderling) searchBonus += 5;
-		if(nemesis && nemesis.id) searchBonus += 5;
-		searchBonus += player.actionLevel;
-		let searchChance = (0.03 + searchBonus) * searchMultiplier;
+		let searchMultiplier = 1;
+		if(player.status.find(s => s.type == enums.Statuses.Carrot)) searchMultiplier += 1;
+		if(player.isUnderling) searchMultiplier += 1;
+		if(nemesis && nemesis.id) searchMultiplier += 1;
+		searchMultiplier *= (10 / Math.max(world.maxPopulation, 10)) * (effectiveTime / (hour * 72));
+		let searchChance = (0.03 + player.actionLevel * 0.005) * searchMultiplier;
 		if(world.lostOrbs == 0) searchChance = 0;
 
-		let roll = Math.random();
+		output = await this.searchOrbs(player, nemesis, searchChance);
+		if(!output && !player.npc) {
+			// Reset search multiplier with the orb-only modifiers removed - no bonus for underling or nemesis presence
+			searchMultiplier = 1;
+			if(player.status.find(s => s.type == enums.Statuses.Carrot)) searchMultiplier += 1;
+			searchMultiplier *= (10 / Math.max(world.maxPopulation, 10));
+			searchChance = (0.05 + 0.01 * player.actionLevel) * searchMultiplier;
+			output = await this.searchPlants(player, searchChance);
+			if(!output) {
+				// Reset search multiplier to be ONLY based on game population
+				searchMultiplier = (10 / Math.max(world.maxPopulation, 10));
+				searchChance = 0.03 * searchMultiplier;
+				output = await this.searchMonsters(player, searchChance);
+			}
+			if(!output) {
+				searchChance = 10.02 * searchMultiplier;
+				output = await this.searchEvents(player, world, searchChance);
+			}
+		}
+		if(!output) {
+			output = this.searchJunk(0.1);
+		}
+		if(!output) {
+			output = [];
+			if(world.lostOrbs == 0) {
+				output.push(`${player.name} searches the world, but there are no orbs left to find.`);
+			} else {
+				output.push(`${player.name} searches the world, but finds nothing of value.`);
+			}
+		}
+		if(await this.actionLevelUp(player)) {
+			output.push('Action level increased!');
+		}
+		
+		await sql.setPlayer(player);
+		await sql.setWorld(world);
+		
+		return output;
+	},
+	async searchOrbs(player, nemesis, searchChance) {
+		const now = new Date().getTime();
+		const roll = Math.random();
+		let output = [];
 		if(roll < searchChance) {
 			console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 			// They found an orb!
 			if(player.npc) {
 				output.push(`${player.name} finds a magic orb, and delivers it to the Nemesis!`);
-				await sql.addItems(channel, nemesis.id, enums.Items.Orb, 1);
+				await sql.addItems(player.channel, nemesis.id, enums.Items.Orb, 1);
 			} else {
 				output.push(`${player.name} searches the world, and finds a magic orb!`);
-				await sql.addItems(channel, player.id, enums.Items.Orb, 1);
+				await sql.addItems(player.channel, player.id, enums.Items.Orb, 1);
 			}
 			const existingOrbs = player.items.find(i => i.type == enums.Statuses.Orb);
 			if(!existingOrbs) {
@@ -1852,106 +1924,145 @@ module.exports = {
 				output.push("You've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.");
 			}
 		} else {
-			searchChance = (0.05 + 0.01 * player.actionLevel) * searchModifier;
-			roll = Math.random();
-			if(roll < searchChance && !player.npc) {
-				//They found a plant!
-				const plantType = Math.floor(Math.random() % 6) + 1;
-				let plantName;
-				switch(plantType) {
-					case enums.Items.Flower:
-						plantName = 'flower';
-						break;
-					case enums.Items.Rose:
-						plantName = 'rose';
-						break;
-					case enums.Items.Carrot:
-						plantName = 'carrot';
-						break;
-					case enums.Items.Bean:
-						plantName = 'bean';
-						break;
-					case enums.Items.Sedge:
-						plantName = 'sedge';
-						break;
-					case enums.Items.Fern:
-						plantName = 'fern';
-						break;
-				}
-				console.log(`${player.name} found a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-				let message = `${player.name} searches the world, and finds a ${plantName}!`;
-				const existingPlants = player.items.find(i => i.type == plantType);
-				if(existingPlants && existingPlants.count >= 3) {
-					message += ` But you can't carry any more.`;
-				} else {
-					await sql.addItems(channel, player.id, plantType, 1);
-				}
-				output.push(message);
+			console.log(`${player.name} failed to find an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);			
+		}
+
+		if(output.length > 0) {
+			return output;
+		} else {
+			return null;
+		}
+	},
+	async searchPlants(player, searchChance) {
+		const roll = Math.random();
+		let output = [];
+
+		if(roll < searchChance) {
+			//They found a plant!
+			const availablePlants = Object.values(enums.Items).filter(i => enums.Items.Type[i] == enums.ItemTypes.Plant);
+			const plantType = availablePlants[Math.floor(Math.random() * availablePlants.length)];
+			const plantName = enums.Items.Name[plantType];
+			
+			console.log(`${player.name} found a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+			let message = `${player.name} searches the world, and finds a ${plantName}!`;
+			const existingPlants = player.items.find(i => i.type == plantType);
+			if(existingPlants && existingPlants.count >= 3) {
+				message += ` But you can't carry any more.`;
 			} else {
-				roll = Math.random()
-				if(roll < 0.1) {
-					// They found some junk!
-					const junkItems = [
-						'a magic orb?! ...Nope, just a coconut.',
-						"a time machine... but it's broken.",
-						"a chaos emerald. Only hedgehogs can use it.",
-						"a power star. Someone find a plumber.",
-						"a Pokémon.",
-						"a missile capacity upgrade.",
-						"a heart piece.",
-						"a clow card.",
-						"a dojo sign.",
-						"a gym badge.",
-						"a golden banana.",
-						"a korok seed. Yahaha!",
-						"the Holy Grail... wait, it's a fake.",
-						"a limited edition magic orb model.",
-						"a hotspring! Sadly, it has no healing properties.",
-						"a dinosaur egg.",
-						"a single delicious muffin.",
-						"a giant catfish.",
-						"two huge snakes.",
-						"a grief seed.",
-						"a Zorb skeleton. Looks pretty fearsome..."
-					];
-					const junk = junkItems[Math.floor(Math.random() * junkItems.length)];
-					console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-					output.push(`${player.name} searches the world, and finds ${junk}`);
-				} else {
-					searchChance = 0.04 * 10 / Math.max(world.maxPopulation, 10);
-					roll = Math.random();
-					if(roll < searchChance && !player.npc) {
-						if(Math.random() < 0.1) {
-							// Zorb discovered!
-							output.push(`${player.name} searches the world, and awakens one of the ancient Zorbmasters! This world is surely doomed!`);
-							const zorbmaster = await this.addNpc(channel, enums.NpcTypes.Zorbmaster);
-							output.push(await this.generatePlayerDescription(await sql.getPlayerById(zorbmaster.id)));
-						} else {
-							// Zorb discovered!
-							output.push(`${player.name} searches the world, and awakens an ancient Zorb!`);
-							const zorb = await this.addNpc(channel, enums.NpcTypes.Zorb);
-							output.push(await this.generatePlayerDescription(await sql.getPlayerById(zorb.id)));
-						}
-					} else {
-						console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
-						if(world.lostOrbs == 0) {
-							output.push(`${player.name} searches the world, but there are no orbs left to find.`);
-						} else {
-							output.push(`${player.name} searches the world, but finds nothing of value.`);
-						}
-					}
-				}
+				await sql.addItems(player.channel, player.id, plantType, 1);
 			}
+			output.push(message);
+		} else {
+			console.log(`${player.name} failed to find a plant on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);			
 		}
-		
-		if(await this.actionLevelUp(player)) {
-			output.push('Action level increased!');
+
+		if(output.length > 0) {
+			return output;
+		} else {
+			return null;
 		}
-		
-		await sql.setPlayer(player);
-		await sql.setWorld(world);
-		
-		return output;
+	},
+	async searchMonsters(player, searchChance) {
+		const roll = Math.random();
+		let output = [];
+
+		if(roll < searchChance) {
+			console.log(`${player.name} found a monster on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+			if(Math.random() < 0.1) {
+				// Zorbmaster discovered!
+				output.push(`${player.name} searches the world, and awakens one of the ancient Zorbmasters! This world is surely doomed!`);
+				const zorbmaster = await this.addNpc(player.channel, enums.NpcTypes.Zorbmaster);
+				output.push(await this.generatePlayerDescription(await sql.getPlayerById(zorbmaster.id)));
+			} else {
+				// Zorb discovered!
+				output.push(`${player.name} searches the world, and awakens an ancient Zorb!`);
+				const zorb = await this.addNpc(player.channel, enums.NpcTypes.Zorb);
+				output.push(await this.generatePlayerDescription(await sql.getPlayerById(zorb.id)));
+			}
+		} else {
+			console.log(`${player.name} failed to find a monster on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+		}
+
+		if(output.length > 0) {
+			return output;
+		} else {
+			return null;
+		}
+	},
+	async searchEvents(player, world, searchChance) {
+		const roll = Math.random();
+		let output = [];
+
+		const existingEvent = world.cooldowns.find(c => enums.Cooldowns.IsEvent[c.type]);
+		const eventList = Object.keys(enums.Events).map(key => enums.Events[key]);
+		if(roll < searchChance && !existingEvent) {
+			const eventType = eventList[Math.floor(Math.random() * eventList.length)];
+			switch(eventType) {
+				case enums.Events.HotSpring:
+					output.push(`${player.name} searches the world, and finds an enchanted hot spring! ` +
+						`For the next 12 hours, injured players can use \`!event\` to recover faster.`);
+					break;
+				case enums.Events.Dojo:
+					output.push(`${player.name} searches the world, and finds a training dojo in the mountains! ` +
+						`For the next 12 hours, training players can use \`!event\` to boost the results of their training.`);
+					break;
+				case enums.Events.Guru:
+					output.push(`${player.name} searches the world, and finds a mystical mountain guru! ` +
+						`For the next 12 hours, active players can use \`!event\` to spar with the guru, suffering injuries but drawing out their latent potential.`);
+					break;
+			}
+			await sql.addStatus(player.channel, null, enums.Statuses.Cooldown, 12 * hour, eventType);
+		} else {
+			console.log(`${player.name} failed to find an event on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+		}
+
+		if(output.length > 0) {
+			return output;
+		} else {
+			return null;
+		}
+	},
+	searchJunk(player, searchChance) {
+		const roll = Math.random();
+		let output = [];
+
+		if(roll < searchChance) {
+			// They found some junk!
+			const junkItems = [
+				'a magic orb?! ...Nope, just a coconut.',
+				"a time machine... but it's broken.",
+				"a chaos emerald. Only hedgehogs can use it.",
+				"a power star. Someone find a plumber.",
+				"a Pokémon.",
+				"a missile capacity upgrade.",
+				"a heart piece.",
+				"a clow card.",
+				"a dojo sign.",
+				"a gym badge.",
+				"a golden banana.",
+				"a korok seed. Yahaha!",
+				"the Holy Grail... wait, it's a fake.",
+				"a limited edition magic orb model.",
+				"a hotspring! Sadly, it has no healing properties.",
+				"a dinosaur egg.",
+				"a single delicious muffin.",
+				"a giant catfish.",
+				"two huge snakes.",
+				"a grief seed.",
+				"a Zorb skeleton. Looks pretty fearsome..."
+			];
+			const junk = junkItems[Math.floor(Math.random() * junkItems.length)];
+			console.log(`${player.name} found junk on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+			output.push(`${player.name} searches the world, and finds ${junk}`);
+		} else {
+			console.log(`${player.name} found nothing on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
+		}
+
+		if(output.length > 0) {
+			return output;
+		} else {
+			return null;
+		}
 	},
 	async wish(player, wish) {
 		const channel = player.channel;
@@ -2137,6 +2248,15 @@ module.exports = {
 						`${this.their(p.config.Pronoun)} ${orbs.count} ${orbs.count > 1 ? 'orbs vanish' : 'orb vanishes'}.`);
 				}
 			}
+
+			// Decay items
+			for(const i of p.items) {
+				if(!i.decay) return;
+				if(i.decay > lastUpdate && i.decay < now) {
+					messages.push(`A ${enums.Items.Name[i.type]} in ${p.name}'s inventory has decayed.`);
+					await sql.addItems(channel, p.id, i.type, -1);
+				}
+			}
 		}
 
 		if(activePlayers > world.maxPopulation) {
@@ -2208,7 +2328,7 @@ module.exports = {
 					// Journey
 					const storedTrainingTime = status.rating;
 					const journeyTime = status.endTime - status.startTime;
-					const journeyEffect = Math.random() + 0.8;
+					const journeyEffect = (Math.random() * 0.4 + 0.8) * (1 + player.latentPower * 0.7);
 					if(nemesis) {
 						// Journeys that end during a Nemesis reign are amazing
 						journeyEffect += 1.0;
@@ -2496,7 +2616,7 @@ module.exports = {
 		await sql.addItems(player.channel, player.id, playerItem.type, -1);
 		await sql.addItems(target.channel, target.id, playerItem.type, 1);
 
-		let output = `${player.name} gives a magic orb to ${target.name}.`;
+		let output = `${player.name} gives a ${enums.Items.Name[playerItem.type]} to ${target.name}.`;
 		if(playerItem.type.toLowerCase == 'orb') {
 			if(targetItem && targetItem.count == 6) {
 				output += `\n${target.name} has gathered all seven magic orbs! Enter \`!help wish\` to learn about your new options.`;
@@ -2657,11 +2777,24 @@ module.exports = {
 					output += `\nA new tournament can't start for another ${this.getTimeString(cooldown.endTime - now)}.`;
 					break;
 				case enums.Cooldowns.Ruin:
-				output += `\nUnless the Nemesis is defeated, the universe will end in ${this.getTimeString(cooldown.endTime - now)}!`;
+					output += `\nUnless the Nemesis is defeated, the universe will end in ${this.getTimeString(cooldown.endTime - now)}!`;
+					break;
+				case enums.Cooldowns.HotSpringEvent:
+					output += `\n**Hot Spring Event**: For the next ${this.getTimeString(cooldown.endTime - now)}, ` +
+						`\`!event\` will reduce your defeat timer.`;
+					break;
+				case enums.Cooldowns.DojoEvent:
+					output += `\n**Mountain Dojo Event**: For the next ${this.getTimeString(cooldown.endTime - now)}, ` +
+						`\`!event\` will boost your training time.`;
+					break;
+				case enums.Cooldowns.GuruEvent:
+					output += `\n**Mystic Guru Event**: For the next ${this.getTimeString(cooldown.endTime - now)}, ` +
+						`\`!event\` will knock you out, but boost your Latent Power.`;
+					break;
 			}
 		}
 
-		embed.setTitle(`World Info`)
+		embed.setTitle(`UNIVERSE ${world.id}`)
 			.setColor(0x00AE86)
 			.setDescription(output);
 		return embed;
@@ -2856,7 +2989,7 @@ module.exports = {
 
 		// Gather our cast
 		let cast = [player];
-		if(targetName) cast.push(target);
+		if(target) cast.push(target);
 
 		let remainingPlayers = players.filter(p => p.id != player.id && (!target || p.id != target.id) && !this.isFusionPart(p));
 		this.shuffle(remainingPlayers);
@@ -2866,7 +2999,8 @@ module.exports = {
 		}
 
 		// Fill in the template
-		for(const p of cast) {
+		for(const i in cast) {
+			const p = cast[i];
 			summary = summary.replace(new RegExp(`\\$${i}their`, 'g'), this.their(p.config.pronoun));
 			summary = summary.replace(new RegExp(`\\$${i}them`, 'g'), this.them(p.config.pronoun));
 			summary = summary.replace(new RegExp(`\\$${i}`, 'g'), p.name);
@@ -2889,10 +3023,6 @@ module.exports = {
 					await this.healPlayer(player, healing);
 				}
 			}
-		}
-		if(defeated) {
-			// Remove 10 minutes of defeated time
-			await this.healPlayer(player, 10 * 60 * 1000);
 		}
 		await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Action);
 
@@ -3224,5 +3354,47 @@ module.exports = {
 			await sql.addStatus(player.channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Garden);
 			return newGardenLevel > oldGardenLevel;
 		}
+	},
+	async event(player) {
+		const now = new Date().getTime();
+		const world = await sql.getWorld(player.channel);
+		const event = world.cooldowns.find(c => enums.Cooldowns.IsEvent[c.type]);
+		if(event) {
+			switch(event.type) {
+				case enums.Cooldowns.HotSpringEvent:
+					const defeated = await this.healPlayer(player, settings.HotSpringHours * hour);
+					if(defeated) {
+						return `${player.name} takes some time to relax in a magical hot spring, ` +
+							`but still can't fight for another ${this.getTimeString(defeated.endTime - now)},`;
+					} else {
+						return `${player.name} takes some time to relax in a magical hot spring, and is once again ready to fight!`;
+					}
+				case enums.Cooldowns.DojoEvent:
+					let training = player.status.find(s => s.type == enums.Statuses.Training);
+					if(training) {
+						training.startTime -= settings.DojoHours * hour;
+						await sql.setStatus(training);
+						return `${player.name} visits the dojo and works hard, boosting the effects of ${this.their(player.config.pronoun)} training!`;
+					}
+					break;
+				case enums.Cooldowns.GuruEvent:
+					await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, 6 * hour);
+					this.addLatentPower(player, Math.random() * 0.1 + 0.1);
+					await sql.setPlayer(player);
+					return `${player.name} fights the guru, and is soundly thrashed! However, ${this.their(player.config.pronoun)} latent power may have awakened...`;
+			}
+
+			return null;
+		}
+	},
+	addLatentPower(player, amount) {
+		let gains = amount;
+		// Take some out of base latent power
+		if(player.baseLatentPower > 0) {
+			const lostGains = Math.min(player.baseLatentPower, amount / 2);
+			gains -= lostGains;
+			player.baseLatentPower -= lostGains;
+		}
+		player.latentPower += gains / Math.max(player.latentPower, 1);
 	}
 }

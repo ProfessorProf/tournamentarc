@@ -26,8 +26,8 @@ client.on('ready', () => {
 					if(debugMode) {
 						channel.send(`Bot in debug mode. Only the admin can use commands.`);
 					} else {
-						channel.send(`Bot online! Greetings, ${channel.name}.`);
 						let world = await sql.getWorld(c);
+						channel.send(`Bot online! Greetings, Universe ${world.id}.`);
 						const downtime = now - world.lastUpdate
 						console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
 						if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
@@ -144,14 +144,18 @@ async function handleMessage(message) {
 		} catch (e) {
 			console.log(e);
 		}
-		await sql.initializeChannel(channel);
-		message.channel.send('Initialization complete.');
+		const world = await sql.initializeChannel(channel);
+		message.channel.send(`Initialization complete for Universe ${world.id}.`);
 		const endTime = new Date().getTime();
 		const duration = (endTime - now) / 1000;
 		console.log(`${channel}: Command "${message.content}" completed for player ${username} in ${duration} seconds`);
 		return;
 	}
 
+	if(!(await sql.worldExists(channel))) {
+		return;
+	}
+	
 	if(cmd != 'debug') {
 		const update = await tools.updateWorld(channel);
 
@@ -292,7 +296,7 @@ async function handleMessage(message) {
 			output.messages = await tools.empower(player, targetName);
 			break;
 		case 'give':
-			output.messages = await tools.give(player, target, args[1]);
+			output.messages = await tools.give(player, target, args[0]);
 			break;
 		case 'history':
 			output.messages = await tools.history(player, target);
@@ -325,6 +329,9 @@ async function handleMessage(message) {
 			output.messages = await tools.config(player, args[0], args[1]);
 			output.informational = true;
 			break;
+		case 'event':
+			output.messages = await tools.event(player);
+			break;
 		case 'help':
 			output.messages = await help.showHelp(player, args[0]);
 			output.informational = true;
@@ -340,9 +347,6 @@ async function handleMessage(message) {
 			break;
 		case 'test':
 			output.messages = await tools.testMethod(channel, name, args[0]);
-			break;
-		case 'test':
-			output.messages = await tools.testCode(player, args[0]);
 			break;
 	}
 

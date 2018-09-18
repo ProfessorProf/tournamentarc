@@ -4,9 +4,16 @@ sql.open('./data.sqlite');
 
 const hour = (60 * 60 * 1000);
 
+const updateSql = `
+ALTER TABLE Player ADD COLUMN Base_Latent_Power REAL;
+ALTER TABLE Player ADD COLUMN Latent_Power REAL;
+ALTER TABLE Plants ADD COLUMN Planter_ID INTEGER;
+ALTER TABLE HeldItems ADD COLUMN Decay_Time INTEGER;
+ALTER TABLE Worlds ADD COLUMN Offset INTEGER;`;
+
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
-	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER);
+	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER, Offset INTEGER);
 CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
@@ -55,6 +62,8 @@ INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (3, $channel, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (4, $channel, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (5, $channel, 0);
 INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (6, $channel, 0);
+INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (10, $channel, 0);
+INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (11, $channel, 0);
 INSERT OR REPLACE INTO Gardens (Channel) VALUES ($channel)`;
 
 const updatePlayerSql = `UPDATE Players SET
@@ -73,14 +82,16 @@ const updatePlayerSql = `UPDATE Players SET
     Nemesis_Flag = $nemesisFlag,
     Fusion_Flag = $fusionFlag,
     Wish_Flag = $wishFlag,
-    NPC = $npc
+	NPC = $npc,
+	Latent_Power = $latentPower,
+	Base_Latent_Power = $baseLatentPower
 WHERE ID = $id AND Channel = $channel`;
 
 const insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
 	Action_Level, Garden_Level, Glory, Last_Active, Last_Fought, Overdrive_Count,
-	Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC) 
+	Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC, Latent_Power, Base_Latent_Power) 
 VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $gardenLevel, $glory, 
-	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npc)`;
+	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npc, $latentPower, $latentPower)`;
 
 const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
 (Channel, Player_ID, Nemesis_Type, Start_Time, Last_Ruin_Update, Base_Power)
@@ -111,10 +122,30 @@ module.exports = {
 			await sql.run(query, params);
 		}
 
+		let offset = (await sql.get(`SELECT Offset FROM Worlds ORDER BY ID`)).Offset;
+		if(!offset) offset = Math.floor(Math.random() * 1000);
+		await sql.run(`UPDATE Worlds SET Offset = $offset WHERE Channel = $channel`, {$offset: offset, $channel: channel});
+
 		// Make one random plant known
 		const knownPlant = Math.floor(Math.random() * 5) + 2;
 		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
 		console.log(`Channel ${channel} initialized`);
+		return await this.getWorld(channel);
+	},
+	async update() {
+		const queries = updateSql.split(';');
+		for(const i in queries) {
+			const query = queries[i];
+			await sql.run(query);
+		}
+		const offset = Math.floor(Math.random() * 1000);
+		await sql.run(`UPDATE Worlds SET Offset = $offset`, {$offset: offset});
+		const channels = (await sql.all(`SELECT Channel FROM Worlds`)).map(row => row.Channel);
+
+		for(const channel of channels) {
+			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (10, $channel, 0)`, {$channel: channel});
+			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (11, $channel, 0)`, {$channel: channel});
+		}
 	},
 	// Debug commands to run arbitrary SQL. Be careful, admin.
     async execute(command) {
@@ -137,6 +168,7 @@ module.exports = {
 			{$channel: channel, $type: enums.Items.Orb});
 		if(row) {
 			const world = {
+				id: (row.ID * 739 + row.Offset) % 1000, // Human-usable ID for up to 1000 worlds
 				channel: channel,
 				heat: row.Heat,
 				resets: row.Resets,
@@ -188,6 +220,7 @@ module.exports = {
 				$fusionFlag: player.fusionFlag ? 1 : 0, 
 				$wishFlag: player.wishFlag ? 1 : 0, 
 				$npc: player.npc,
+				$latentPower: Math.random()
 			});
 		let playerId = result.lastID;
 		for(var i in player.config) {
@@ -229,7 +262,9 @@ module.exports = {
             $nemesisFlag: player.nemesisFlag ? 1 : 0,
             $fusionFlag: player.fusionFlag ? 1 : 0,
             $wishFlag: player.wishFlag ? 1 : 0,
-            $npc: player.npc,
+			$npc: player.npc,
+			$latentPower: player.latentPower,
+			$baseLatentPower: player.baseLatentPower
 		});
 		for(var i in player.config) {
 			await this.setConfig(player.channel, player.id, i, player.config[i]);
@@ -311,6 +346,8 @@ module.exports = {
 			fusionFlag: row.Fusion_Flag != 0,
 			wishFlag: row.Wish_Flag != 0,
 			npc: row.NPC,
+			latentPower: row.Latent_Power,
+			baseLatentPower: row.Base_Latent_Power,
 			config: {},
 			cooldowns: statusRows.filter(s => s.Type == enums.Statuses.Cooldown).map(c => { return {
 				id: c.ID,
@@ -337,7 +374,8 @@ module.exports = {
 			}}),
 			items: itemRows.map(i => { return {
 				type: i.Item_ID,
-				count: i.Count
+				count: i.Count,
+				decay: i.Decay_Time
 			}}),
 			fusionId: row.Fusion_ID,
 			fusionNames: [],
@@ -424,7 +462,12 @@ module.exports = {
 	},
 	// Gives a new item to a player
 	async addItems(channel, playerId, itemId, count) {
+		const now = new Date().getTime();
 		if(count == 0) return;
+		let decay = null;
+		if(enums.ItemTypes.IsPlantType[enums.Items.Type[itemId]]) {
+			decay = now + 72 * hour;
+		}
 		const existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
 			{$playerId: playerId, $itemId: itemId});
 		if(existingItem) {
@@ -432,14 +475,17 @@ module.exports = {
 			if(newCount <= 0) {
 				await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
 					{$playerId: playerId, $itemId: itemId});
+			} else if(count < 0 && decay) {
+				await sql.run(`UPDATE HeldItems SET Count = $count, Decay_Time = $decay WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
+					{$playerId: playerId, $itemId: itemId, $count: newCount, $decay: decay});
 			} else {
 				await sql.run(`UPDATE HeldItems SET Count = $count WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
 					{$playerId: playerId, $itemId: itemId, $count: newCount});
 			}
 		} else if(count > 0) {
-			await sql.run(`INSERT INTO HeldItems (Channel, Player_ID, Item_ID, Count) VALUES
-				($channel, $playerId, $itemId, $count)`,
-				{$channel: channel, $playerId: playerId, $itemId: itemId, $count: count});
+			await sql.run(`INSERT INTO HeldItems (Channel, Player_ID, Item_ID, Count, Decay_Time) VALUES
+				($channel, $playerId, $itemId, $count, $decay)`,
+				{$channel: channel, $playerId: playerId, $itemId: itemId, $count: count, $decay: decay});
 		}
 	},
 	async setPlant(plant) {
@@ -561,7 +607,7 @@ module.exports = {
 				id: i.ID,
 				known: i.Known
 			}});
-			garden.slots = Math.floor(garden.sizeLevel + 3);
+			garden.slots = Math.min(Math.floor(garden.sizeLevel + 3), 8);
 
 			return garden;
 		} else {
@@ -912,5 +958,13 @@ module.exports = {
 	},
 	async eliminatePlayer(id) {
 		await sql.run(`DELETE FROM TournamentPlayers WHERE Player_ID = $id`, {$id: id});
+	},
+	async worldExists(channel) {
+		const dbExists = await sql.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Worlds'`);
+		if(dbExists) {
+			const world = await sql.get(`SELECT * FROM Worlds WHERE Channel = $channel`, {$channel: channel});
+			return world;
+		}
+		return false;
 	}
 }

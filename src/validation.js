@@ -71,10 +71,9 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
-					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+					const defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
-						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
+						errors.push(`**${player.name}** cannot fight for another ${tools.getTimeString(defeated.endTime - now)}.`);
 					}
 					if(target) {
 						this.validateAnnihilation(errors, target);
@@ -82,10 +81,9 @@ module.exports = {
 						if(player.name == target.name) {
 							errors.push('You cannot fight yourself!');
 						}
-						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
+						const targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
-							let timeString = tools.getTimeString(targetDefeated.endTime - now);
-							errors.push(`**${target.name}** cannot fight for another ${timeString}.`);
+							errors.push(`**${target.name}** cannot fight for another ${tools.getTimeString(targetDefeated.endTime - now)}.`);
 						}
 					} else if(args.length > 0) {
 						errors.push(`The player "${args[0]}" could not be found.`);
@@ -306,6 +304,10 @@ module.exports = {
 					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+					if(defeated) {
+						errors.push(`**${player.name}** cannot use items for another ${tools.getTimeString(defeated.endTime - now)}.`);
+					}
 					const knownPlants = garden.plantTypes.filter(t => t.known);
 					const plantType = this.getPlantType(args[0]);
 					const hasPlant = player.items.find(i => i.type == plantType);
@@ -319,9 +321,6 @@ module.exports = {
 								if(target) {
 									this.validateAnnihilation(errors, target);
 									this.validateJourney(errors, target);
-									if(target.id == player.id && !enums.Items.CanUseOnSelf[plantType]) {
-										errors.push("You can't use this plant on yourself.");
-									}
 									let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 									switch(plantType) {
 										case enums.Items.Flower:
@@ -331,12 +330,17 @@ module.exports = {
 											}
 											break;
 										case enums.Items.Bean:
-										case enums.Items.Fern:
-											if(targetDefeated) {
+											if(targetDefeated && targetDefeated.endTime - now > hour) {
 												let timeString = tools.getTimeString(targetDefeated.endTime - now);
-												errors.push(`**${target.name}** cannot eat that for another ${timeString}.`);
+												errors.push(`**${target.name}** can't fight for another ${timeString}, so the bean would be wasted.`);
 											}
 											break;
+										case enums.Items.Gourd:
+											const trainingState = target.status.find(s => s.type == enums.Statuses.Training);
+											const journeyState = target.status.find(s => s.type == enums.Statuses.Journey);
+											if(!trainingState && !journeyState) {
+												errors.push(`Only someone who's training or on a journey can use a gourd.`);
+											}
 									}
 									if(player.isUnderling && !target.isNemesis && !target.isUnderling) {
 										errors.push('A underling can only use plants on their allies.');
@@ -367,6 +371,8 @@ module.exports = {
 				// !plant validation rules:
 				// - Must not have done any gardening in past hour
 				// - Must be room in the garden for a new plant
+				// - Dark Plants can only be grown by the Nemesis
+				// - Must not have anything else you planted currently growing in the garden
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateAnnihilation(errors, player);
@@ -384,9 +390,18 @@ module.exports = {
 					if((plantType == -1 || !plantKnown) && darkPlantType == -1 && args[0]) {
 						errors.push("You've never heard of that plant.");
 					}
-					let plantCount = garden.plants.filter(p => p && enums.Items.Type[p.type] != enums.ItemTypes.DarkPlant).length;
+					const plantCount = garden.plants.filter(p => p && enums.Items.Type[p.type] != enums.ItemTypes.DarkPlant).length;
 					if(plantType != -1 && darkPlantType == -1 && plantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
+					}
+					const myPlants = garden.plants.filter(p => p.planterId == player.id);
+					if(myPlants && myPlants.length > 0) {
+						const myPlant = myPlants[0];
+						if(enums.Items.Type[myPlant.type] == enums.ItemTypes.DarkPlant) {
+							errors.push(`The ${enums.Items.Name[myPlant.type]} in the garden must finish growing before you can plant again.`);
+						} else {
+							errors.push(`The ${enums.Items.Name[myPlant.type]} in slot ${myPlant.slot + 1} must finish growing before you can plant again.`);
+						}
 					}
 					if(darkPlantType != -1 && garden.plants.find(p => p.slot == 99)) {
 						errors.push("There can only be one dark plant in the garden at a time.");
@@ -685,7 +700,7 @@ module.exports = {
 				// - Target must exist
 				// - Target must be alive
 				// - Target must not be you
-				// - Must have at least one orb
+				// - Must have at least one of the item
 				// - Must have used up your wish, or must be an underling
 				// - If underling, target must be nemesis
 				this.validatePlayerRegistered(errors, player);
@@ -693,34 +708,38 @@ module.exports = {
 					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					let item = player.items.find(i => enums.Items.Name[i.type] == plantType.toLowerCase());
-					if(!item) {
-						errors.push("You don't have any of that item!");
-					}
-					if(target) {
-						this.validateAnnihilation(errors, target);
-						this.validateJourney(errors, target);
-						if(player.name == target.name) {
-							errors.push("You can't give items to yourself!");
-						}
-						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
-						if(targetDefeated) {
-							let timeString = tools.getTimeString(targetDefeated.endTime - now);
-							errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
-						}
-						if(item.type == enums.Items.Orb) {
-							if(!player.isUnderling && !player.wishFlag) {
-								errors.push('In order to give orbs, you must either be an underling or have already used up your wish.');
-							}
-							if(player.isUnderling && !target.isNemesis) {
-								errors.push('A underling can only give orbs to the Nemesis.');
-							}
-							if(target.wishFlag) {
-								errors.push("That person doesn't need any orbs.");
-							}
-						}
+					if(args.length < 2) {
+						errors.push("Syntax: `!give itemtype playername");
 					} else {
-						errors.push('Must specify a valid target.');
+						let item = player.items.find(i => enums.Items.Name[i.type] == args[0].toLowerCase());
+						if(!item) {
+							errors.push("You don't have any of that item!");
+						}
+						if(target) {
+							this.validateAnnihilation(errors, target);
+							this.validateJourney(errors, target);
+							if(player.name == target.name) {
+								errors.push("You can't give items to yourself!");
+							}
+							let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
+							if(targetDefeated) {
+								let timeString = tools.getTimeString(targetDefeated.endTime - now);
+								errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
+							}
+							if(item.type == enums.Items.Orb) {
+								if(!player.isUnderling && !player.wishFlag) {
+									errors.push('In order to give orbs, you must either be an underling or have already used up your wish.');
+								}
+								if(player.isUnderling && !target.isNemesis) {
+									errors.push('A underling can only give orbs to the Nemesis.');
+								}
+								if(target.wishFlag) {
+									errors.push("That person doesn't need any orbs.");
+								}
+							}
+						} else {
+							errors.push('Must specify a valid target.');
+						}
 					}
 				}
 				break;
@@ -1006,7 +1025,35 @@ module.exports = {
 							}
 					}
 				}
-			break;
+				break;
+			case 'event':
+				this.validatePlayerRegistered(errors, player);
+				this.validateActionTime(errors, player);
+				this.validateJourney(errors, player);
+				const event = world.cooldowns.find(c => enums.Cooldowns.IsEvent[c.type]);
+				if(!event) {
+					errors.push("There's no event going on right now.");
+				} else {
+					const defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+					switch(event.type) {
+						case enums.Events.HotSpring:
+							if(!defeated) {
+								errors.push("You're already healthy.");
+							}
+							break;
+						case enums.Events.Dojo:
+							const training = player.status.find(s => s.type == enums.Statuses.Training);
+							if(!training) {
+								errors.push(`**${player.name}** must be training to visit the dojo.`);
+							}
+							break;
+						case enums.Events.Guru:
+							if(defeated) {
+								errors.push(`**${player.name}** cannot face the guru for another ${tools.getTimeString(defeated.endTime - now)}.`);
+							}
+					}
+				}
+				break;
 		}
 
 		if(errors.length > 0) {
@@ -1082,6 +1129,12 @@ module.exports = {
 				break;
 			case 'fern':
 				plantType = 6;
+				break;
+			case 'gourd':
+				plantType = 10;
+				break;
+			case 'peach':
+				plantType = 11;
 				break;
 			default:
 				plantType = -1;
