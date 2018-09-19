@@ -1,4 +1,5 @@
 const enums = require('./enum.js');
+const fs = require('fs');
 const sql = require ('sqlite');
 sql.open('./data.sqlite');
 
@@ -7,9 +8,12 @@ const hour = (60 * 60 * 1000);
 const updateSql = `
 ALTER TABLE Player ADD COLUMN Base_Latent_Power REAL;
 ALTER TABLE Player ADD COLUMN Latent_Power REAL;
+ALTER TABLE Player DROP Nemesis_Flag;
+ALTER TABLE Player DROP Fusion_Flag;
+ALTER TABLE Player DROP Wish_Flag;
 ALTER TABLE Plants ADD COLUMN Planter_ID INTEGER;
 ALTER TABLE HeldItems ADD COLUMN Decay_Time INTEGER;
-ALTER TABLE Worlds ADD COLUMN Offset INTEGER;`;
+ALTER TABLE Worlds ADD COLUMN Offset INTEGER`;
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER, Max_Population INTEGER, 
@@ -17,8 +21,7 @@ CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat RE
 CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
-	Overdrive_Count INTEGER, Nemesis_Flag INTEGER, Fusion_Flag INTEGER, Wish_Flag INTEGER, 
-	NPC INTEGER, Latent_Power REAL, Base_Latent_Power REAL);
+	Overdrive_Count INTEGER, NPC INTEGER, Latent_Power REAL, Base_Latent_Power REAL);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Status (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Type INTEGER,
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
@@ -79,9 +82,6 @@ const updatePlayerSql = `UPDATE Players SET
 	Last_Active = $lastActive,
 	Last_Fought = $lastFought,
 	Overdrive_Count = $overdriveCount,
-    Nemesis_Flag = $nemesisFlag,
-    Fusion_Flag = $fusionFlag,
-    Wish_Flag = $wishFlag,
 	NPC = $npc,
 	Latent_Power = $latentPower,
 	Base_Latent_Power = $baseLatentPower
@@ -89,9 +89,9 @@ WHERE ID = $id AND Channel = $channel`;
 
 const insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
 	Action_Level, Garden_Level, Glory, Last_Active, Last_Fought, Overdrive_Count,
-	Nemesis_Flag, Fusion_Flag, Wish_Flag, NPC, Latent_Power, Base_Latent_Power) 
+	NPC, Latent_Power, Base_Latent_Power) 
 VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $gardenLevel, $glory, 
-	$lastActive, $lastFought, $overdriveCount, $nemesisFlag, $fusionFlag, $wishFlag, $npc, $latentPower, $latentPower)`;
+	$lastActive, $lastFought, $overdriveCount, $npc, $latentPower, $latentPower)`;
 
 const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
 (Channel, Player_ID, Nemesis_Type, Start_Time, Last_Ruin_Update, Base_Power)
@@ -216,11 +216,8 @@ module.exports = {
 				$lastActive: player.lastActive,
 				$lastFought: player.lastFought,
 				$overdriveCount: player.overdriveCount,
-				$nemesisFlag:  player.nemesisFlag ? 1 : 0,
-				$fusionFlag: player.fusionFlag ? 1 : 0, 
-				$wishFlag: player.wishFlag ? 1 : 0, 
 				$npc: player.npc,
-				$latentPower: Math.random()
+				$latentPower: player.latentPower
 			});
 		let playerId = result.lastID;
 		for(var i in player.config) {
@@ -259,9 +256,6 @@ module.exports = {
 			$lastActive: player.lastActive,
 			$lastFought: player.lastFought,
 			$overdriveCount: player.overdriveCount,
-            $nemesisFlag: player.nemesisFlag ? 1 : 0,
-            $fusionFlag: player.fusionFlag ? 1 : 0,
-            $wishFlag: player.wishFlag ? 1 : 0,
 			$npc: player.npc,
 			$latentPower: player.latentPower,
 			$baseLatentPower: player.baseLatentPower
@@ -342,9 +336,6 @@ module.exports = {
 			gardenLevel: row.Garden_Level,
 			actionLevel: row.Action_Level,
 			overdriveCount: row.Overdrive_Count,
-			nemesisFlag: row.Nemesis_Flag != 0,
-			fusionFlag: row.Fusion_Flag != 0,
-			wishFlag: row.Wish_Flag != 0,
 			npc: row.NPC,
 			latentPower: row.Latent_Power,
 			baseLatentPower: row.Base_Latent_Power,

@@ -236,6 +236,23 @@ module.exports = {
 					}
 				}
 				break;
+			case 'return':
+				// !return validation rules:
+				// - Must be on a journey
+				// - Ruin timer must be active
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateAnnihilation(errors, player);
+					const journey = player.status.find(s => s.type == enums.Statuses.Journey);
+					const ruinTimer = world.cooldowns.find(c => c.type == enums.Cooldowns.Ruin);
+					if(!journey) {
+						errors.push("You aren't on a journey.");
+					}
+					if(!ruinTimer) {
+						errors.push("You can only abandon a journey if the universe is in true peril.");
+					}
+				}
+				break;
 			case 'reset':
 			case 'debug':
 			case 'clone':
@@ -521,8 +538,9 @@ module.exports = {
 				if(args.length > 2) {
 					errors.push('Fusion Name must not contain spaces.');
 				}
-				if(player.fusionFlag) {
-					errors.push(`**${player.name} can't fuse again until the game resets.`);
+				const fusionUsed = player.status.find(s => s.type == enums.Statuses.FusionUsed);
+				if(fusionUsed) {
+					errors.push(`**${player.name} can't fuse again for another ${tools.getTimeString(fusionUsed.endTime - now)}.`);
 				}
 				let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeated) {
@@ -536,8 +554,9 @@ module.exports = {
 					this.validateAnnihilation(errors, target);
 					this.validateJourney(errors, target);
 					this.validateNotNpc(errors, target);
-					if(target.fusionFlag) {
-						errors.push(`**${target.name} can't fuse again until the game resets.`);
+					const targetFusionUsed = target.status.find(s => s.type == enums.Statuses.FusionUsed);
+					if(targetFusionUsed) {
+						errors.push(`**${target.name} can't fuse again for another ${tools.getTimeString(targetFusionUsed.endTime - now)}.`);
 					}
 					if(player.name == target.name) {
 						errors.push("You can't fuse with yourself!");
@@ -582,8 +601,9 @@ module.exports = {
 					if(player.isNemesis) {
 						errors.push(`**${player.name}** is already a Nemesis.`);
 					}
-					if(player.nemesisFlag) {
-						errors.push(`**${player.name}** cannot become a Nemesis again.`);
+					const nemesisUsed = player.status.find(s => s.type == enums.Statuses.NemesisUsed);
+					if(nemesisUsed) {
+						errors.push(`**${player.name}** cannot become a Nemesis again for another ${tools.getTimeString(nemesisUsed.endTime - now)}.`);
 					}
 					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					if(defeated) {
@@ -647,10 +667,11 @@ module.exports = {
 					if(orbCount < 7) {
 						errors.push('Insufficient orbs.');
 					}
-					if(player.wishFlag) {
-						errors.push("You can only wish upon the orbs once per season.");
+					const wishUsed = player.status.find(s => s.type == enums.Statuses.WishUsed);
+					if(wishUsed) {
+						errors.push(`You can't make a wish for another ${tools.getTimeString(wishUsed.endTime - now)}.`);
 					}
-					if(player.fusionFlag) {
+					if(tools.isFusion(player)) {
 						errors.push("Fusions can't wish.");
 					}
 					if(args.length > 0) {
@@ -727,13 +748,14 @@ module.exports = {
 								errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
 							}
 							if(item.type == enums.Items.Orb) {
-								if(!player.isUnderling && !player.wishFlag) {
-									errors.push('In order to give orbs, you must either be an underling or have already used up your wish.');
+								const wishUsed = player.status.find(s => s.type == enums.Statuses.WishUsed)
+								if(!player.isUnderling && !wishUsed) {
+									errors.push('In order to give orbs, you must either be an underling or be unable to make a wish.');
 								}
 								if(player.isUnderling && !target.isNemesis) {
 									errors.push('A underling can only give orbs to the Nemesis.');
 								}
-								if(target.wishFlag) {
+								if(target.status.find(s => s.type == enums.Statuses.WishUsed)) {
 									errors.push("That person doesn't need any orbs.");
 								}
 							}

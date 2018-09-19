@@ -155,7 +155,7 @@ async function handleMessage(message) {
 	if(!(await sql.worldExists(channel))) {
 		return;
 	}
-	
+
 	if(cmd != 'debug') {
 		const update = await tools.updateWorld(channel);
 
@@ -315,6 +315,9 @@ async function handleMessage(message) {
 			break;
 		case 'journey':
 			output.messages = await tools.startJourney(player, args[0]);
+			break;
+		case 'return':
+			output.messages = await tools.return(player);
 			break;
 		case 'selfdestruct':
 			output.messages = await tools.selfDestruct(player, target);

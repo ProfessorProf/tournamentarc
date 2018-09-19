@@ -168,6 +168,9 @@ module.exports = {
         HotSpringEvent: 15,
         DojoEvent: 16,
         GuruEvent: 17,
+        NemesisUsed: 18,
+        FusionUsed: 19,
+        WishUsed: 20,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',

@@ -578,7 +578,8 @@ module.exports = {
 		}
 		this.addHeat(world, hours);
 		let newPowerLevel = this.newPowerLevel(world.heat);
-		newPowerLevel *= (1 + player.latentPower * 0.5);
+		newPowerLevel *= (1 + player.latentPower * (forcedValue ? 0.7 : 0.5));
+		this.addLatentPower(player, (forcedValue ? 0.0015 : 0.001) * hours);
 		if (this.isFusion(player)) {
 			newPowerLevel *= 1.3;
 		}
@@ -865,7 +866,7 @@ module.exports = {
 
 			// Immortality
 			if(loser.status.find(s => s.type == enums.Statuses.Immortal)) {
-				hours = 1;
+				hours = winner.isNemesis ? 3 : 1;
 			}
 		}
 
@@ -1110,8 +1111,8 @@ module.exports = {
 				}
 			} else {
 				if(target.status.find(s => s.type == enums.Statuses.Immortal)) {
-					await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 1);
-					output += `${target.name} cannot fight for another 1 hour!`;
+					await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 3);
+					output += `${target.name} cannot fight for another 3 hours!`;
 				} else {
 					await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 12);
 					output += `${target.name} cannot fight for another 12 hours!`;
@@ -1161,7 +1162,7 @@ module.exports = {
 		return `No plants were found to burn!`
 	},
 	// Attempt to create a new Fusion.
-    async fuse(channel, sourcePlayer, targetPlayer, fusionName) {
+    async fuse(sourcePlayer, targetPlayer, fusionName) {
 		const channel = sourcePlayer.channel;
 		const now = new Date().getTime();
 		const world = await sql.getWorld(channel);
@@ -1185,9 +1186,7 @@ module.exports = {
 				trainingDate: now,
 				actionLevel: Math.max(sourcePlayer.actionLevel, targetPlayer.actionLevel),
 				gardenLevel: Math.max(sourcePlayer.gardenLevel, targetPlayer.gardenLevel),
-				nemesisFlag: false,
-				fusionFlag: true,
-				wishFlag: false,
+				latentPower: Math.max(sourcePlayer.latentPower, targetPlayer.latentPower),
 				config: {
 					alwaysPrivate: sourcePlayer.config.alwaysPrivate && targetPlayer.config.alwaysPrivate,
 					ping: sourcePlayer.config.ping && targetPlayer.config.ping,
@@ -1203,6 +1202,8 @@ module.exports = {
 			await sql.deleteAllFusionOffers(sourcePlayer.id);
 			await sql.deleteAllFusionOffers(targetPlayer.id);
 			await sql.addStatus(channel, fusionId, enums.Statuses.Fused, 24 * hour);
+			await sql.addStatus(channel, sourcePlayer.id, enums.Statuses.FusionUsed, 7 * 24 * hour);
+			await sql.addStatus(channel, targetPlayer.id, enums.Statuses.FusionUsed, 7 * 24 * hour);
 			for (const item of sourcePlayer.items) {
 				await sql.addItems(channel, fusionId, item.type, item.count);
 				await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
@@ -1223,21 +1224,22 @@ module.exports = {
 					await sql.addStatus(channel, fusionId, status.type, status.endTime - now, status.rating);
 				}
 			}
-			console.log(`Created fusion of ${sourcePlayerName} and ${targetPlayerName} as ${name}`);
+			console.log(`Created fusion of ${sourcePlayer.name} and ${targetPlayer.name} as ${name}`);
 			
-			return {embed: await this.getPlayerDescriptionById(fusionId), message: `**${sourcePlayerName}** and **${targetPlayerName}** pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!` };
+			return [`**${sourcePlayer.name}** and **${targetPlayer.name}** pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!`,
+				await this.getPlayerDescriptionById(fusionId)];
 		}
 
 		// Send an offer to the other player
 		const expiration = now + hour * 6;
-		const fuseCommand = `!fuse ${sourcePlayerName}` + (fusionName ? ' ' + fusionName : '');
+		const fuseCommand = `!fuse ${sourcePlayer.name}` + (fusionName ? ' ' + fusionName : '');
 		sql.addOffer(sourcePlayer, targetPlayer, enums.OfferTypes.Fusion, fusionName);
-		console.log(`'New fusion offer from ${sourcePlayerName} for player ${targetPlayerName} expires at ${new Date(expiration)}`);
+		console.log(`'New fusion offer from ${sourcePlayer.name} for player ${targetPlayer.name} expires at ${new Date(expiration)}`);
 		
 		let embed = new Discord.RichEmbed();
 		embed.setTitle('FUSION OFFER')
 			.setColor(0x8080ff)
-			.setDescription(`**${sourcePlayerName}** wants to fuse with **${targetPlayerName}**! ${targetPlayerName}, enter \`${fuseCommand}\` to accept the offer and fuse.\n` +
+			.setDescription(`**${sourcePlayer.name}** wants to fuse with **${targetPlayer.name}**! ${targetPlayer.name}, enter \`${fuseCommand}\` to accept the offer and fuse.\n` +
 			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
 			'The offer will expire in six hours.');
 		const message = targetPlayer.config.Ping ? await this.getPings(targetPlayer) : null;
@@ -1373,6 +1375,7 @@ module.exports = {
 		await sql.setHeat(channel, world.heat);
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
+		await sql.addStatus(channel, player, enums.Statuses.NemesisUsed, 7 * 24 * hour);
 
 		let output = [];
 		output.push(`**${player.name}** has become a Nemesis, and has declared war on the whole galaxy! ` +
@@ -1755,9 +1758,6 @@ module.exports = {
 				player.gardenLevel = 0;
 				player.actionLevel = 0;
 				player.fusionId = null;
-				player.nemesisFlag = false;
-				player.fusionFlag = false;
-				player.wishFlag = false;
 				player.lastActive = now - 24 * hour;
 				player.lastFought = now - 24 * hour;
 				await sql.setPlayer(player);
@@ -1783,10 +1783,8 @@ module.exports = {
 			lastFought: now,
 			gardenLevel: 0,
 			actionLevel: 0,
-			fusionId: null,
-			nemesisFlag: false,
-			fusionFlag: false,
-			wishFlag: false
+			latentPower: Math.random() * 0.5,
+			fusionId: null
 		};
 		await sql.addPlayer(player);
 		console.log(`Registered ${username} as ${name}`);
@@ -1915,7 +1913,7 @@ module.exports = {
 				output.push(`${player.name} searches the world, and finds a magic orb!`);
 				await sql.addItems(player.channel, player.id, enums.Items.Orb, 1);
 			}
-			const existingOrbs = player.items.find(i => i.type == enums.Statuses.Orb);
+			const existingOrbs = player.items.find(i => i.type == enums.Items.Orb);
 			if(!existingOrbs) {
 				// Start the fight timer
 				player.lastFought = now;
@@ -2115,12 +2113,13 @@ module.exports = {
 			case 'ruin':
 				output += '\n**The countdown to the destruction of the universe has begun!**\n'
 					+ 'You have 6 hours to defeat the Nemesis! If the Nemesis is still alive when time runs out, everything will be destroyed.';
-				nemesis.ruinTime = now + 6 * hour;
+				await sql.addStatus(channel, null, enums.Statuses.Cooldown, hour * 6, enums.Cooldowns.Ruin);
 				nemesis.lastRuinUpdate = now;
 				await sql.setNemesis(channel, nemesis);
 				break;
 			case 'snap':
-				output += `${player.name} snaps ${this.their(player.config.pronoun)} fingers, and half of the universe perishes!\n`;
+				output += `\n${player.name} snaps ${this.their(player.config.pronoun)} fingers, and half of the universe perishes!\n`;
+				let snappedSelf = false;
 				let snapPlayers = players.filter(p => !p.idle);
 				this.shuffle(snapPlayers);
 				for(var i = 0; i < snapPlayers.length / 2; i++) {
@@ -2132,8 +2131,8 @@ module.exports = {
 						output += `${target.name} disintegrates with a roar!`;
 					} else {
 						if(target.status.find(s => s.type == enums.Statuses.Immortal)) {
-							await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 1);
-							output += `${target.name} cannot fight for another 1 hour!`;
+							await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 3);
+							output += `${target.name} cannot fight for another 3 hours!`;
 						} else {
 							await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 24);
 							output += `${target.name} cannot fight for another 24 hours!`;
@@ -2142,19 +2141,28 @@ module.exports = {
 
 					if(target.isNemesis) {
 						// The nemesis suicided
+						snappedSelf = true;
 						await sql.endNemesis(channel);
 						target.level = this.newPowerLevel(world.heat * 0.8);
 						await sql.setPlayer(target);
 					}
 					output += '\n';
 				}
+
+				if(!snappedSelf) {
+					output += `${player.name}'s dark work is complete, and ${player.config.pronoun} retires from the life of the Nemesis.`;
+					await sql.endNemesis(channel);
+					player.level = this.newPowerLevel(world.heat);
+					await sql.setPlayer(player);
+				}
 				break;
 		}
 		
 		await sql.scatterOrbs(channel);
 		output += `\nThe orbs scatter to the furthest reaches of the world!`;
-		player.wishFlag = true;
-		await sql.setPlayer(player);
+		await sql.addStatus(channel, player.id, enums.Statuses.WishUsed, 7 * 24 * hour);
+		world.lastWish = now;
+		await sql.setWorld(world);
 		
 		return output;
 	},
@@ -2268,12 +2276,14 @@ module.exports = {
 		return messages;
 	},
 	async ruinAlert(channel) {
+		const world = await sql.getWorld(channel);
+		const ruinTime = world.cooldowns.find(c => c.type == enums.Cooldowns.Ruin);
 		let nemesis = await sql.getNemesis(channel);
 		let output = { message: null, abort: false };
-		if(nemesis && nemesis.ruinTime) {
+		if(nemesis && ruinTime) {
 			const now = new Date().getTime();
-			const hoursLeft = Math.ceil((nemesis.ruinTime - now) / hour);
-			const lastHoursLeft = Math.ceil((nemesis.ruinTime - nemesis.lastRuinUpdate) / hour);
+			const hoursLeft = Math.ceil((ruinTime.endTime - now) / hour);
+			const lastHoursLeft = Math.ceil((ruinTime.endTime - nemesis.lastRuinUpdate) / hour);
 			if(hoursLeft != lastHoursLeft) {
 				// Reminder the players about their impending doom
 				if(hoursLeft > 0) {
@@ -2328,20 +2338,14 @@ module.exports = {
 					// Journey
 					const storedTrainingTime = status.rating;
 					const journeyTime = status.endTime - status.startTime;
-					const journeyEffect = (Math.random() * 0.4 + 0.8) * (1 + player.latentPower * 0.7);
+					const journeyEffect = (Math.random() * 0.4 + 0.8);
 					if(nemesis) {
 						// Journeys that end during a Nemesis reign are amazing
-						journeyEffect += 1.0;
+						journeyEffect += 0.5;
 					}
 					const time = journeyTime * journeyEffect + storedTrainingTime;
 					await this.completeTraining(player, time);
-					if(journeyEffect < 1) {
-						messages.push(`**${player.name}** returns from a rough training journey!`);
-					} else if(journeyEffect < 1.5) {
-						messages.push(`**${player.name}** returns from an ordinary training journey!`);
-					} else if(journeyEffect < 2.0) {
-						messages.push(`**${player.name}** returns from a **legendary** training journey!`);
-					}
+					messages.push(`**${player.name}** returns from ${this.their(player.config.pronoun)} training journey!`);
 					await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 12 * hour, enums.Cooldowns.Journey);
 					await sql.setPlayer(player);
 					break;
@@ -3396,5 +3400,9 @@ module.exports = {
 			player.baseLatentPower -= lostGains;
 		}
 		player.latentPower += gains / Math.max(player.latentPower, 1);
+	},
+	async return(player) {
+		await sql.deleteStatus(player.channel, player.id, enums.Statuses.Journey);
+		return `${player.name} comes rushing back from ${this.their(player.config.pronoun)} journey!`;
 	}
 }
