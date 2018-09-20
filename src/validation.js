@@ -12,7 +12,7 @@ module.exports = {
 		let nemesis = await sql.getNemesis(channel)
 		let garden = await sql.getGarden(channel)
 		let glory = player ? player.glory : 0;
-		if(player && player.fusionNames.length == 2) {
+		if(player && player.fusedPlayers.length == 2) {
 			glory /= 2;
 		}
 		let errors = [];
@@ -477,8 +477,8 @@ module.exports = {
 					this.validateJourney(errors, player);
 				}
 				break;
-			case 'overdrive':
-				// !overdrive validation rules:
+			case 'transform':
+				// !transform validation rules:
 				// - Must be registered
 				// - Must not be the Nemesis
 				// - Must not have done any world actions in past hour
@@ -488,8 +488,28 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateActionTime(errors, player);
 					this.validateJourney(errors, player);
-					if(glory < 150) {
-						errors.push(`**${player.name}** must be at least Rank A to overdrive.`);
+					const transformation = player.status.find(s => s.type == enums.Statuses.Transform);
+					const superForm = player.status.find(s => s.type == enums.Statuses.SuperTransform);
+					const ultimateForm = player.status.find(s => s.type == enums.Statuses.UltimateForm);
+					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+					if(defeated) {
+						let timeString = tools.getTimeString(defeated.endTime - now);
+						errors.push(`**${player.name}** cannot transform for another ${timeString}.`);
+					}
+					if(ultimateForm) {
+						errors.push('You have already reached the limit.');
+					} else if(superForm) {
+						if(glory < 1000) {
+							errors.push(`**${player.name}** must be at the highest rank to attempt an Ultimate Transformation.`);
+						}
+					} else if(transformation) {
+						if(glory < 700) {
+							errors.push(`**${player.name}** must be at least Rank S++ to attempt a Super Transformation.`);
+						}
+					} else {
+						if(glory < 150) {
+							errors.push(`**${player.name}** must be at least Rank A to transform.`);
+						}
 					}
 				}
 				break;
@@ -538,9 +558,9 @@ module.exports = {
 				if(args.length > 2) {
 					errors.push('Fusion Name must not contain spaces.');
 				}
-				const fusionUsed = player.status.find(s => s.type == enums.Statuses.FusionUsed);
+				const fusionUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.FusionUsed);
 				if(fusionUsed) {
-					errors.push(`**${player.name} can't fuse again for another ${tools.getTimeString(fusionUsed.endTime - now)}.`);
+					errors.push(`**${player.name}** can't fuse again for another ${tools.getTimeString(fusionUsed.endTime - now)}.`);
 				}
 				let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 				if(defeated) {
@@ -554,9 +574,9 @@ module.exports = {
 					this.validateAnnihilation(errors, target);
 					this.validateJourney(errors, target);
 					this.validateNotNpc(errors, target);
-					const targetFusionUsed = target.status.find(s => s.type == enums.Statuses.FusionUsed);
+					const targetFusionUsed = target.cooldowns.find(c => c.type == enums.Cooldowns.FusionUsed);
 					if(targetFusionUsed) {
-						errors.push(`**${target.name} can't fuse again for another ${tools.getTimeString(targetFusionUsed.endTime - now)}.`);
+						errors.push(`**${target.name}** can't fuse again for another ${tools.getTimeString(targetFusionUsed.endTime - now)}.`);
 					}
 					if(player.name == target.name) {
 						errors.push("You can't fuse with yourself!");
@@ -601,7 +621,7 @@ module.exports = {
 					if(player.isNemesis) {
 						errors.push(`**${player.name}** is already a Nemesis.`);
 					}
-					const nemesisUsed = player.status.find(s => s.type == enums.Statuses.NemesisUsed);
+					const nemesisUsed = player.cooldown.find(c => c.type == enums.Cooldowns.NemesisUsed);
 					if(nemesisUsed) {
 						errors.push(`**${player.name}** cannot become a Nemesis again for another ${tools.getTimeString(nemesisUsed.endTime - now)}.`);
 					}
@@ -667,7 +687,7 @@ module.exports = {
 					if(orbCount < 7) {
 						errors.push('Insufficient orbs.');
 					}
-					const wishUsed = player.status.find(s => s.type == enums.Statuses.WishUsed);
+					const wishUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed);
 					if(wishUsed) {
 						errors.push(`You can't make a wish for another ${tools.getTimeString(wishUsed.endTime - now)}.`);
 					}
@@ -730,7 +750,7 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
 					if(args.length < 2) {
-						errors.push("Syntax: `!give itemtype playername");
+						errors.push("Syntax: `!give itemtype playername`");
 					} else {
 						let item = player.items.find(i => enums.Items.Name[i.type] == args[0].toLowerCase());
 						if(!item) {
@@ -748,14 +768,14 @@ module.exports = {
 								errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
 							}
 							if(item.type == enums.Items.Orb) {
-								const wishUsed = player.status.find(s => s.type == enums.Statuses.WishUsed)
+								const wishUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)
 								if(!player.isUnderling && !wishUsed) {
 									errors.push('In order to give orbs, you must either be an underling or be unable to make a wish.');
 								}
 								if(player.isUnderling && !target.isNemesis) {
 									errors.push('A underling can only give orbs to the Nemesis.');
 								}
-								if(target.status.find(s => s.type == enums.Statuses.WishUsed)) {
+								if(target.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)) {
 									errors.push("That person doesn't need any orbs.");
 								}
 							}
@@ -793,7 +813,7 @@ module.exports = {
 					if(target.id == player.id) {
 						errors.push(`That's not what "be your own boss" means.`);
 					}
-					if(target.fusionNames.length == 2) {
+					if(tools.isFusion(target)) {
 						errors.push("You can't recruit a fusion.");
 					}
 					if(target.npc) {
@@ -803,7 +823,7 @@ module.exports = {
 				const underlingIds = await sql.getUnderlings(channel);
 				const players = await sql.getPlayers(channel);
 				const underlings = players.filter(p => underlingIds.find(u => u.id == p.id) && !p.npc);
-				let maxUnderlings = Math.floor(world.maxPopulation / 5) - 1;
+				let maxUnderlings = Math.floor(world.population / 5) - 1;
 				if(underlings.length >= maxUnderlings) {
 					errors.push("You can't recruit more underlings.");
 				}
@@ -826,11 +846,11 @@ module.exports = {
 						const underlingIds = await sql.getUnderlings(channel);
 						const players = await sql.getPlayers(channel);
 						const underlings = players.filter(p => underlingIds.find(u => u.id == p.id) && !p.npc);
-						const maxUnderlings = Math.floor(world.maxPopulation / 5);
+						const maxUnderlings = Math.floor(world.population / 5);
 						if(underlings.length >= maxUnderlings) {
 							errors.push("The Nemesis already has too many underlings.");
 						}
-						if(player.fusionNames.length == 2) {
+						if(tools.isFusion(player)) {
 							errors.push("A Fusion can't join the Nemesis.");
 						}
 					}
@@ -1050,12 +1070,13 @@ module.exports = {
 				break;
 			case 'event':
 				this.validatePlayerRegistered(errors, player);
-				this.validateActionTime(errors, player);
-				this.validateJourney(errors, player);
 				const event = world.cooldowns.find(c => enums.Cooldowns.IsEvent[c.type]);
 				if(!event) {
 					errors.push("There's no event going on right now.");
-				} else {
+				} else if(player) {
+					this.validateActionTime(errors, player);
+					this.validateJourney(errors, player);
+					this.validateAnnihilation(errors, player);
 					const defeated = player.status.find(s => s.type == enums.Statuses.Dead);
 					switch(event.type) {
 						case enums.Events.HotSpring:
@@ -1073,6 +1094,39 @@ module.exports = {
 							if(defeated) {
 								errors.push(`**${player.name}** cannot face the guru for another ${tools.getTimeString(defeated.endTime - now)}.`);
 							}
+					}
+				}
+				break;
+			case 'steal':
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					if(args.length < 2) {
+						errors.push("Syntax: `!steal itemtype playername`");
+					} else {
+						this.validateAnnihilation(errors, player);
+						this.validateActionTime(errors, player);
+						this.validateNotNemesis(errors, player);
+						this.validateJourney(errors, player);
+						const defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+						if(defeated) {
+							errors.push(`**${player.name}** cannot attempt a steal for another ${tools.getTimeString(defeated.endTime - now)}.`);
+						}
+						if(target) {
+							this.validateAnnihilation(errors, target);
+							this.validateJourney(errors, target);
+							if(player.name == target.name) {
+								errors.push("You can't steal from yourself!");
+							}
+							if(!target.isNemesis && !target.isUnderling) {
+								errors.push("You can only steal from the forces of evil.");
+							}
+							let item = target.items.find(i => enums.Items.Name[i.type] == args[0].toLowerCase());
+							if(!item) {
+								errors.push(`**${target.name}** doesn't have that item!`);
+							}
+						} else {
+							errors.push(`Must specify a valid target.`);
+						}
 					}
 				}
 				break;

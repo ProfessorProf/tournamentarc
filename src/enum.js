@@ -26,6 +26,9 @@ module.exports = {
             10: 'gourd',
             11: 'peach'
         },
+        An: {
+            0: true
+        },
         Type: {
             0: 0,
             1: 1,
@@ -78,14 +81,15 @@ module.exports = {
         Fight: 0,
         Fusion: 1,
         Recruit: 2,
-        Taunt: 3
+        Taunt: 3,
+        Confirmation: 4
     },
     Statuses: {
         Dead: 0,
         Journey: 1,
         Training: 2,
         Energized: 3,
-        Overdrive: 4,
+        Transform: 4,
         Ready: 5,
         Carrot: 6,
         Bean: 7,
@@ -93,17 +97,19 @@ module.exports = {
         Fused: 9,
         PowerWish: 10,
         Immortal: 11,
-        Berserk: 12,
+        SuperTransform: 12,
         Cooldown: 13,
         SelfDestruct: 14,
         Annihilation: 15,
         TrainingComplete: 16,
+        Caught: 17,
+        UltimateForm: 18,
         Name: {
             0: 'Defeated',
             1: 'Journey',
             2: 'Training',
             3: 'Energized',
-            4: 'Overdrive',
+            4: 'Transformed',
             5: 'Ready',
             6: 'Carrot',
             7: 'Bean',
@@ -111,11 +117,12 @@ module.exports = {
             9: 'Fusion',
             10: 'Power',
             11: 'Immortal',
-            12: 'Berserk',
+            12: 'Super Form',
             13: 'Cooldown',
             14: 'Self Destruct',
             15: 'Annihilation',
-            16: 'Training Complete'
+            16: 'Training Complete',
+            18: 'Ultimate Form'
         },
         Priority: {
             0: 600,
@@ -124,7 +131,8 @@ module.exports = {
             3: 300,
             4: 200,
             5: 100,
-            12: 250
+            12: 450,
+            18: 475
         },
         CopyToFusion: {
             4: true,
@@ -134,7 +142,8 @@ module.exports = {
             8: true,
             10: true,
             11: true,
-            12: true
+            12: true,
+            18: true
         }
     },
     NemesisTypes: {

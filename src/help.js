@@ -13,7 +13,7 @@ module.exports = {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
                 .addField('!help info', 'Help with informational commands: !check, !scan, !roster, !episode, !graveyard, !history.')
-                .addField('!help actions', 'Help with commands related to world actions: !search, !empower, !overdrive, !filler.')
+                .addField('!help actions', 'Help with commands related to world actions: !search, !empower, !transform, !filler.')
                 .addField('!help garden', 'Help with commands related to the garden: !garden, !expand, !water, !plant, !pick, !use.')
                 .addField('!help battle', 'Help with commands related to combat: !fight, !unfight, !taunt, !train, !journey.')
                 .addField('!help nemesis', 'Help with commands related to the Nemesis: !nemesis, !recruit, !exile, !attack, !destroy, !burn, !energize, !revive.')
@@ -130,10 +130,10 @@ Rank ??? 1000 Glory
                     this.addHelpField(output, 'selfdestruct');
                     break;
                 case 'actions':
-                    output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !overdrive boosts your Action Level.');
+                    output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !transform boosts your Action Level.');
                     this.addHelpField(output, 'search');
                     this.addHelpField(output, 'empower');
-                    this.addHelpField(output, 'overdrive');
+                    this.addHelpField(output, 'transform');
                     this.addHelpField(output, 'filler');
                     break;
                 case 'fusion':
@@ -154,7 +154,7 @@ Rank ??? 1000 Glory
                             "When you defeat someone, they'll remain defeated for 12 hours." +
                             "Can recruit underlings.\n" +
                             "Cannot upgrade the garden.\n" +
-                            "Cannot use: !train, !pick, !use, !water, !search, !overdrive, !empower, !fuse, !scan.\n" + 
+                            "Cannot use: !train, !pick, !use, !water, !search, !transform, !empower, !fuse, !scan.\n" + 
                             "Can use: !attack, !destroy, !burn, !recruit, !exile, !energize, !revive.\n" +
                             "Can't make normal wishes.\n" + 
                             "Can make Nemesis wishes.")
@@ -318,10 +318,11 @@ Rank ??? 1000 Glory
                     "If the Nemesis is at large, your chances are doubled.\n" +
                     "Requirements: Must be registered. Must not have used any world actions in the past hour.");
                 break;
-            case 'overdrive':
-                embed.addField('!overdrive', "Supercharge your power, increasing your power level temporarily! The exact bonus varies randomly, and is affected by your Action Level.\n" +
-                    "Overdriving boosts your power for one hour. When it wears off, your power level returns to normal, then falls by 10%. If you overuse Overdrive, something bad might happen." +
-                    "Requirements: Must be registered. Must not have used any world actions in the past hour. Must be Rank A or above.");
+            case 'transform':
+                embed.addField('!transform', "Go beyond your limits and assume a new, more powerful temporary form! " +
+                    "While transformed, your power level spikes dramatically, but once it ends, you'll collapse, and be unable to fight for a few hours. " +
+                    "The duration of the transformation is based on your Action Level, and its strength is based on your Latent Power. " +
+                    "Requirements: Must be registered. Must not have used any world actions in the past hour. Must be Rank A or above. Must not be the Nemesis.");
                 break;
             case 'empower':
                 embed.addField('!empower target', "Send someone your energy, raising their power level permanently! " +

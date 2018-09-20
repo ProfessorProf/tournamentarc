@@ -7,5 +7,6 @@ module.exports = {
     PeachHours: 6,
     HotSpringHours: 1,
     DojoHours: 1,
-    GardenMaxSize: 8
+    GardenMaxSize: 8,
+    MaxStealChance: 0.25
 }

@@ -13,22 +13,34 @@ Expanding this later:
 # Database spec
 Writing this later.
 
-# Remaining Work for S3
-- Port all old commands over to the Sqlite data schema.
-- As players join the game, track the largest number of active players at once as Max_Population.
-- AddHeat needs to be updated to scale based on the size of the server - Heat /= 1 + (Math.Max(10, MaxPop) / 10)
-- !unfight command - deletes all Fight offers from that player.
-- !give command - transfers one orb to another player.
-- !journey command - details later.
-- Garden restructure.
-- !recruit and !join commands for the Nemesis to recruit underlings.
-- !energize command to power up underlings.
-- Honor underlings properties in other places.
-- !revive command to revive underlings.
-- !burn command to destroy plants.
-- !tournament command - details later.
-- !history command - displays past battle history between two players.
-- Indicate in !check when further training won't make you any stronger.
-- !config command.
-- !empower command.
-- !overdrive command.
+# New features for S5:
+- Garden: "!plant" no longer takes a garden action.
+- Garden: You can no longer use plants while defeated.
+- Garden: That aside, all plants can now be given to others or used on yourself.
+- Garden: Players are limited to one plant planted by them in the garden at a time.
+- Garden: If you don't use a plant for 3 days, it will decay.
+- Garden: Size limit reduced to 8 slots.
+- Garden: When your Power Level is hidden by a fern, you can still see it with a private "!check".
+- Garden: New plant "gourd".
+- Garden: New plant "peach".
+- Actions: "!filler" now splits its healing between every named player.
+- Actions: "!search" rebalanced so that underlings with carrots no longer have 70%+ search rates.
+- Actions: "!search" can sometimes begin a channel-wide special event.
+- Actions: New "!event" command that does different things based on what kind of world event is going on.
+- Nemesis: Instead of once per season, you can become Nemesis once every 7 days.
+- Nemesis: Using "!wish snap" now ends your reign as the Nemesis.
+- Nemesis: Once a ruin timer starts, anyone on a journey can use "!return" to abandon it early.
+- Nemesis: Defeating an Immortal player as the Nemesis drops them for 3 hours instead of 1.
+- Fusion: Instead of once per season, you can now use !fuse once every 7 days.
+- Fusion: Certain actions now require both players to enter the command.
+- Wishes: Instead of once per season, you can now use !wish once every 7 days.
+- New: A new mysterious attribute has been added to all players.
+- New: !steal command can steal orbs from the nemesis or their underlings.
+- New: Effects that scale by channel size now go by the current active population instead of the historical maximum.
+- New: !transform command replacing overdrive.
+New: !tournament command to run in-game battle tournaments.
+- Bugfix: Glory gained for defeating the Nemesis was wrong.
+- Bugfix: "Totals Glory" should say "Total Glory".
+- Bugfix: The case of a fusion using !selfdestruct is now addressed.
+- Bugfix: When defeating a Zorb, all its items are properly transferred to you.
+- Bugfix: Destroyed monsters no longer remember each other's battle history.

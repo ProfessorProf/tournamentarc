@@ -172,7 +172,7 @@ async function handleMessage(message) {
 	}
 
 	let targetName;
-	if(cmd == 'use' || cmd == 'give') {
+	if(cmd == 'use' || cmd == 'give' || cmd == 'steal') {
 		targetName = args.length > 1 ? args[1] : null;
 	} else {
 		targetName = args.length > 0 ? args[0] : null;
@@ -289,14 +289,17 @@ async function handleMessage(message) {
 		case 'research':
 			output.messages = await tools.expand(player, 'research');
 			break;
-		case 'overdrive':
-			output.messages = await tools.overdrive(player);
+		case 'transform':
+			output.messages = await tools.transform(player);
 			break;
 		case 'empower':
 			output.messages = await tools.empower(player, targetName);
 			break;
 		case 'give':
 			output.messages = await tools.give(player, target, args[0]);
+			break;
+		case 'steal':
+			output.messages = await tools.steal(player, target, args[0]);
 			break;
 		case 'history':
 			output.messages = await tools.history(player, target);
@@ -320,7 +323,7 @@ async function handleMessage(message) {
 			output.messages = await tools.return(player);
 			break;
 		case 'selfdestruct':
-			output.messages = await tools.selfDestruct(player, target);
+			output.messages = await tools.selfDestruct(player, target, username);
 			break;
 		case 'filler':
 			output.messages = await tools.filler(player, target);

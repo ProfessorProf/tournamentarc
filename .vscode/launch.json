@@ -16,7 +16,7 @@
                 "--no-deprecation"
             ],
             "args": [
-                "--debug"
+                //"--debug"
             ]
         },
         {
