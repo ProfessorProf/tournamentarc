@@ -3229,10 +3229,10 @@ module.exports = {
 
 		return embed;
 	},
-	async tournament(channel, name, command) {
-		const player = await sql.getPlayerByUsername(channel, name);
+	async tournament(player, command) {
+		let tournament = await sql.getTournament(player.channel);
 		if(!command) {
-			return this.displayTournament(channel);
+			return this.displayTournament(tournament);
 		}
 		switch(command) {
 			case 'single':
@@ -3240,13 +3240,12 @@ module.exports = {
 			case 'royale':
 				return this.createTournament(channel, player, enums.TournamentTypes.BattleRoyale);
 			case 'join':
-				return this.joinTournament(channel, player);
+				return this.joinTournament(player, tournament);
 			case 'start':
-				return this.startTournament(channel);
+				return this.startTournament(tournament);
 		}
 	},
-	async displayTournament(channel) {
-		const tournament = await sql.getTournament(channel);
+	async displayTournament(tournament) {
 		let embed = new Discord.RichEmbed();
 		embed.setTitle(`Tournament Status`)
 			.setColor(0x4f0a93)
@@ -3315,6 +3314,23 @@ module.exports = {
 
 		return embed;
 	},
+	getTournamentSeeds(numPlayers) {
+		var rounds = Math.log(numPlayers) / Math.log(2) - 1;
+		var seeds = [1, 2];
+		for(var i = 0; i < rounds; i++){
+			seeds = nextLayer(seeds);
+		}
+		return seeds;
+		function nextLayer(seeds){
+			var out=[];
+			var length = seeds.length * 2 + 1;
+			seeds.forEach(d => {
+				out.push(d);
+				out.push(length - d);
+			});
+			return out;
+		}
+	},
 	async createTournament(channel, player, type) {
 		let tournament = await sql.getTournament(channel);
 
@@ -3338,34 +3354,21 @@ module.exports = {
 		
 		return embed;
 	},
-	async joinTournament(channel, player) {
-		await sql.joinTournament(channel, player.id);
-		const tournament = await sql.getTournament(channel);
-
+	async joinTournament(player, tournament) {
+		await sql.joinTournament(tournament.channel, player.id);
 		return `${player.name} has joined the tournament! There's room for ${16 - tournament.players.length} more players.`;
 	},
-	async startTournament(channel) {
-		let tournament = await sql.getTournament(channel);
-
+	async startTournament(tournament) {
 		// Generate seed list
-		let seeds = tournament.players;
-		seeds = this.shuffle(seeds);
-		const numRounds = Math.ceil(Math.log(tournament.players.length) / Math.log(2));
-		const slots = Math.pow(2, numRounds);
-		let nextEmptySeed = 1;
-		while(seeds.length < slots) {
-			seeds = seeds.slice(0,nextEmptySeed)
-				.concat([null])
-				.concat(seeds.slice(nextEmptySeed));
-			nextEmptySeed += 2;
-		}
-		
-		// Set everyone's positions accordingly
+		let seeds = this.getTournamentSeeds(tournament.players.length);
+		let players = tournament.players;
+		players = this.shuffle(players);
+
 		for(const i in seeds) {
-			const player = seeds[i];
-			if(player) {
-				player.position = i;
-				player.status = enums.TournamentPlayerStatuses.Pending;
+			if(seeds[i] <= players.length) {
+				players[i - 1].position = i - 1;
+			} else {
+				players[i - 1] = null;
 			}
 		}
 

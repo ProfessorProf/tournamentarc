@@ -342,6 +342,10 @@ async function handleMessage(message) {
 			output.messages = await help.showHelp(player, args[0]);
 			output.informational = true;
 			break;
+		case 'tourney':
+		case 'tournament':
+			output.messages = await tools.tournament(player, args[0]);
+			output.informational = args.length > 0;
 		case 'debug':
 			await sql.execute(args.join(' '));
 			break;
