@@ -889,6 +889,19 @@ module.exports = {
 				}
 			}
 
+			// Tournament processing
+			const tournament = await sql.getTournament(winner.channel);
+			if(tournament && tournament.status == enums.TournamentStatuses.Active) {
+				const tourneyWinner = tournament.players.find(p => p && p.id == winner.id);
+				const tourneyLoser = tournament.players.find(p => p && p.id == loser.id);
+				if(tourneyWinner && tourneyLoser && 
+					((tourneyWinner.position % 2 == 0 && tourneyLoser.position == tourneyWinner.position + 1) ||
+					(tourneyLoser.position % 2 == 0 && tourneyWinner.position == tourneyLoser.position + 1))) {
+					// This was a tournament match!
+					output += await this.tournamentMatch(tournament, winner);
+				}
+			}
+
 			// Transformation penalty
 			if(loser.status.find(s => s.type == enums.Statuses.Transform || 
 				s.type == enums.Statuses.SuperTransform)) {
@@ -3236,9 +3249,9 @@ module.exports = {
 		}
 		switch(command) {
 			case 'single':
-				return this.createTournament(channel, player, enums.TournamentTypes.SingleElimination);
-			case 'royale':
-				return this.createTournament(channel, player, enums.TournamentTypes.BattleRoyale);
+				return this.createTournament(player.channel, player, enums.TournamentTypes.SingleElimination);
+			//case 'royale':
+			//	return this.createTournament(player.channel, player, enums.TournamentTypes.BattleRoyale);
 			case 'join':
 				return this.joinTournament(player, tournament);
 			case 'start':
@@ -3253,9 +3266,10 @@ module.exports = {
 		let output = '';
 
 		if(!tournament || tournament.status == enums.TournamentStatuses.Off) {
-			output = "There isn't a tournament going on! Enter `!tourney single` or `!tourney royale` to recruit for one.";
+			output = "There isn't a tournament going on! Enter `!tourney single` to recruit for one.";
 		} else {
 			let names = tournament.players.filter(p => p).map(p => p.name);
+			const world = await sql.getWorld(tournament.channel);
 			switch(tournament.status) {
 				case enums.TournamentStatuses.Recruiting:
 					const organizer = await sql.getPlayerById(tournament.organizerId);
@@ -3271,7 +3285,6 @@ module.exports = {
 					output += `Players: ${names.join(', ')} (${names.length}/16)`
 					break;
 				case enums.TournamentStatuses.Active:
-					const world = await sql.getWorld(channel);
 					if(tournament.players.length == 2) {
 						output += `FINAL ROUND\n`;
 					} else if(tournament.players.length == 4) {
@@ -3306,6 +3319,16 @@ module.exports = {
 						}
 					}
 					output += `This round's matches:\n` + ( matches.join(`\n`));
+					break;
+				case enums.TournamentStatuses.Complete:
+					output += `TOURNAMENT COMPLETE\n`;
+					output += `The grand champion was **${tournament.players[0].name}!**\n`;
+					const nextTournament = world.cooldowns.find(c => c.type == enums.Cooldowns.NextTournament);
+					if(nextTournament) {
+						output += `A new tournament can begin in ${this.getTimeString(nextTournament.endTime - now)}.`;
+					} else {
+						output += `Enter \`!tourney single\` to begin a new tournament.`;
+					}
 					break;
 			}
 		}
@@ -3366,9 +3389,8 @@ module.exports = {
 
 		for(const i in seeds) {
 			if(seeds[i] <= players.length) {
-				players[i - 1].position = i - 1;
-			} else {
-				players[i - 1] = null;
+				players[seeds[i] - 1].position = i;
+				players[seeds[i] - 1].status = enums.TournamentPlayerStatuses.Pending;
 			}
 		}
 
@@ -3376,61 +3398,58 @@ module.exports = {
 		tournament.reward = tournament.players.length * 10;
 		tournament.round = 1;
 		await sql.setTournament(tournament);
-		await sql.addStatus(channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextRound);
+		await sql.addStatus(tournament.channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextRound);
 
-		return this.displayTournament(channel);
+		return this.displayTournament(await sql.getTournament(tournament.channel));
 	},
-	async tournamentMatch(channel, winnerId, loserId) {
-		const tournament = await sql.getTournament(channel);
+	async tournamentMatch(tournament, winnerPlayer) {
+		let winner = tournament.players.find(p => p.id == winnerPlayer.id);
+		const winnerPosition = winner.position;
+		const loserPosition = winnerPosition % 2 == 0 ? winnerPosition + 1 : winnerPosition - 1;
+		let loser = tournament.players[loserPosition];
 
-		if(tournament) {
-			let winner = tournament.players.find(p => p && p.id == winnerId);
-			let loser = tournament.players.find(p => p && p.id == loserId);
-			if(winner && loser &&
-				((winner.position + 1 == loser.position && winner.position % 2 == 0) ||
-				(loser.position + 1 == winner.position && loser.position % 2 == 0))) {
-				// This was a tournament match! Resolve it
-				winner.status = enums.TournamentPlayerStatuses.Won;
-				loser.status = enums.TournamentPlayerStatuses.Lost;
+		winner.status = enums.TournamentPlayerStatuses.Won;
+		loser.status = enums.TournamentPlayerStatuses.Lost;
 
-				if(tournament.players.length == 2) {
-					output = `The tournament is over! ${winner} is the world's strongest warrior!`;
-					let winnerPlayer = await sql.getPlayerById(winner.id);
-					let world = await sql.getWorld(channel);
-					if(world.lostOrbs) {
-						output = ` The new champion is awarded ${tournament.reward} Glory and a magic orb!`;
-						winnerPlayer.glory += tournament.reward;
-						await sql.addItems(channel, winner.id, enums.Items.Orb, 1);
-					} else {
-						output = ` The new champion is awarded ${tournament.reward * 2} Glory!`;
-						winnerPlayer.glory += tournament.reward * 2;
-					}
-					await sql.setPlayer(winnerPlayer);
-					tournament.status = enums.TournamentStatuses.Complete;
-					let roundTimer = world.cooldowns.find(c => c.type == enums.Cooldowns.NextRound);
-					if(roundTimer) {
-						await sql.deleteStatusById(roundTimer.id);
-					}
-				} else {
-					output = `${winner.name} advances to the next round of the tournament!`;
-				}
+		if(tournament.players.length == 2) {
+			output = `The tournament is over! ${winner.name} is the world's strongest warrior!`;
+			await sql.eliminatePlayer(loser.id);
+			tournament.players.splice(loserPosition, 1);
+			winner.position = 0;
+			let world = await sql.getWorld(tournament.channel);
+			if(world.lostOrbs) {
+				output += ` The new champion is awarded ${tournament.reward} Glory and a magic orb!`;
+				winnerPlayer.glory += tournament.reward;
+				await sql.addItems(tournament.channel, winner.id, enums.Items.Orb, 1);
+			} else {
+				output += ` The new champion is awarded ${tournament.reward * 2} Glory!`;
+				winnerPlayer.glory += tournament.reward * 2;
+			}
+			await sql.addItems(tournament.channel, winner.id, enums.Items.Trophy, 1);
+			tournament.status = enums.TournamentStatuses.Complete;
+			let roundTimer = world.cooldowns.find(c => c.type == enums.Cooldowns.NextRound);
+			if(roundTimer) {
+				await sql.deleteStatusById(roundTimer.id);
+			}
+			await sql.addStatus(tournament.channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextTournament);
+		} else {
+			output = `${winner.name} advances to the next round of the tournament!`;
+		}
 
-				let remainingMatches = false;
-				for(let i = 0; i < tournament.players.length; i += 2) {
-					const leftPlayer = tournament.players[i];
-					const rightPlayer = tournament.players[i+1];
-					if(leftPlayer && rightPlayer && 
-						(leftPlayer.status == enums.TournamentPlayerStatuses.Pending || rightPlayer.status == enums.TournamentPlayerStatuses.Pending)) {
-						remainingMatches = true;
-					}
-				}
-				if(!remainingMatches && tournament.players.length > 0) {
-					await this.advanceTournament(tournament);
-				}
-
-				await sql.setTournament(tournament);
+		let remainingMatches = false;
+		for(let i = 0; i < tournament.players.length; i += 2) {
+			const leftPlayer = tournament.players[i];
+			const rightPlayer = tournament.players[i+1];
+			if(leftPlayer && rightPlayer && 
+				(leftPlayer.status == enums.TournamentPlayerStatuses.Pending || rightPlayer.status == enums.TournamentPlayerStatuses.Pending)) {
+				remainingMatches = true;
 			}
 		}
+		if(!remainingMatches && tournament.players.length > 2) {
+			output += await this.advanceTournament(tournament);
+		}
+
+		await sql.setTournament(tournament);
 		if(output) {
 			return '\n' + output;
 		} else {
@@ -3480,8 +3499,7 @@ module.exports = {
 		}
 		await sql.addStatus(tournament.channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextRound);
 
-		const numRounds = Math.ceil(Math.log(tournament.players.length) / Math.log(2));
-		if(tournament.round == numRounds) {
+		if(tournament.players.length == 2) {
 			return ` It's time for the tournament finals!`;
 		} else {
 			return ` It's time for the next round of the tournament!`;

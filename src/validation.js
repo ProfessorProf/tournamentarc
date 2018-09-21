@@ -755,6 +755,8 @@ module.exports = {
 						let item = player.items.find(i => enums.Items.Name[i.type] == args[0].toLowerCase());
 						if(!item) {
 							errors.push("You don't have any of that item!");
+						} else if(item.type == enums.Items.Trophy) {
+							errors.push("You can't give away your trophies.");
 						}
 						if(target) {
 							this.validateAnnihilation(errors, target);
@@ -1037,19 +1039,26 @@ module.exports = {
 					}
 				}
 				break;
+			case 'tourney':
 			case 'tournament':
 				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
 					const tournament = await sql.getTournament(channel);
 					switch(args[0]) {
 						case 'single':
-						case 'royale':
+						//case 'royale':
 							const players = await sql.getPlayers(channel);
 							if(players.length < 4) {
 								errors.push(`You need at least four players for a tournament.`);
 							}
 							if(glory < 100) {
 								errors.push(`**${player.name}** must be at least Rank B to organize a tournament.`);
+							}
+							
+							let cooldown = world.cooldowns.find(c => c.type == enums.Cooldowns.NextTournament);
+							if(cooldown) {
+								let timeString = tools.getTimeString(cooldown.endTime - now);
+								errors.push(`A new Tournament can't begin for another ${timeString}.`);
 							}
 							break;
 						case 'join':
@@ -1063,7 +1072,10 @@ module.exports = {
 								errors.push('Only the organizer can start the tournament.');
 							}
 							if(tournament.players.length < 4) {
-								errors.push(`You need at least four players for a tournament..`);
+								errors.push(`You need at least four players for a tournament.`);
+							}
+							if(tournament.status == enums.TournamentStatuses.Active) {
+								errors.push(`The tournament has already begun.`);
 							}
 					}
 				}
@@ -1123,6 +1135,8 @@ module.exports = {
 							let item = target.items.find(i => enums.Items.Name[i.type] == args[0].toLowerCase());
 							if(!item) {
 								errors.push(`**${target.name}** doesn't have that item!`);
+							} else if(item.type == enums.Items.Trophy) {
+								errors.push("You can't steal a trophy.");
 							}
 						} else {
 							errors.push(`Must specify a valid target.`);

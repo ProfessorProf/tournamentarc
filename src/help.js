@@ -20,24 +20,28 @@ module.exports = {
                 .addField('!help underlings', 'Help with commands related to underlings: !join, !recruit, !exile.')
                 .addField('!help wish', 'Help with commands related to orbs and wishes: !search, !give, !wish.')
                 .addField('!help rank', 'Help with Rank, Glory, and how to increase them.')
+                .addField('!help latentpower', 'Help with the mysterious latent power hiding within.')
+                .addField('!help tournaments', 'Help with commands related to martial arts tournaments.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
         } else {
             switch(topic.toLowerCase()) {
                 case 'basic':
-                    output.setTitle('Help: Basic Commands');
-                    this.addHelpField(output, 'reg');
-                    this.addHelpField(output, 'config');
-                    this.addHelpField(output, 'check');
+                    output.setTitle('Help: Basic Commands')
+                        .setDescription('To get more info on any command, enter `!help commandname`.')
+                        .addField('!reg name', 'Register to start playing the game.')
+                        .addField('!config', 'Display or set various configuration flags.')
+                        .addField('!check', 'Display information about your character.');
                     break;
                 case 'info':
-                    output.setTitle('Help: Info Commands');
-                    this.addHelpField(output, 'check');
-                    this.addHelpField(output, 'scan');
-                    this.addHelpField(output, 'roster');
-                    this.addHelpField(output, 'graveyard');
-                    this.addHelpField(output, 'history');
-                    this.addHelpField(output, 'episode');
+                    output.setTitle('Help: Info Commands')
+                        .setDescription('To get more info on any command, enter `!help commandname`.')
+                        .addField('!check', 'Display information about your character.')
+                        .addField('!scan target', 'Scan another player to learn their basic stats.')
+                        .addField('!roster', 'Display basic info on all active players.')
+                        .addField('!graveyard', 'Display all defeated players.')
+                        .addField('!history', 'Display your battle history.')
+                        .addField('episode', 'Display a summary of a past episode.');
                 case 'config':
                     output.setTitle('Help: Configuration Commands')
                         .addField('!config', 'Displays your current config options.')
@@ -49,7 +53,7 @@ module.exports = {
                             '**Pronoun**: Valid values: "he"/"she"/"they". Determines what pronouns the game uses for messages about you. Default: They.');
                     break;
                 case 'rank':
-                    output.setTitle('Help: Player Ranks')
+                    output.setTitle('Help: Player Ranks');
                     output.setDescription("Rank is determined by accumulating Glory. Glory is gained by winning battles, especially against foes stronger than yourself. As your Rank increases, you gain access to various new features.")
                         .addField('Rank Thresholds:', `\`\`\`\n
 Rank C   50 Glory
@@ -61,28 +65,34 @@ Rank S++ 700 Glory
 Rank ??? 1000 Glory
 \`\`\``);
                     break;
+                case 'latentpower':
+                    output.setTitle('Latent Power')
+                        .setDescription('This mysterious trait represents not your current strength, but how quickly you can become stronger.\n' +
+                            "The higher your latent power, the more power you'll gain from training and journeys. To figure out your potential, fight repeated battles." +
+                            "Training, journeying, defeating powerful foes, and some special events can increase your latent power over time. " +
+                            "Don't worry if your latent power is low - the lower it starts, the faster it rises over time.");
+                    break;
                 case 'garden':
                     if(player && player.isNemesis) {
                         output.setTitle('Help: The Garden')
                             .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
                                 'After using any gardening command, you must wait three hours before using another.\n' +
-                                'Enter `!help plants` for more info on available plant types.');
-                        this.addHelpField(output, 'garden');
-                        this.addHelpField(output, 'plant');
-                        this.addHelpField(output, 'pick');
-                        this.addHelpField(output, 'use');
+                                'Enter `!help plants` for more info on available plant types.')
+                            .addField('!garden', 'Display info about the garden.')
+                            .addField('!plant', 'Plant a new plant in the garden.')
+                            .addField('!pick', 'Pick a finished plant from tohe garden.');
                     } else {
                         output.setTitle('Help: The Garden')
-                        .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
-                            'After using any gardening command, you must wait an hour before using another.\n' +
-                            'Watering plants or expanding the garden boosts your Garden Level.\n' +
-                            'Enter `!help plants` for more info on available plant types.');
-                        this.addHelpField(output, 'garden');
-                        this.addHelpField(output, 'expand');
-                        this.addHelpField(output, 'plant');
-                        this.addHelpField(output, 'water');
-                        this.addHelpField(output, 'pick');
-                        this.addHelpField(output, 'use');
+                            .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
+                                'After using any gardening command, you must wait an hour before using another.\n' +
+                                'Watering plants or expanding the garden boosts your Garden Level.\n' +
+                                'Enter `!help plants` for more info on available plant types.')
+                            .addField('!garden', 'Display info about the garden.')
+                            .addField('!plant', 'Plant a new plant in the garden.')
+                            .addField('!pick', 'Pick a finished plant from tohe garden.')
+                            .addField('!expand', "Improve the garden's overall attributes.")
+                            .addField('!water', 'Water all plants in the garden.')
+                            .addField('!use plantname target', 'Use a plant on someone.');
                     }
                     break;
                 case 'plants':
@@ -116,30 +126,39 @@ Rank ??? 1000 Glory
                                 case enums.Items.Fern:
                                     output.addField('Fern (12 hours)', "Magic properties conceal power. Hides someone's power level for twelve hours.");
                                     break;
+                                case enums.Items.Gourd:
+                                    output.addField('Gourd (18 hours)', "Distorts time and boosts your motivation. Instantly adds an hour to your training time.");
+                                    break;
+                                case enums.Items.Peach:
+                                    output.addField('Peach (36 hours)', "Gain a glimpse of the eternal. For six hours, grants immortality.");
+                                    break;
                             }
                         }
                     }
                     break;
                 case 'battle':
-                    output.setTitle('Help: Battle');
-                    this.addHelpField(output, 'fight');
-                    this.addHelpField(output, 'taunt');
-                    this.addHelpField(output, 'unfight');
-                    this.addHelpField(output, 'train');
-                    this.addHelpField(output, 'journey');
-                    this.addHelpField(output, 'selfdestruct');
+                    output.setTitle('Help: Battle')
+                        .setDescription('To get more info on any command, enter `!help commandname`.')
+                        .addField('!fight target', 'Challenge a player to a battle.')
+                        .addField('!taunt target', 'Challenge a player to a battle with Glory at stake.')
+                        .addField('!unfight', 'Cancel all outgoing battle challenges.')
+                        .addField('!train', 'Begin training to increase your power level.')
+                        .addField('!journey hours', 'Go on a long journey to hone your skills.')
+                        .addField('!selfdestruct', 'Sacrifice yourself to defeat a powerful foe.');
                     break;
                 case 'actions':
-                    output.setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !transform boosts your Action Level.');
-                    this.addHelpField(output, 'search');
-                    this.addHelpField(output, 'empower');
-                    this.addHelpField(output, 'transform');
-                    this.addHelpField(output, 'filler');
+                    output.setTitle('Help: World Actions')
+                        .setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !transform boosts your Action Level.')
+                        .addField('!search', 'Seek out interesting things in the world.')
+                        .addField('!empower', 'Send another player your energy.')
+                        .addField('!transform', 'Unleash your true power.')
+                        .addField('!filler', 'Engage in a relaxing filler episode.')
+                        .addField('!steal itemname target', 'Attempt to steal an item from an evil player.');
                     break;
                 case 'fusion':
                     output.setDescription('Fusion:')
                         .addField('!fuse name fusionname', "Send a fusion offer to another player. Name is their name, fusionname is your proposed name for your fusion. If they offered to fuse already, then you'll combine! Fusion lasts for 24 hours.")
-                        .addField('Fusion requirements', 'Must both be Rank B or higher.\nMust both be alive.\nMust not be the Nemesis.\nMust not be a fusion.\nEach player can only fuse once per season.')
+                        .addField('Fusion requirements', 'Must both be Rank B or higher.\nMust both be alive.\nMust not be the Nemesis.\nMust not be a fusion.\nEach player can only fuse once every 7 days.')
                         .addField('Fusion effects', 'Your power level increases dramatically.\nYour action and gardening levels are combined.\nYou need twice as much glory to rank up.\nWish bonuses carry over into the fusion.')
                         .addField('When a Fusion ends', 'You each gain half of the glory you earned while fused.\nYou each gain half of the gardening and action levels you gained while fused.\nYour inventories are split between you at random.');
                     break;
@@ -175,15 +194,24 @@ Rank ??? 1000 Glory
                 case 'wish':
                     output.setTitle('Help: Wishes')
                         .setDescription("Seven magic orbs are waiting to be found! If you collect all seven, then you can make a wish, giving you incredible powers. " +
-                            "You can only make a wish once per season, and after you do, the orbs are lost again. After someone makes a wish, the orbs are harder to find for three days.")
+                            "You can only make a wish once every seven days, and after you do, the orbs are lost again. After someone makes a wish, the orbs are harder to find for three days.")
                         .addField('!give', "Gives one of your magic orbs to another player. You can only do this if you've already used up your wish, or if you're an underling.")
-                        .addField('!wish power', 'Become incredibly powerful! Your Power Level increases by 200%, and you gain a 50% bonus to the results of all training until the next season.')
+                        .addField('!steal itemname target', 'Attempt to steal an item from an evil player.')
+                        .addField('!wish power', 'Become incredibly powerful! Your Power Level increases dramatically, and you gain a huge bonus to your Latent Power.')
                         .addField('!wish immortality', "Become immortal! No matter how you die, you'll revive in one hour. Lasts until the next season.")
                         .addField('!wish resurrection', 'Raise the dead! All fallen players are instantly revived, and their Power Levels increase by 20%.')
                         .addField('!wish gardening', 'Become the master of gardening! Gardening Level increases by 12.')
                         .addField('!wish ruin', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.')
                         .addField('!wish snap', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.');
                     break;
+                case 'tournament':
+                    output.setTitle('Help: Tournaments')
+                        .setDescription("Thrilling battle tournaments, organized by players, with glory and treasure as the stakes!")
+                        .addField('!tourney', "Also accepts `!tournament`. Displays the status of the current tournament.")
+                        .addField('!tourney single', "Begin recruiting players for a single-elimination tournament. A new tournament can only start when it's been 24 hours since the last tournament.\n" +
+                            "Once a single elimination tournament starts, each round lasts for 24 hours or until every match in the round is resolved.")
+                        .addField('!tourney join', "Sign up for a tournament that's recruiting for players. A tournament requires at least four players, but can't have more than sixteen.")
+                        .addField('!tourney start', "Start the tournament with the current set of players!");
                 default:
                     if(this.addHelpField(output, topic)) {
                         return output;
@@ -279,8 +307,9 @@ Rank ??? 1000 Glory
                     '**!expand research:** Unlocks new types of plants to plant.\n');
                 break;
             case 'plant':
-                embed.addField('!plant type', 'Adds a plant to the garden. When it finishes growing, you can then use `!pick type` to collect it.\n' +
-                    'Requirements: Must be registered. Must have your gardening action ready. Must be an empty space in the garden.');
+                embed.addField('!plant type', 'Adds a plant to the garden. When it finishes growing, you can then use `!pick type` to collect it. ' +
+                    'However, a given player can only have one plant growing in the garden at a time.\n' +
+                    'Requirements: Must be registered. Must be an empty space in the garden.');
                 break;
             case 'water':
                 embed.addField('!water', 'Advances every plant in the garden a little bit closer to being ready to pick.\n' +
@@ -289,12 +318,13 @@ Rank ??? 1000 Glory
                 break;
             case 'pick':
                 embed.addField('!pick type', 'Pick a finished plant from the garden, and adds it to your inventory.' +
-                    "If you don't specify a type, you'll just pick the first plant you see.\n" +
+                    "If you don't specify a type, you'll just pick the first plant you see. " +
+                    "Be sure to use your plants once you've picked them - they'll start to decay after 3 days." +
                     'Requirements: Must be registered. Specified plant must be ready to pick.');
                 break;
             case 'use':
                 embed.addField('!use type target', 'Use a plant in your inventory on someone! Effect depends on the type of plant.\n' +
-                    "Requirements: Must be registered. Must have the plant in your inventory. Certain plants can't be used on yourself.");
+                    "Requirements: Must be registered. Must have the plant in your inventory. Must not be defeated.");
                 break;
             case 'train':
                 embed.addField('!train', "Begin training! The longer you train, the stronger you'll be when you finish." +
@@ -308,6 +338,10 @@ Rank ??? 1000 Glory
                     "When you return from your journey, your power will increase dramatically! It's the same as normal training, but the effect is anywhere from 80% to 180% of normal.\n" +
                     "Requirements: Must qualify for !train. Can't journey for more than 24 hours. Can't journey while carrying orbs. Must wait at least 12 hours between journeys.");
                 break;
+            case 'return':
+                embed.addField('!return', "Ends your journey instantly, abandoning all rewards for it.\n" +
+                    "Rerquirements: Must be on a journey. The universe must be in great peril.");
+                break;
             case 'search':
                 embed.addField('!search', "Search the world for something interesting! " +
                     "Maybe you'll find an orb, maybe you'll find some plants, maybe you'll find nothing... or maybe you'll find a real surprise.\n" +
@@ -317,6 +351,10 @@ Rank ??? 1000 Glory
                     "If you're an Underling, your chances are doubled.\n" +
                     "If the Nemesis is at large, your chances are doubled.\n" +
                     "Requirements: Must be registered. Must not have used any world actions in the past hour.");
+                break;
+            case 'event':
+                embed.addField('!event', "Engages with the current event, if there is one. Use `!world` to check for events.\n" +
+                    "Requirements: Must be registered. Must be alive. Must have your world action ready. Must be an event going on.");
                 break;
             case 'transform':
                 embed.addField('!transform', "Go beyond your limits and assume a new, more powerful temporary form! " +
@@ -330,10 +368,16 @@ Rank ??? 1000 Glory
                     "Requirements: Must be registered. Must not have used any world actions in the past hour. Must be Rank C or above.");
                 break;
             case 'give':
-                embed.addField('!give target', "Give one magic orb to someone else!\n" +
-                    "Requirements: Must be registered. Must have at least one orb. " +
-                    "Must either be an underling or have already used your wish for this season. " + 
+                embed.addField('!give itemtype target', "Give one item to someone else!\n" +
+                    "Requirements: Must be registered. Must have the item. You and the target must both be alive. " +
+                    "If giving orbs, must either be an underling or have already used your wish for this week. " + 
                     "If you're an underling, you can only give orbs to the Nemesis.");
+                break;
+            case 'steal':
+                embed.addField('!steal itemtype target', "Attempt to steal an item from an enemy player!\n" +
+                    "If you succeed, the item will be yours. However, if you get caught, you'll be thrust into a fight, and your power will be reduced. " +
+                    "The chance of success is slim, but the stronger your foe, the more likely they are to overlook you.\n" +
+                    "Requirements: Must be alive. Must have a world action ready. Target must be an Underling or the Nemesis.");
                 break;
             case 'world':
                 embed.addField('!world', "Displays basic info about the world - age, countdown timers, how many orbs are still in hiding. Can be used by anyone.");
@@ -349,8 +393,8 @@ Rank ??? 1000 Glory
                 break;
             case 'filler':
                 embed.addField('!filler target', "Creates a randomized filler episode! If you specify a target, they'll be " +
-                    "involved in the episode as well. If the person who uses the command is defeated, their timer will " +
-                    "fast forward by ten minutes.");
+                    "involved in the episode as well. If any of the named players are injured, their timers will " +
+                    "fast forward by a few minutes.");
                 break;
             case 'episode':
                 embed.addField('!episode number', "Shows the air date and summary of a specific episode.");

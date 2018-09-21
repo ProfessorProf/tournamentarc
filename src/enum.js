@@ -12,6 +12,7 @@ module.exports = {
         Zedge: 9,
         Gourd: 10,
         Peach: 11,
+        Trophy: 12,
         Name: {
             0: 'orb',
             1: 'flower',
@@ -24,7 +25,8 @@ module.exports = {
             8: 'zarrot',
             9: 'zedge',
             10: 'gourd',
-            11: 'peach'
+            11: 'peach',
+            12: 'trophy'
         },
         An: {
             0: true
@@ -41,7 +43,8 @@ module.exports = {
             8: 2,
             9: 2,
             10: 1,
-            11: 3
+            11: 3,
+            12: 4
         },
         GrowTime: {
             1: 18,
@@ -71,6 +74,7 @@ module.exports = {
         Plant: 1,
         DarkPlant: 2,
         SuperPlant: 3,
+        Other: 4,
         IsPlantType: {
             1: true,
             2: true,

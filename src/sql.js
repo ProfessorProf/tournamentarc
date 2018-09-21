@@ -9,14 +9,9 @@ const updateSql = `
 ALTER TABLE Players ADD COLUMN Latent_Power REAL;
 ALTER TABLE Players ADD COLUMN Base_Latent_Power REAL;
 ALTER TABLE Players ADD COLUMN Known_Latent_Power REAL;
-ALTER TABLE Players DROP Nemesis_Flag;
-ALTER TABLE Players DROP Fusion_Flag;
-ALTER TABLE Players DROP Wish_Flag;
-ALTER TABLE Players DROP Overdrive_Count;
 ALTER TABLE Plants ADD COLUMN Planter_ID INTEGER;
 ALTER TABLE HeldItems ADD COLUMN Decay_Time INTEGER;
-ALTER TABLE Worlds ADD COLUMN Offset INTEGER;
-ALTER TABLE Worlds DROP Max_Population`;
+ALTER TABLE Worlds ADD COLUMN Offset INTEGER`;
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER,
@@ -779,8 +774,7 @@ module.exports = {
 		let player = await this.getPlayerByUsername(channel, name);
 		const now = new Date().getTime();
 		if(!player) return;
-		player.lastActive = now;
-		await this.setPlayer(player);
+		await sql.run(`UPDATE Players SET Last_Active = $now WHERE ID = $id`, {$id: player.id, $now: now});
 	},
 	async unfightOffers(id) {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $id AND Type IN (0, 3)`, {$id: id});

@@ -346,6 +346,7 @@ async function handleMessage(message) {
 		case 'tournament':
 			output.messages = await tools.tournament(player, args[0]);
 			output.informational = args.length > 0;
+			break;
 		case 'debug':
 			await sql.execute(args.join(' '));
 			break;
@@ -357,6 +358,9 @@ async function handleMessage(message) {
 			break;
 		case 'test':
 			output.messages = await tools.testMethod(channel, name, args[0]);
+			break;
+		case 'update':
+			await sql.update();
 			break;
 	}
 
