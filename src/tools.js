@@ -3377,7 +3377,7 @@ module.exports = {
 	},
 	async joinTournament(player, tournament) {
 		await sql.joinTournament(tournament.channel, player.id);
-		return `${player.name} has joined the tournament! There's room for ${16 - tournament.players.length} more players.`;
+		return `${player.name} has joined the tournament! There's room for ${15 - tournament.players.length} more players.`;
 	},
 	async startTournament(tournament) {
 		// Generate seed list

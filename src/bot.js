@@ -359,7 +359,7 @@ async function handleMessage(message) {
 		case 'tourney':
 		case 'tournament':
 			output.messages = await tools.tournament(player, args[0]);
-			output.informational = args.length > 0;
+			output.informational = args.length == 0;
 			break;
 		case 'debug':
 			await sql.execute(args.join(' '));

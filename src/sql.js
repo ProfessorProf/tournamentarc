@@ -714,7 +714,7 @@ module.exports = {
 		await sql.run(`DELETE FROM History WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`);
+		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE Items SET Known = 0 WHERE Channel = $channel`, {$channel: channel});
 
 		// Make one random plant known
