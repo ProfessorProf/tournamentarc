@@ -702,7 +702,7 @@ module.exports = {
 	},
 	async resetWorld(channel) {
 		const now = new Date().getTime();
-		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = Resets + 1, Start_Time = $now WHERE Channel = $channel`,
+		await sql.run(`UPDATE Worlds SET Heat = 0, Resets = Resets + 1, Episode = 1, Start_Time = $now WHERE Channel = $channel`,
 			{$channel: channel, $now: now});
 		await sql.run(`UPDATE Gardens SET Growth_Level = 0, Research_Level = 0, Size_Level = 0
 			WHERE Channel = $channel`, {$channel: channel});
@@ -714,11 +714,13 @@ module.exports = {
 		await sql.run(`DELETE FROM History WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`);
 		await sql.run(`UPDATE Items SET Known = 0 WHERE Channel = $channel`, {$channel: channel});
 
 		// Make one random plant known
 		const knownPlant = Math.floor(Math.random() * 5) + 2;
 		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
+		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = 1 AND Channel = $channel`, {$channel: channel});
 		console.log(`Channel ${channel} initialized`);
 	},
 	async clone(player, targetName) {
