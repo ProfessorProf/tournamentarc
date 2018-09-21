@@ -135,10 +135,12 @@ module.exports = {
 		for(const query of queries) {
 			await sql.run(query);
 		}
-		const offset = Math.floor(Math.random() * 1000);
-		await sql.run(`UPDATE Worlds SET Offset = $offset`, {$offset: offset});
-		const channels = (await sql.all(`SELECT Channel FROM Worlds`)).map(row => row.Channel);
 
+		let offset = (await sql.get(`SELECT Offset FROM Worlds ORDER BY ID`)).Offset;
+		await sql.run(`UPDATE Worlds SET Offset = $offset`, {$offset: offset});
+		if(!offset) offset = Math.floor(Math.random() * 1000);
+
+		const channels = (await sql.all(`SELECT Channel FROM Worlds`)).map(row => row.Channel);
 		for(const channel of channels) {
 			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (10, $channel, 0)`, {$channel: channel});
 			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (11, $channel, 0)`, {$channel: channel});
@@ -709,9 +711,9 @@ module.exports = {
 		await sql.run(`DELETE FROM HeldItems WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Nemesis WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Underlings WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM History WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Tournament_Players WHERE Channel = $channel`, {$channel: channel});
-		await sql.run(`DELETE FROM Tournament_Brackets WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE Items SET Known = 0 WHERE Channel = $channel`, {$channel: channel});
 
 		// Make one random plant known

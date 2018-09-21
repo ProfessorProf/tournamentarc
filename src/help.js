@@ -21,7 +21,7 @@ module.exports = {
                 .addField('!help wish', 'Help with commands related to orbs and wishes: !search, !give, !wish.')
                 .addField('!help rank', 'Help with Rank, Glory, and how to increase them.')
                 .addField('!help latentpower', 'Help with the mysterious latent power hiding within.')
-                .addField('!help tournaments', 'Help with commands related to martial arts tournaments.')
+                .addField('!help tournament', 'Help with commands related to martial arts tournaments.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
         } else {
@@ -42,6 +42,7 @@ module.exports = {
                         .addField('!graveyard', 'Display all defeated players.')
                         .addField('!history', 'Display your battle history.')
                         .addField('episode', 'Display a summary of a past episode.');
+                    break;
                 case 'config':
                     output.setTitle('Help: Configuration Commands')
                         .addField('!config', 'Displays your current config options.')
@@ -49,7 +50,7 @@ module.exports = {
                         .addField('Config Flags:', '**AlwaysPrivate**: Valid values: "on"/"off". Sends messages via DM by default. If you want a specific message to send via DM, preface it with "!!" instead of "!". ' +
                             'For a list of commands that can be made private, enter `!help info`. Default: Off.\n' +
                             '**Ping**: Valid values: "on"/"off". Mentions you when various important events happen related to your character. Default: Off.\n' + 
-                            '**AutoTrain**: Valid Values: "on"/"off". When active, you will automatically start training whenever you come back from a defeat.\n' +
+                            '**AutoTrain**: Valid Values: "on"/"off". When active, you will automatically start training whenever you come back from a defeat. Default: On.\n' +
                             '**Pronoun**: Valid values: "he"/"she"/"they". Determines what pronouns the game uses for messages about you. Default: They.');
                     break;
                 case 'rank':
@@ -76,7 +77,7 @@ Rank ??? 1000 Glory
                     if(player && player.isNemesis) {
                         output.setTitle('Help: The Garden')
                             .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
-                                'After using any gardening command, you must wait three hours before using another.\n' +
+                                'After using most  gardening commands, you must wait three hours before using another.\n' +
                                 'Enter `!help plants` for more info on available plant types.')
                             .addField('!garden', 'Display info about the garden.')
                             .addField('!plant', 'Plant a new plant in the garden.')
@@ -84,7 +85,7 @@ Rank ??? 1000 Glory
                     } else {
                         output.setTitle('Help: The Garden')
                             .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
-                                'After using any gardening command, you must wait an hour before using another.\n' +
+                                'After using most gardening commands, you must wait an hour before using another.\n' +
                                 'Watering plants or expanding the garden boosts your Garden Level.\n' +
                                 'Enter `!help plants` for more info on available plant types.')
                             .addField('!garden', 'Display info about the garden.')
@@ -148,7 +149,7 @@ Rank ??? 1000 Glory
                     break;
                 case 'actions':
                     output.setTitle('Help: World Actions')
-                        .setDescription('After using any action command, you must wait an hour before using another. Using !search, !empower, or !transform boosts your Action Level.')
+                        .setDescription('After using any action command, you must wait an hour before using another. Using any Action boosts your Action Level.')
                         .addField('!search', 'Seek out interesting things in the world.')
                         .addField('!empower', 'Send another player your energy.')
                         .addField('!transform', 'Unleash your true power.')
@@ -178,12 +179,12 @@ Rank ??? 1000 Glory
                             "Can't make normal wishes.\n" + 
                             "Can make Nemesis wishes.")
                         .addField('Nemesis-only commands:', '!recruit: Ask a player to join you as an underling.\n' +
-                            '!exile: Fire an underling.\n' +
-                            '!energize: Power up an underling.\n' +
-                            '!revive: Resurrect a defeated underling.\n' +
-                            "!attack: Fight a player, even if they haven't challenged you.\n" +
-                            '!destroy: Destroy a planet.\n' +
-                            '!burn: Attack the garden.');
+                            '**!exile**: Fire an underling.\n' +
+                            '**!energize**: Power up an underling.\n' +
+                            '**!revive**: Resurrect a defeated underling.\n' +
+                            "**!attack**: Fight a player, even if they haven't challenged you.\n" +
+                            '**!destroy**: Destroy a planet.\n' +
+                            '**!burn**: Attack the garden.');
                     break;
                 case 'underling':
                 case 'underlings':
@@ -291,12 +292,10 @@ Rank ??? 1000 Glory
             case 'energize':
                 embed.addField('!energize target', "Imbues an underling with power, boosting their power level by 30% for 3 hours.\n" +
                     "Requirements: Must be the Nemesis. Target must be an underling. Can only be used once every 3 hours.");
+                break;
             case 'revive':
                 embed.addField('!revive target', "Resurrects a fallen underling immediately, and increases their power level by 20%.\n" +
                     "Requirements: Must be the Nemesis. Target must be an underling. Can only be used once every 24 hours.");
-                break;
-            case 'garden':
-                embed.addField('!garden', "Displays basic information about the garden - the status of each planted plant, and the Size, Growth and Research levels.")
                 break;
             case 'expand':
                 embed.addField('!expand type', 'Requires Rank C. Work on upgrading the garden! Amount is based on your Garden Level. ' +
@@ -347,9 +346,9 @@ Rank ??? 1000 Glory
                     "Maybe you'll find an orb, maybe you'll find some plants, maybe you'll find nothing... or maybe you'll find a real surprise.\n" +
                     "Modifiers to the chance of finding something:\n" +
                     "Each Action Level increases chances by 1 percentage point.\n" +
-                    "If you've eaten a carrot, your chances are tripled.\n" +
-                    "If you're an Underling, your chances are doubled.\n" +
-                    "If the Nemesis is at large, your chances are doubled.\n" +
+                    "If you've eaten a carrot, your chances are increased.\n" +
+                    "If you're an Underling, your chances are increased.\n" +
+                    "If the Nemesis is at large, your chances are increased.\n" +
                     "Requirements: Must be registered. Must not have used any world actions in the past hour.");
                 break;
             case 'event':

@@ -18,7 +18,7 @@ module.exports = {
 		let errors = [];
 		let now = new Date().getTime();
 		if((!world || !world.startTime) &&
-			cmd != 'scores' && cmd != 'debug') {
+			cmd != 'scores' && cmd != 'debug' && cmd != 'season') {
 			errors.push(`A new universe is waiting to be born.`);
 			return errors;
 		}
@@ -259,7 +259,7 @@ module.exports = {
 			case 'test':
 				// !clone validation rules:
 				// - Must be admin
-				if(player.username != auth.admin) {
+				if(player.username != auth.admin && !player.fusedPlayers.find(p => p.username == auth.admin)) {
 					errors.push('Only the game master can use debug commands.');
 				}
 				break;
@@ -621,7 +621,7 @@ module.exports = {
 					if(player.isNemesis) {
 						errors.push(`**${player.name}** is already a Nemesis.`);
 					}
-					const nemesisUsed = player.cooldown.find(c => c.type == enums.Cooldowns.NemesisUsed);
+					const nemesisUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.NemesisUsed);
 					if(nemesisUsed) {
 						errors.push(`**${player.name}** cannot become a Nemesis again for another ${tools.getTimeString(nemesisUsed.endTime - now)}.`);
 					}

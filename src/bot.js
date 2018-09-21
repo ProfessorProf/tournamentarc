@@ -137,10 +137,24 @@ async function handleMessage(message) {
 		args = args.splice(2);
 	}
 
+	if(cmd == 'update' ) {
+		message.channel.send('Beginning update...');
+		try {
+			await sql.update();
+			message.channel.send(`Update complete.`);
+		} catch (e) {
+			console.log(e);
+		}
+		const endTime = new Date().getTime();
+		const duration = (endTime - now) / 1000;
+		console.log(`${channel}: Command "${message.content}" completed for player ${username} in ${duration} seconds`);
+		return;
+	}
+
 	if(cmd == 'init' ) {
 		message.channel.send('Beginning initialization...');
 		try {
-		await sql.initializeGame()
+			await sql.initializeGame()
 		} catch (e) {
 			console.log(e);
 		}
@@ -270,7 +284,7 @@ async function handleMessage(message) {
 		case 'train':
 			output.messages = await tools.train(player);
 			break;
-		case 'reset':
+		case 'season':
 			output.messages = await tools.resetData(channel);
 			break;
 		case 'search':
@@ -293,7 +307,7 @@ async function handleMessage(message) {
 			output.messages = await tools.transform(player);
 			break;
 		case 'empower':
-			output.messages = await tools.empower(player, targetName);
+			output.messages = await tools.empower(player, target);
 			break;
 		case 'give':
 			output.messages = await tools.give(player, target, args[0]);

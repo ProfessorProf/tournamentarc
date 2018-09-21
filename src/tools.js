@@ -901,15 +901,6 @@ module.exports = {
 					output += await this.tournamentMatch(tournament, winner);
 				}
 			}
-
-			// Transformation penalty
-			if(loser.status.find(s => s.type == enums.Statuses.Transform || 
-				s.type == enums.Statuses.SuperTransform)) {
-				await sql.deleteStatus(loser.id, enums.Statuses.Transform);
-				await sql.deleteStatus(loser.id, enums.Statuses.SuperTransform);
-				hours += 3;
-			}
-
 			// Berserk penalty
 			if(loser.status.find(s => s.type == enums.Statuses.Berserk)) {
 				hours += 3;
@@ -918,6 +909,14 @@ module.exports = {
 			// Immortality
 			if(loser.status.find(s => s.type == enums.Statuses.Immortal)) {
 				hours = winner.isNemesis ? 3 : 1;
+			}
+
+			// Transformation penalty
+			if(loser.status.find(s => s.type == enums.Statuses.Transform || 
+				s.type == enums.Statuses.SuperTransform)) {
+				await sql.deleteStatus(loser.id, enums.Statuses.Transform);
+				await sql.deleteStatus(loser.id, enums.Statuses.SuperTransform);
+				hours += 3;
 			}
 
 			// Ultimate Form
@@ -1161,8 +1160,6 @@ module.exports = {
 	async destroy(player) {
 		const channel = player.channel;
 		let players = await sql.getPlayers(channel);
-		let nemesis = await sql.getNemesis(channel);
-		let player = name ? await sql.getPlayerByUsername(channel, name) : await sql.getPlayerById(nemesis.id);
 		let embed = new Discord.RichEmbed();
 		
 		embed.setTitle('DESTRUCTION')
@@ -1172,13 +1169,13 @@ module.exports = {
 		let targetPlayers = [];
 		for(const i in players) {
 			let p = players[i];
-			if(p && p.username != name && !p.status.find(s => s.type == enums.Statuses.Dead) && 
+			if(p && p.id != player.id && !p.status.find(s => s.type == enums.Statuses.Dead) && 
 				!p.status.find(s => s.type == enums.Statuses.Annihilation) &&
 				(!p.isUnderling || !player.isNemesis)) {
 				targetPlayers.push(p);
 			}
 		}
-		let targets = Math.max(2, Math.floor(players.length / 4));
+		let targets = Math.max(2, Math.ceil(players.length / 4));
 		targets = Math.min(targets, targetPlayers.length);
 		const firstTarget = Math.floor(Math.random() * targetPlayers.length);
 		
@@ -1795,8 +1792,10 @@ module.exports = {
 				modifier = Math.min(1.5, Math.pow((averageLevel + 2) / (garden.researchLevel + 2), 3));
 				expansion *= modifier * 2 / (100 * (3 + garden.researchLevel));
 				percent = Math.floor(1000 * expansion) / 10;
+				const unknownPlants = garden.plantTypes.filter(t => !t.known && enums.Items.Type[t.id] == enums.ItemTypes.Plant);
+				const unknownSuperPlants = garden.plantTypes.filter(t => !t.known && enums.Items.Type[t.id] == enums.ItemTypes.SuperPlant);
 				console.log(`${player.name} advanced garden research by ${Math.floor(expansion * 100) / 100}, modifier was ${modifier}`);
-				if(garden.researchLevel > 4) {
+				if(unknownPlants.length + unknownSuperPlants.length == 0) {
 					output += `**${player.name}** works on researching gardening in general, with a rating of ${percent}%. Growth and Size levels are now easier to advance.`;
 				} else {
 					output += `**${player.name}** works on researching new plants, with a rating of ${percent}%.`;
@@ -1804,13 +1803,11 @@ module.exports = {
 				garden.researchLevel += expansion;
 				if(Math.floor(garden.researchLevel) > Math.floor(garden.researchLevel - expansion)) {
 					// Level up!
-					let unknownPlants = garden.plantTypes.filter(t => !t.known && enums.Items.Type[t.id] == enums.ItemTypes.Plant);
-					let unknownSuperPlants = garden.plantTypes.filter(t => !t.known && enums.Items.Type[t.id] == enums.ItemTypes.SuperPlant);
 					if(unknownPlants.length > 0) {
 						let newPlant = unknownPlants[Math.floor(Math.random() * unknownPlants.length)];
 						output += `\nResearch level increased! New plant "${enums.Items.Name[newPlant.id]}" can now be planted in the garden.`;
 						await sql.researchPlant(player.channel, newPlant.id);
-					} else if(unknownSuperPlants > 0) {
+					} else if(unknownSuperPlants.length > 0) {
 						let newPlant = unknownSuperPlants[Math.floor(Math.random() * unknownSuperPlants.length)];
 						output += `\nResearch level increased! New plant "${enums.Items.Name[newPlant.id]}" can now be planted in the garden.`;
 						await sql.researchPlant(player.channel, newPlant.id);
@@ -1836,6 +1833,7 @@ module.exports = {
 	},
 	// Reset the universe.
 	async resetData(channel) {
+		const now = new Date().getTime();
 		await sql.resetWorld(channel);
 		let players = await sql.getPlayers(channel);
 		for(const i in players) {
@@ -1854,7 +1852,7 @@ module.exports = {
 			}
 		}
 
-		return 'Onwards, to a new universe...! Some Glory is preserved, but all Power Levels and player status has been reverted.'
+		return 'Onwards, to a new adventure...! Some Glory is preserved, but all Power Levels and player status has been reverted.'
 	},
 	// Register a new player.
 	async registerPlayer(channel, username, userId, name) {
@@ -1965,12 +1963,12 @@ module.exports = {
 				output = await this.searchMonsters(player, searchChance);
 			}
 			if(!output) {
-				searchChance = 10.02 * searchMultiplier;
+				searchChance = 0.02 * searchMultiplier;
 				output = await this.searchEvents(player, world, searchChance);
 			}
 		}
 		if(!output) {
-			output = this.searchJunk(0.1);
+			output = this.searchJunk(player, 0.1);
 		}
 		if(!output) {
 			output = [];
@@ -2054,7 +2052,7 @@ module.exports = {
 		const roll = Math.random();
 		let output = [];
 
-		if(roll < 10 + searchChance) {
+		if(roll < searchChance) {
 			console.log(`${player.name} found a monster on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 			if(Math.random() < 0.1) {
 				// Zorbmaster discovered!
@@ -2443,7 +2441,7 @@ module.exports = {
 					// Journey
 					const storedTrainingTime = status.rating;
 					const journeyTime = status.endTime - status.startTime;
-					const journeyEffect = (Math.random() * 0.4 + 0.8);
+					let journeyEffect = (Math.random() * 0.4 + 0.8);
 					if(nemesis) {
 						// Journeys that end during a Nemesis reign are amazing
 						journeyEffect += 0.5;
@@ -2646,7 +2644,7 @@ module.exports = {
 	getPowerLevel(player) {
 		let level = player.level;
 		// Transformation
-		const transform = player.status.find(s => s.type == enums.Statuses.Transform || s.type == enums.Statuses.SuperTransform || enums.Statuses.UltimateForm);
+		const transform = player.status.find(s => s.type == enums.Statuses.Transform || s.type == enums.Statuses.SuperTransform || s.type == enums.Statuses.UltimateForm);
 		if(transform) {
 			level *= transform.rating;
 		}
@@ -2755,7 +2753,7 @@ module.exports = {
 		let targetItem = target.items.find(i => enums.Items.Name[i.type] == itemType.toLowerCase());
 		if(!targetItem) return;
 
-		let stealChance = target.level / player.level * 0.01;
+		let stealChance = target.level / player.level * 0.0125;
 		if(target.isUnderling) stealChance *= 5;
 		if(stealChance > settings.MaxStealChance) stealChance = settings.MaxStealChance;
 
@@ -2815,7 +2813,7 @@ module.exports = {
 		let description = '';
 		if(twoPlayers) {
 			if(history.length == 0) {
-				embed.setDescription(`${player1.name} and ${player2.name} have never fought.`);
+				description += `${player1.name} and ${player2.name} have never fought.`;
 			} else {
 				const player1wins = history.filter(h => h.winnerId == player1.id).length;
 				const player2wins = history.filter(h => h.winnerId == player2.id).length;
@@ -3213,7 +3211,7 @@ module.exports = {
 
 		let defeatedPlayers = cast.filter(p => p.status.find(s => s.type == enums.Statuses.Dead));
 		if(defeatedPlayers) {
-			const healing = 12 * 60 * 1000 / (defeatedPlayers.length + 1)
+			const healing = 12 * 60 * 1000 / (defeatedPlayers.length + 1) * (1 + player.actionLevel * 0.025);
 			for(const p of defeatedPlayers) {
 				if(p.id == player.id) {
 					await this.healPlayer(player, 2 * healing);
@@ -3222,7 +3220,7 @@ module.exports = {
 				}
 			}
 		}
-		await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour, enums.Cooldowns.Action);
+		await this.actionLevelUp(player);
 
 		
 		return embed;
@@ -3403,7 +3401,7 @@ module.exports = {
 		return this.displayTournament(await sql.getTournament(tournament.channel));
 	},
 	async tournamentMatch(tournament, winnerPlayer) {
-		let winner = tournament.players.find(p => p.id == winnerPlayer.id);
+		let winner = tournament.players.find(p => p && p.id == winnerPlayer.id);
 		const winnerPosition = winner.position;
 		const loserPosition = winnerPosition % 2 == 0 ? winnerPosition + 1 : winnerPosition - 1;
 		let loser = tournament.players[loserPosition];

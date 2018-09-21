@@ -8,5 +8,5 @@ module.exports = {
     HotSpringHours: 1,
     DojoHours: 1,
     GardenMaxSize: 8,
-    MaxStealChance: 0.25
+    MaxStealChance: 0.50
 }
