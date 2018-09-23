@@ -187,6 +187,7 @@ module.exports = {
 				startTime: row.Start_Time,
 				episode: row.Episode,
 				cooldowns: statusRows.map(c => { return {
+					id: c.ID,
 					type: c.Rating,
 					endTime: c.EndTime
 				}})

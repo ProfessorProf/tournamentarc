@@ -3571,32 +3571,36 @@ module.exports = {
 		const now = new Date().getTime();
 		const world = await sql.getWorld(player.channel);
 		const event = world.cooldowns.find(c => enums.Cooldowns.IsEvent[c.type]);
+		let output = null;
+
 		if(event) {
 			switch(event.type) {
 				case enums.Cooldowns.HotSpringEvent:
 					const defeated = await this.healPlayer(player, settings.HotSpringHours * hour);
 					if(defeated) {
-						return `${player.name} takes some time to relax in a magical hot spring, ` +
+						output = `${player.name} takes some time to relax in a magical hot spring, ` +
 							`but still can't fight for another ${this.getTimeString(defeated.endTime - now)},`;
 					} else {
-						return `${player.name} takes some time to relax in a magical hot spring, and is once again ready to fight!`;
+						output = `${player.name} takes some time to relax in a magical hot spring, and is once again ready to fight!`;
 					}
 				case enums.Cooldowns.DojoEvent:
 					let training = player.status.find(s => s.type == enums.Statuses.Training);
 					if(training) {
 						training.startTime -= settings.DojoHours * hour;
 						await sql.setStatus(training);
-						return `${player.name} visits the dojo and works hard, boosting the effects of ${this.their(player.config.Pronoun)} training!`;
+						output = `${player.name} visits the dojo and works hard, boosting the effects of ${this.their(player.config.Pronoun)} training!`;
 					}
 					break;
 				case enums.Cooldowns.GuruEvent:
 					await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, 6 * hour);
 					this.addLatentPower(player, Math.random() * 0.1 + 0.1);
 					await sql.setPlayer(player);
-					return `${player.name} fights the guru, and is soundly thrashed! However, ${this.their(player.config.Pronoun)} latent power may have awakened...`;
+					output = `${player.name} fights the guru, and is soundly thrashed! However, ${this.their(player.config.Pronoun)} latent power may have awakened...`;
 			}
 
-			return null;
+			await this.actionLevelUp(player);
+
+			return output;
 		}
 	},
 	addLatentPower(player, amount) {
