@@ -2425,7 +2425,7 @@ module.exports = {
 	async deleteExpired(channel, pings) {
 		let expired = await sql.getExpired(channel);
 		const nemesis = await sql.getNemesis(channel);
-		const nemesisPlayer = await sql.getPlayerById(nemesis.id);
+		const nemesisPlayer = nemesis ? await sql.getPlayerById(nemesis.id) : null;
 		const now = new Date().getTime();		
 		let messages = [];
 
