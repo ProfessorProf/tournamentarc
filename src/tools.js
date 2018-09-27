@@ -787,7 +787,7 @@ module.exports = {
 				loser.level = this.newPowerLevel(data.heat * 0.8);
 				hours = 24;
 				output += `${winner.name} defeated the Nemesis!`;
-				if(nemesisHistory.length > 1 && !winner.isUnderling) {
+				if(nemesisHistory.length > 2 && !winner.isUnderling) {
 					output +=  ` Everyone's sacrifices were not in vain!`;
 				}
 				output += `\n`;
@@ -810,7 +810,7 @@ module.exports = {
 				for(const key in gloryGains) {
 					const g = gloryGains[key];
 					const gloryPlayer = await sql.getPlayerById(g.id);
-					if(gloryPlayer && !gloryPlayer.isUnderling) {
+					if(gloryPlayer && !gloryPlayer.isUnderling && !gloryPlayer.npc) {
 						const rankUp = this.rankUp(g.oldGlory, g.glory);
 						output += `${g.name} gains ${g.glory} glory! Total glory: ${g.oldGlory + g.glory}\n`;
 						if(rankUp) {
@@ -943,12 +943,8 @@ module.exports = {
 			template = enums.FightSummaries.NemesisBetrayal;
 		}
 		
-		// Delete challenges
-		await sql.deleteOffersFromFight(winner.id, loser.id);
-		if(winner.status.find(s => s.type == enums.Statuses.Berserk)) {
-			// Winner is berserk - re-challenge the world
-			await sql.addOffer(winner, null, enums.OfferTypes.Fight);
-		}
+		// Delete open challenges for the winner
+		await sql.deleteOpenOffers(winner.id, enums.OfferTypes.Fight);
 
 		// Learn latent power
 		winner.knownLatentPower = Math.min(winner.knownLatentPower + (Math.random() * 4 + 4) / 100, winner.latentPower);
@@ -962,6 +958,7 @@ module.exports = {
 		await sql.addHistory(winner.channel, winner.id, this.getPowerLevel(winner), winnerSkill, loser.id, this.getPowerLevel(loser), loserSkill);
 		
 		if(loser.npc) {
+			// Death rewards
 			output += `\n${loser.name} is slain, its body disintegrating in the wind!`;
 			switch(loser.npc) {
 				case enums.NpcTypes.Zorb:
@@ -976,12 +973,10 @@ module.exports = {
 					this.addLatentPower(winner, Math.random() * 0.2 + 0.4);
 					break;
 			}
-			await sql.annihilatePlayer(loser.id);
 		} else {
 			// Death timer
 			if(hours) {
 				output += `\n${loser.name} will be able to fight again in ${this.getTimeString(hours * hour)}.`;
-				await sql.addStatus(loser.channel, loser.id, enums.Statuses.Dead, hours * hour);
 			}
 		}
 
@@ -1054,11 +1049,8 @@ module.exports = {
 		await sql.addEpisode(winner.channel, summary);
 
 		// Save changes
-		if(loser.npc) {
-			await sql.deletePlayer(loser.id);
-		} else {
-			await sql.setPlayer(loser);
-		}
+		await this.killPlayer(loser, hours * hour);
+		await sql.setPlayer(loser);
 		await sql.setPlayer(winner);
 		
 		return output;
@@ -1188,19 +1180,19 @@ module.exports = {
 				if(target.npc == enums.NpcTypes.Zorbmaster) {
 					output += `${target.name} emerges unscathed from the explosion!`;
 				} else {
-					await sql.deletePlayer(target.id);
+					await this.killPlayer(target);
 					output += `${target.name} disintegrates with a roar!`;
 				}
 			} else {
 				if(target.status.find(s => s.type == enums.Statuses.UltimateForm)) {
-					await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour / 4);
+					await this.killPlayer(target, hour / 4);
 					output += `${target.name} cannot fight for another 15 minutes!`;
 				} else {
 					if(target.status.find(s => s.type == enums.Statuses.Immortal)) {
-						await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 3);
+						await this.killPlayer(target, hour * 3);
 						output += `${target.name} cannot fight for another 3 hours!`;
 					} else {
-						await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 12);
+						await this.killPlayer(target, hour * 12);
 						output += `${target.name} cannot fight for another 12 hours!`;
 					}
 				}
@@ -1296,8 +1288,10 @@ module.exports = {
 				await sql.addItems(channel, sourcePlayer.id, item.type, -item.count);
 			}
 			for (const item of targetPlayer.items) {
-				await sql.addItems(channel, fusionId, item.type, item.count);
-				await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
+				if(item.type != enums.Items.Trophy) {
+					await sql.addItems(channel, fusionId, item.type, item.count);
+					await sql.addItems(channel, targetPlayer.id, item.type, -item.count);
+				}
 			}
 			for(const status of sourcePlayer.status) {
 				if(enums.Statuses.CopyToFusion[status.type]) {
@@ -1327,7 +1321,7 @@ module.exports = {
 		embed.setTitle('FUSION OFFER')
 			.setColor(0x8080ff)
 			.setDescription(`**${sourcePlayer.name}** wants to fuse with **${targetPlayer.name}**! ${targetPlayer.name}, enter \`${fuseCommand}\` to accept the offer and fuse.\n` +
-			'**Warning**: You can only fuse once per game! Fusion lasts 24 hours before you split again.\n' + 
+			'Fusion lasts 24 hours before you split again.\n' + 
 			'The offer will expire in six hours.');
 		const message = targetPlayer.config.Ping ? await this.getPings(targetPlayer) : null;
 		output.push(embed);
@@ -1514,7 +1508,7 @@ module.exports = {
 		}
 
 		if(!plantName) {
-			plantName = 'flower';
+			plantName = player.isNemesis ? 'zlower' : 'flower';
 		}
 
 		let plantId = Object.values(enums.Items).find(t => enums.Items.Name[t] == plantName.toLowerCase());
@@ -1630,7 +1624,22 @@ module.exports = {
 		// Find the plant
 		const plant = plantType ?
 			garden.plants.find(p => p && p.name.toLowerCase() == plantType.toLowerCase() && p.endTime < now) :
-			garden.plants.find(p => p && p.endTime < now);
+			garden.plants.find(p => {
+				if(p && p.endTime < now) {
+					if(player.isNemesis && enums.Items.Type[p.type] != enums.ItemTypes.DarkPlant) {
+						return false;
+					}
+					if(!player.isNemesis && enums.Items.Type[p.type] == enums.ItemTypes.DarkPlant) {
+						return false;
+					}
+					let heldPlants = player.items.find(i => i.type == p.type);
+					if(heldPlants && heldPlants.count >= 3) {
+						return false;
+					}
+					return true;
+				}
+				return false;
+			});
 		if(!plant) return;
 
 		await sql.deletePlant(plant.id);
@@ -1994,7 +2003,7 @@ module.exports = {
 		if(roll < searchChance) {
 			console.log(`${player.name} found an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);
 			// They found an orb!
-			if(player.npc) {
+			if(player.npc && nemesis) {
 				output.push(`${player.name} finds a magic orb, and delivers it to the Nemesis!`);
 				await sql.addItems(player.channel, nemesis.id, enums.Items.Orb, 1);
 			} else {
@@ -2220,14 +2229,14 @@ module.exports = {
 						output += `${target.name} disintegrates with a roar!`;
 					} else {
 						if(target.status.find(s => s.type == enums.Statuses.UltimateForm)) {
-							await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour / 2);
+							await this.killPlayer(target, hour / 2);
 							output += `${target.name} cannot fight for another 30 minutes!`;
 						} else {
 							if(target.status.find(s => s.type == enums.Statuses.Immortal)) {
-								await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 3);
+								await this.killPlayer(target, hour * 3);
 								output += `${target.name} cannot fight for another 6 hours!`;
 							} else {
-								await sql.addStatus(target.channel, target.id, enums.Statuses.Dead, hour * 12);
+								await this.killPlayer(target, hour * 12);
 								output += `${target.name} cannot fight for another 24 hours!`;
 							}
 						}
@@ -2416,6 +2425,7 @@ module.exports = {
 	async deleteExpired(channel, pings) {
 		let expired = await sql.getExpired(channel);
 		const nemesis = await sql.getNemesis(channel);
+		const nemesisPlayer = await sql.getPlayerById(nemesis.id);
 		const now = new Date().getTime();		
 		let messages = [];
 
@@ -2459,12 +2469,12 @@ module.exports = {
 					break;
 				case enums.Statuses.Transform: 
 					// Transform - 4 hour KO
-					await sql.addStatus(channel, player.id, enums.Statuses.Dead, 4 * hour);
+					await this.killPlayer(player, hour * 4);
 					messages.push(`**${player.name}** is no longer transformed; ${player.config.Pronoun} can't fight for another 4 hours.`);
 					break;
 				case enums.Statuses.SuperTransform: 
 					// Super Transform - 8 hour KO
-					await sql.addStatus(channel, player.id, enums.Statuses.Dead, 4 * hour);
+					await this.killPlayer(player, hour * 8);
 					messages.push(`**${player.name}** is no longer transformed; ${player.config.Pronoun} can't fight for another 8 hours.`);
 					break;
 				case enums.Statuses.UltimateForm: 
@@ -2508,14 +2518,21 @@ module.exports = {
 								break;
 							case enums.Cooldowns.Search:
 								// Search for orbs
-								messages = messages.concat(await this.search(player));
-								await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 1 * hour, enums.Cooldowns.Search);
+								if(nemesisPlayer) {
+									messages = messages.concat(await this.search(player));
+									await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 1 * hour, enums.Cooldowns.Search);
+								} else {
+									messages.push(`**${player.name}** searches for the Nemesis, to no avail.`);
+								}
 								break;
 							case enums.Cooldowns.Empower:
 								// Empower the Nemesis
-								const nemesisPlayer = await sql.getPlayerById(nemesis.id);
-								messages.push(await this.empower(player, nemesisPlayer));
-								await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 1 * hour, enums.Cooldowns.Empower);
+								if(nemesisPlayer) {
+									messages.push(await this.empower(player, nemesisPlayer));
+									await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 1 * hour, enums.Cooldowns.Empower);
+								} else {
+									messages.push(`**${player.name}** searches for the Nemesis, to no avail.`);
+								}
 								break;
 							case enums.Cooldowns.Unwater:
 								// Drain life from the garden
@@ -2986,7 +3003,7 @@ module.exports = {
 				output += `With a cry heard across the universe, ${player.name} ascends to the true pinnacle of transformation, increasing ${this.their(player.config.Pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 			} else {
 				await sql.deleteStatus(player.id, enums.Statuses.Transform);
-				await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, 24 * hour);
+				await this.killPlayer(player, hour * 24);
 				output += `${player.name} tries to push past ${this.their(player.config.Pronoun)} limitations, but it's too much! The power devastates ${this.their(player.config.Pronoun)} body.`;
 			}
 		} else if(transform) {
@@ -3001,7 +3018,7 @@ module.exports = {
 				output += `With a blazing explosion, ${player.name} surpasses ${this.their(player.config.Pronoun)} old transformation with another, even stronger one, increasing ${this.their(player.config.Pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 			} else {
 				await sql.deleteStatus(player.id, enums.Statuses.Transform);
-				await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, 24 * hour);
+				await this.killPlayer(player, hour * 24);
 				output += `${player.name} tries to push past ${this.their(player.config.Pronoun)} limitations, but it's too much! The power devastates ${this.their(player.config.Pronoun)} body.`;
 			}
 		} else {
@@ -3590,7 +3607,7 @@ module.exports = {
 					}
 					break;
 				case enums.Cooldowns.GuruEvent:
-					await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, 6 * hour);
+					await this.killPlayer(player, hour * 6);
 					this.addLatentPower(player, Math.random() * 0.1 + 0.1);
 					await sql.setPlayer(player);
 					return `${player.name} fights the guru, and is soundly thrashed! However, ${this.their(player.config.Pronoun)} latent power may have awakened...`;
@@ -3626,5 +3643,53 @@ module.exports = {
 			await sql.addOffer(askingPlayer, otherPlayer, enums.OfferTypes.Confirmation, command);
 			return false;
 		}
+	},
+	async killPlayer(player, duration) {
+		if(duration <= 0) return;
+
+		const training = player.status.find(s => s.type == enums.Statuses.Training);
+		const journey = player.status.find(s => s.type == enums.Statuses.Journey);
+		
+		if(journey) {
+			const nemesis = await sql.getNemesis(player.channel);
+			const storedTrainingTime = status.rating;
+			const journeyTime = status.endTime - status.startTime;
+			let journeyEffect = (Math.random() * 0.4 + 0.8);
+			if(nemesis) {
+				// Journeys that end during a Nemesis reign are amazing
+				journeyEffect += 0.5;
+			}
+			const time = journeyTime * journeyEffect + storedTrainingTime;
+			await this.completeTraining(player, time);
+		} else if(training) {
+			await this.completeTraining(player);
+		}
+		
+		if(player.isNemesis) {
+			const world = await sql.getWorld(player.channel);
+			player.level = this.newPowerLevel(world.heat * 0.8);
+			await sql.addStatus(player.channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextNemesis);
+			for(const cooldown of player.cooldowns) {
+				if(enums.Cooldowns.IsNemesis[cooldown.type]) {
+					await sql.deleteStatusById(cooldown.id);
+				}
+			}
+			const garden = await sql.getGarden(player.channel);
+			const darkPlant = garden.plants.find(p => p.slot == 99);
+			if(darkPlant) {
+				await sql.deletePlant(darkPlant.id);
+			}
+		}
+		if(player.isUnderling) {
+			player.underlingDefeats++;
+		}
+		if(player.npc) {
+			await sql.addStatus(player.channel, player.id, enums.Statuses.Annihilation);
+		} else {
+			await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, duration);
+		}
+		await sql.deleteOffersForPlayer(player.id);
+
+		await sql.setPlayer(player);
 	}
 }

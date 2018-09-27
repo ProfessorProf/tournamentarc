@@ -616,9 +616,13 @@ module.exports = {
 		}
 	},
 	// Delete all offers for a player who was just defeated.
-	async deleteOffersFromFight(winnerId, loserId) {
-		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: loserId});
-		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId AND Target_ID IS NULL`, {$playerId: winnerId});
+	async deleteOffersForPlayer(playerId) {
+		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
+	},
+	// Delete all open offers of a given type
+	async deleteOpenOffers(playerId, type) {
+		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId AND Type = $type AND Target_ID IS NULL`, 
+			{$playerId: playerId, $type: type});
 	},
 	// Delete all fusion offers (for instance, for a player that just fused).
 	async deleteAllFusionOffers(playerId) {

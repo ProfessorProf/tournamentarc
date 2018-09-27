@@ -271,11 +271,32 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
-					if(args[0]) {
+					let plantName = args.length > 0 ? args[0] : null;
+					if(!plantName) {
+						if(player.isNemesis) {
+							// If there's no plant specified, then it defaults to picking the first thing in the garden
+							const plant = garden.plants.find(p => p && p.slot == 99 && p.endTime < now);
+							plantName = plant ? enums.Items.Name[plant.type] : null;
+						} else {
+							// If there's no plant specified, then it defaults to picking the first thing in the garden
+							const plant = garden.plants.find(p => {
+								if(p && p.endTime < now) {
+									let heldPlants = player.items.find(i => i.type == p.type);
+									if(heldPlants && heldPlants.count >= 3) {
+										return false;
+									}
+									return true;
+								}
+								return false;
+							});
+							plantName = plant ? enums.Items.Name[plant.type] : null;
+						}
+					}
+					if(plantName) {
 						const knownPlants = garden.plantTypes.filter(t => t.known);
-						const plantType = this.getPlantType(args[0]);
+						const plantType = this.getPlantType(plantName);
+						const darkPlantType = this.getDarkPlantType(plantName);
 						const plantKnown = knownPlants.find(p => p.id == plantType);
-						const darkPlantType = this.getDarkPlantType(args[0]);
 						if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
 							errors.push("That plant was sealed away thousands of years ago.");
 						}
@@ -293,18 +314,7 @@ module.exports = {
 							errors.push("None of those are ready to be picked.");
 						}
 					} else {
-						// If there's no plant specified, then it defaults to picking the first thing in the garden
-						let plant = garden.plants.find(p => p && p.endTime < now);
-						if(plant) {
-							let heldPlants = player.items.find(i => i.type == plant.type);
-							if(heldPlants && heldPlants.count >= 3) {
-								errors.push("You can't carry any more of that plant.");
-							}
-						}
-						let plantCount = garden.plants.filter(p => p && p.endTime < now).length;
-						if(plantCount == 0) {
-							errors.push('There are no finished plants in the garden.');
-						}
+						errors.push('There are no plants in the garden that you can pick.');
 					}
 				}
 				break;
@@ -321,10 +331,6 @@ module.exports = {
 					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
-					if(defeated) {
-						errors.push(`**${player.name}** cannot use items for another ${tools.getTimeString(defeated.endTime - now)}.`);
-					}
 					const knownPlants = garden.plantTypes.filter(t => t.known);
 					const plantType = this.getPlantType(args[0]);
 					const hasPlant = player.items.find(i => i.type == plantType);
@@ -395,9 +401,10 @@ module.exports = {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
 					let knownPlants = garden.plantTypes.filter(t => t.known);
-					const plantType = this.getPlantType(args[0]);
+					let plantName = args.length > 0 ? args[0] : (player.isNemesis ? 'zlower' : 'flower');
+					const plantType = this.getPlantType(plantName);
 					const plantKnown = knownPlants.find(p => p.id == plantType);
-					const darkPlantType = this.getDarkPlantType(args[0]);
+					const darkPlantType = this.getDarkPlantType(plantName);
 					if(plantType == -1 && darkPlantType != -1 && !player.isNemesis) {
 						errors.push("That plant was sealed away thousands of years ago.");
 					}
@@ -411,7 +418,13 @@ module.exports = {
 					if(plantType != -1 && darkPlantType == -1 && plantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
 					}
-					const myPlants = garden.plants.filter(p => p.planterId == player.id);
+					const myPlants = garden.plants.filter(p => {
+						if(p.planterId == player.id) return true;
+						for(const fp of player.fusedPlayers) {
+							if(fp.id == p.planterId) return true;
+						}
+						return false;
+					});
 					if(myPlants && myPlants.length > 0) {
 						const myPlant = myPlants[0];
 						if(enums.Items.Type[myPlant.type] == enums.ItemTypes.DarkPlant) {
@@ -757,32 +770,33 @@ module.exports = {
 							errors.push("You don't have any of that item!");
 						} else if(item.type == enums.Items.Trophy) {
 							errors.push("You can't give away your trophies.");
-						}
-						if(target) {
-							this.validateAnnihilation(errors, target);
-							this.validateJourney(errors, target);
-							if(player.name == target.name) {
-								errors.push("You can't give items to yourself!");
-							}
-							let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
-							if(targetDefeated) {
-								let timeString = tools.getTimeString(targetDefeated.endTime - now);
-								errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
-							}
-							if(item.type == enums.Items.Orb) {
-								const wishUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)
-								if(!player.isUnderling && !wishUsed) {
-									errors.push('In order to give orbs, you must either be an underling or be unable to make a wish.');
-								}
-								if(player.isUnderling && !target.isNemesis) {
-									errors.push('A underling can only give orbs to the Nemesis.');
-								}
-								if(target.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)) {
-									errors.push("That person doesn't need any orbs.");
-								}
-							}
 						} else {
-							errors.push('Must specify a valid target.');
+							if(target) {
+								this.validateAnnihilation(errors, target);
+								this.validateJourney(errors, target);
+								if(player.name == target.name) {
+									errors.push("You can't give items to yourself!");
+								}
+								let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
+								if(targetDefeated) {
+									let timeString = tools.getTimeString(targetDefeated.endTime - now);
+									errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
+								}
+								if(item.type == enums.Items.Orb) {
+									const wishUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)
+									if(!player.isUnderling && !wishUsed) {
+										errors.push('In order to give orbs, you must either be an underling or be unable to make a wish.');
+									}
+									if(player.isUnderling && !target.isNemesis) {
+										errors.push('A underling can only give orbs to the Nemesis.');
+									}
+									if(target.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)) {
+										errors.push("That person doesn't need any orbs.");
+									}
+								}
+							} else {
+								errors.push('Must specify a valid target.');
+							}
 						}
 					}
 				}

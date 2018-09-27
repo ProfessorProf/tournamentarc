@@ -201,6 +201,13 @@ module.exports = {
             15: true,
             16: true,
             17: true
+        },
+        IsNemesis: {
+            2: true,
+            3: true,
+            4: true,
+            5: true,
+            6: true
         }
     },
     Events: {
