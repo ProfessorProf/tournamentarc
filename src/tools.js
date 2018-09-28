@@ -634,6 +634,7 @@ module.exports = {
 			const underlings = await sql.getUnderlings(channel);
 			for(const i in underlings) {
 				const h = await sql.getPlayerById(underlings[i].id);
+				if(!h) continue;
 				if(!h.status.find(s => s.type == enums.Statuses.Dead) && 
 					!h.status.find(s => s.type == enums.Statuses.Annihilation) && h.id != player1.id && 
 					!h.status.find(s => s.type == enums.Statuses.Journey)) {
