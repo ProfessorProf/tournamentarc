@@ -1296,13 +1296,13 @@ module.exports = {
 			for(const status of sourcePlayer.status) {
 				if(enums.Statuses.CopyToFusion[status.type]) {
 					await this.deleteStatusById(sourcePlayer, status.id);
-					await sql.addStatus(channel, fusionId, status.type, status.endTime - now, status.rating);
+					await sql.addStatus(channel, fusionId, status.type, status.endTime ? (status.endTime - now) : null, status.rating);
 				}
 			}
 			for(const status of targetPlayer.status) {
 				if(enums.Statuses.CopyToFusion[status.type]) {
 					await this.deleteStatusById(targetPlayer, status.id);
-					await sql.addStatus(channel, fusionId, status.type, status.endTime - now, status.rating);
+					await sql.addStatus(channel, fusionId, status.type, status.endTime ? (status.endTime - now) : null, status.endTime - now, status.rating);
 				}
 			}
 			console.log(`Created fusion of ${sourcePlayer.name} and ${targetPlayer.name} as ${name}`);
