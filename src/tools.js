@@ -2498,7 +2498,7 @@ module.exports = {
 					break;
 				case enums.Statuses.Cooldown:
 					// Cooldowns
-					if(player && player.npc) {
+					if(player && player.npc && !player.status.find(s => s.type == enums.Statuses.Dead) && !player.status.find(s => s.type == enums.Statuses.Annihilation)) {
 						switch(status.rating) {
 							case enums.Cooldowns.Attack:
 								// Attack a random non-NPC
