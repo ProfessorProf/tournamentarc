@@ -184,17 +184,18 @@ module.exports = {
 					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
 					this.validateJourney(errors, player);
-					let defeated = player.status.find(s => s.type == enums.Statuses.Dead);
-					if(defeated) {
-						let timeString = tools.getTimeString(defeated.endTime - now);
-						errors.push(`**${player.name}** cannot train for another ${timeString}.`);
-					} else {
-						if(!player.status.find(s => s.type == enums.Statuses.Ready)) {
-							errors.push(`**${player.name}** must lose a fight before they can begin training.`);
-						}
-					}
 					if(player.status.find(s => s.type == enums.Statuses.Training)) {
 						errors.push(`**${player.name}** is already training.`);
+					} else {
+						const defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+						if(defeated) {
+							const timeString = tools.getTimeString(defeated.endTime - now);
+							errors.push(`**${player.name}** cannot train for another ${timeString}.`);
+						} else {
+							if(!player.status.find(s => s.type == enums.Statuses.Ready)) {
+								errors.push(`**${player.name}** must lose a fight before they can begin training.`);
+							}
+						}
 					}
 				}
 				break;
@@ -330,7 +331,9 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateNotNemesis(errors, player);
-					this.validateJourney(errors, player);
+					if(!target || player.id != target.id) {
+						this.validateJourney(errors, player);
+					}
 					const knownPlants = garden.plantTypes.filter(t => t.known);
 					const plantType = this.getPlantType(args[0]);
 					const hasPlant = player.items.find(i => i.type == plantType);
@@ -780,7 +783,7 @@ module.exports = {
 								let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 								if(targetDefeated) {
 									let timeString = tools.getTimeString(targetDefeated.endTime - now);
-									errors.push(`**${target.name}** cannot accept items for another ${timeString}`);
+									errors.push(`**${target.name}** cannot accept items for another ${timeString}.`);
 								}
 								if(item.type == enums.Items.Orb) {
 									const wishUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)

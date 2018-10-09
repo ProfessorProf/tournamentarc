@@ -376,6 +376,9 @@ async function handleMessage(message) {
 		case 'update':
 			await sql.update();
 			break;
+		case 'importchannel':
+			await sql.importChannel(channel, args[0]);
+			break;
 	}
 
 	if(!output.informational) {

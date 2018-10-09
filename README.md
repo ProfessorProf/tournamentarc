@@ -13,6 +13,11 @@ Expanding this later:
 # Database spec
 Writing this later.
 
+# Updates for S6:
+- Garden: Plants no longer decay.
+- Bugfix: Gourd trained the user, not the target.
+- Bugfix: Permanent statuses now carry properly into and out of fusion.
+
 # New features for S5:
 - Garden: "!plant" no longer takes a garden action.
 - Garden: You can no longer use plants while defeated.

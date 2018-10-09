@@ -1,5 +1,4 @@
 const enums = require('./enum.js');
-const fs = require('fs');
 const sql = require ('sqlite');
 sql.open('./data.sqlite');
 
@@ -166,10 +165,8 @@ module.exports = {
 	},
 	// Fetches basic world data.
 	async getWorld(channel) {
-		const now = new Date().getTime();
 		const row = await sql.get(`SELECT * FROM Worlds WHERE Channel = $channel`, {$channel: channel});
-		const populationRow = await sql.get(`SELECT COUNT(*) as Count FROM Players WHERE Channel = $channel AND Last_Active > $time`, 
-			{$channel: channel, $time: now - 24 * hour});
+		const players = await this.getPlayers(channel);
 		const statusRows = await sql.all(`SELECT * FROM Status WHERE Channel = $channel AND Type = $type AND Player_ID IS NULL`, 
 			{$channel: channel, $type: enums.Statuses.Cooldown});
 		const orbRows = await sql.get(`SELECT SUM(Count) as Count FROM HeldItems WHERE Channel = $channel AND Item_ID = $type`,
@@ -180,7 +177,7 @@ module.exports = {
 				channel: channel,
 				heat: row.Heat,
 				resets: row.Resets,
-				population: populationRow.Count,
+				population: players.length,
 				lostOrbs: orbRows ? 7 - orbRows.Count : 7,
 				lastWish: row.Last_Wish,
 				lastUpdate: row.Last_Update,
@@ -372,8 +369,7 @@ module.exports = {
 			}}),
 			items: itemRows.map(i => { return {
 				type: i.Item_ID,
-				count: i.Count,
-				decay: i.Decay_Time
+				count: i.Count
 			}}),
 			fusionId: row.Fusion_ID,
 			fusedPlayers: []
@@ -462,10 +458,6 @@ module.exports = {
 	async addItems(channel, playerId, itemId, count) {
 		const now = new Date().getTime();
 		if(count == 0) return;
-		let decay = null;
-		if(enums.ItemTypes.IsPlantType[enums.Items.Type[itemId]]) {
-			decay = now + 72 * hour;
-		}
 		const existingItem = await sql.get(`SELECT Count FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`,
 			{$playerId: playerId, $itemId: itemId});
 		if(existingItem) {
@@ -473,17 +465,14 @@ module.exports = {
 			if(newCount <= 0) {
 				await sql.run(`DELETE FROM HeldItems WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
 					{$playerId: playerId, $itemId: itemId});
-			} else if(count < 0 && decay) {
-				await sql.run(`UPDATE HeldItems SET Count = $count, Decay_Time = $decay WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
-					{$playerId: playerId, $itemId: itemId, $count: newCount, $decay: decay});
 			} else {
 				await sql.run(`UPDATE HeldItems SET Count = $count WHERE Player_ID = $playerId AND Item_ID = $itemId`, 
 					{$playerId: playerId, $itemId: itemId, $count: newCount});
 			}
 		} else if(count > 0) {
-			await sql.run(`INSERT INTO HeldItems (Channel, Player_ID, Item_ID, Count, Decay_Time) VALUES
-				($channel, $playerId, $itemId, $count, $decay)`,
-				{$channel: channel, $playerId: playerId, $itemId: itemId, $count: count, $decay: decay});
+			await sql.run(`INSERT INTO HeldItems (Channel, Player_ID, Item_ID, Count) VALUES
+				($channel, $playerId, $itemId, $count)`,
+				{$channel: channel, $playerId: playerId, $itemId: itemId, $count: count});
 		}
 	},
 	async setPlant(plant) {
@@ -638,13 +627,14 @@ module.exports = {
 		await sql.run(`UPDATE Worlds SET Heat = $heat WHERE Channel = $channel`, {$channel: channel, $heat: heat});
 	},
 	// Get all Players in a channel.
-	async getPlayers(channel) {
+	async getPlayers(channel, includeAnnihilated) {
 		const rows = await sql.all(`SELECT ID, Name FROM Players WHERE Channel = $channel ORDER BY UPPER(Name)`, {$channel: channel});
 		let players = [];
-		for(const i in rows) {
-			const row = rows[i];
+		for(const row of rows) {
 			const player = await this.getPlayerById(row.ID);
-			players.push(player);
+			if(includeAnnihilated || !player.status.find(s => s.type == enums.Statuses.Annihilation)) {
+				players.push(player);
+			}
 		}
 		return players;
 	},
@@ -720,6 +710,8 @@ module.exports = {
 		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Plants WHERE Channel = $channel`, {$channel: channel});
+		await sql.run(`DELETE FROM Players WHERE Channel = $channel AND NPC > 0`, {$channel: channel});
+		await sql.run(`DELETE FROM Episodes WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`UPDATE Items SET Known = 0 WHERE Channel = $channel`, {$channel: channel});
 
 		// Make one random plant known
@@ -739,7 +731,7 @@ module.exports = {
 	},
 	// THIS IS HIGHLY DESTRUCTIVE. ONLY RUN WITH BACKUP DATA YOU ARE PREPARED TO LOSE.
 	async importChannel(channel, importChannel) {
-		if(!channel || !importCHannel) return;
+		if(!channel || !importChannel) return;
 		await sql.run(`DELETE FROM Worlds WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Players WHERE Channel = $channel`, {$channel: channel});
 		await sql.run(`DELETE FROM Items WHERE Channel = $channel`, {$channel: channel});

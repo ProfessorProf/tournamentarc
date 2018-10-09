@@ -318,7 +318,6 @@ Rank ??? 1000 Glory
             case 'pick':
                 embed.addField('!pick type', 'Pick a finished plant from the garden, and adds it to your inventory.' +
                     "If you don't specify a type, you'll just pick the first plant you see. " +
-                    "Be sure to use your plants once you've picked them - they'll start to decay after 3 days." +
                     'Requirements: Must be registered. Specified plant must be ready to pick.');
                 break;
             case 'use':
@@ -339,7 +338,7 @@ Rank ??? 1000 Glory
                 break;
             case 'return':
                 embed.addField('!return', "Ends your journey instantly, abandoning all rewards for it.\n" +
-                    "Rerquirements: Must be on a journey. The universe must be in great peril.");
+                    "Requirements: Must be on a journey. The universe must be in great peril.");
                 break;
             case 'search':
                 embed.addField('!search', "Search the world for something interesting! " +
