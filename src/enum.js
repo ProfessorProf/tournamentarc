@@ -261,5 +261,19 @@ module.exports = {
         Won: 1,
         Lost: 2,
         Idle: 3
+    },
+    ArcTypes: {
+        Filler: 0,
+        OrbHunt: 1,
+        Tournament: 2,
+        Nemesis: 3,
+        DarkTournament: 4,
+        Name: {
+            0: 'Filler',
+            1: 'Orb Hunt',
+            2: 'Tournament',
+            3: 'Nemesis',
+            4: 'Dark Tournament'
+        }
     }
 }

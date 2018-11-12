@@ -5,12 +5,9 @@ sql.open('./data.sqlite');
 const hour = (60 * 60 * 1000);
 
 const updateSql = `
-ALTER TABLE Players ADD COLUMN Latent_Power REAL;
-ALTER TABLE Players ADD COLUMN Base_Latent_Power REAL;
-ALTER TABLE Players ADD COLUMN Known_Latent_Power REAL;
-ALTER TABLE Plants ADD COLUMN Planter_ID INTEGER;
-ALTER TABLE HeldItems ADD COLUMN Decay_Time INTEGER;
-ALTER TABLE Worlds ADD COLUMN Offset INTEGER`;
+ALTER TABLE Worlds ADD COLUMN Arc INTEGER;
+ALTER TABLE Episodes ADD COLUMN Arc INTEGER;
+CREATE TABLE IF NOT EXISTS Arcs (ID INTEGER PRIMARY KEY, Channel TEXT, Number INTEGER, Type INTEGER, Start_Time INTEGER, End_Time INTEGER)`;
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER,
@@ -172,6 +169,8 @@ module.exports = {
 		const orbRows = await sql.get(`SELECT SUM(Count) as Count FROM HeldItems WHERE Channel = $channel AND Item_ID = $type`,
 			{$channel: channel, $type: enums.Items.Orb});
 		if(row) {
+			const arcRow = await sql.get(`SELECT * FROM Arcs WHERE ID = $arc`, {$arc: row.Arc});
+			const lastArcRow = await sql.get(`SELECT * FROM Arcs WHERE ID = $arc`, {$arc: row.LastArc});
 			const world = {
 				id: (row.ID * 739 + row.Offset) % 1000, // Human-usable ID for up to 1000 worlds
 				channel: channel,
@@ -189,6 +188,38 @@ module.exports = {
 					endTime: c.EndTime
 				}})
 			};
+
+			if(arcRow) {
+				world.arc = {
+					id: arcRow.ID,
+					number: arcRow.Number,
+					type: arcRow.Type, 
+					startTime: arcRow.Start_Time
+				};
+			} else {
+				world.arc = {
+					id: null,
+					number: 1,
+					type: enums.ArcTypes.Filler,
+					startTime: world.startTime
+				};
+			}
+			
+			if(lastArcRow) {
+				world.lastArc = {
+					id: lastArcRow.ID,
+					number: lastArcRow.Number,
+					type: lastArcRow.Type, 
+					startTime: lastArcRow.Start_Time
+				};
+			} else {
+				world.lastArc = {
+					id: null,
+					number: 1,
+					type: enums.ArcTypes.Filler,
+					startTime: world.startTime
+				};
+			}
 			
 			return world;
 		} else {
@@ -718,6 +749,12 @@ module.exports = {
 		const knownPlant = Math.floor(Math.random() * 5) + 2;
 		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = $id AND Channel = $channel`, {$id: knownPlant, $channel: channel});
 		await sql.run(`UPDATE Items SET Known = 1 WHERE ID = 1 AND Channel = $channel`, {$channel: channel});
+
+		// Start the first arc
+		const result = await sql.run('INSERT INTO Arcs (Channel, Number, Type, Start_Time) VALUES ($channel, 1, 0, $now)',
+			{$channel: channel, $now: now});
+		await sql.run(`UPDATE Worlds SET Arc = $arcId`, {$arcId: result.lastID});
+
 		console.log(`Channel ${channel} initialized`);
 	},
 	async clone(player, targetName) {
@@ -861,6 +898,8 @@ module.exports = {
 			{$channel: channel, $time: time});
 		await sql.run(`UPDATE Nemesis SET Start_Time = Start_Time + $time WHERE Channel = $channel`,
 			{$channel: channel, $time: time});
+		await sql.run(`UPDATE Arcs SET Start_Time = Start_Time + $time WHERE Channel = $channel`,
+			{$channel: channel, $time: time});
 	},
 	async delayOffer(channel, playerId, targetId, type) {
 		const delayTime = new Date().getTime() + 5 * 60 * 1000;
@@ -965,5 +1004,34 @@ module.exports = {
 			return world;
 		}
 		return false;
+	},
+	async newArc(channel, type) {
+		const now = new Date().getTime();
+
+		// Get the current arc
+		const world = await sql.get(`SELECT * FROM Worlds WHERE Channel = $channel`, {$channel: channel});
+		const oldArc = await sql.get(`SELECT * FROM Arcs WHERE ID = $id`, {$id: world.Arc});
+
+		let number = oldArc ? oldArc.Number : 1;
+
+		if(oldArc) {
+			if(oldArc.Type == enums.ArcTypes.Filler && oldArc.Start_Time + 1 * hour > now) {
+				// Filler arcs under an hour aren't saved
+				await sql.run(`DELETE FROM Arcs WHERE ID = $id`, {$id: oldArc.ID});
+			} else {
+				await sql.run(`UPDATE Arcs SET End_Time = $now WHERE ID = $id`, 
+					{$id: oldArc.ID, $now: now});
+				number++;
+			}
+
+			if(type == enums.ArcTypes.Filler && oldArc.Type != enums.ArcTypes.Filler) {
+				// Record the last arc type
+				await sql.run(`UPDATE Worlds SET LastArc = $arc WHERE Channel = $channel`, {$arc: oldArc.ID, $channel: channel});
+			}
+		}
+
+		const result = await sql.run(`INSERT INTO Arcs (Channel, Number, Type, Start_Time) VALUES ($channel, $number, $type, $now)`,
+			{$channel: channel, $number: number, $type: type, $now: now});
+		await sql.run(`UPDATE Worlds SET Arc = $arc WHERE Channel = $channel`, {$arc: result.lastID, $channel: channel});
 	}
 }

@@ -395,6 +395,10 @@ module.exports = {
 			output += row[2].padEnd(headers[2] + 1);
 			output += row[3].padEnd(headers[3] + 1);
 			output += '\n';
+			if(output.length > 1950) {
+				output += '...\n';
+				break;
+			}
 		}
 		
 		return `\`\`\`\n${output}\`\`\``;
@@ -679,7 +683,7 @@ module.exports = {
 		if(player1.isUnderling) {
 			skill2 += 0.075;
 		}
-		if(player2.isNemesis) {
+		if(player2.isUnderling) {
 			skill1 += 0.075;
 		}
 
@@ -778,6 +782,9 @@ module.exports = {
 				template = enums.FightSummaries.NemesisLoss;
 				nemesis.id = null;
 				await sql.endNemesis(nemesis.channel);
+				if(!winner.isUnderling) {
+					await sql.newArc(winner.channel, enums.ArcTypes.Filler);
+				}
 				loser.level = this.newPowerLevel(data.heat * 0.8);
 				hours = 24;
 				output += `${winner.name} defeated the Nemesis!`;
@@ -932,7 +939,7 @@ module.exports = {
 		if(winner.isUnderling && loser.isNemesis && !trueForm) {
 			output += `\n${winner.name} has betrayed ${this.their(winner.config.Pronoun)} master and become the new Nemesis! The nightmare continues!`;
 			await sql.setPlayer(winner);
-			await this.setNemesis(winner.channel, winner.username);
+			await this.setNemesis(winner);
 			winner = await sql.getPlayerByUsername(winner.channel, winner.username);
 			template = enums.FightSummaries.NemesisBetrayal;
 		}
@@ -996,13 +1003,15 @@ module.exports = {
 			// Annihilate the loser
 			output += `\n${loser.name} gave ${this.their(loser.config.pronoun)} life, but it still wasn't enough...`;
 			loser.level = 0;
-			await sql.annihilatePlayer(loser.id);
-			await sql.addStatus(loser.channel, loser.id, enums.Statuses.Annihilation);
 			if(this.isFusion(loser)) {
 				for(const p of loser.fusedPlayers) {
 					await sql.annihilatePlayer(p.id);
 					await sql.addStatus(p.channel, p.id, enums.Statuses.Annihilation);
 				}
+				await this.breakFusion(channel, loser.id, loser.fusedPlayers[0], loser.fusedPlayers[1]);
+			} else {
+				await sql.annihilatePlayer(loser.id);
+				await sql.addStatus(loser.channel, loser.id, enums.Statuses.Annihilation);
 			}
 		}
         
@@ -1459,6 +1468,7 @@ module.exports = {
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
 		await sql.addStatus(channel, player, enums.Statuses.Cooldown, 7 * 24 * hour, enums.Cooldowns.NemesisUsed);
+		await sql.newArc(channel, enums.ArcTypes.Nemesis);
 
 		let output = [];
 		output.push(`**${player.name}** has become a Nemesis, and has declared war on the whole galaxy! ` +
@@ -1466,7 +1476,7 @@ module.exports = {
 			`The Nemesis can no longer use most peaceful actions, but in exchange, ` +
 			`${player.config.Pronoun} ${this.have(player.config.Pronoun)} access to several powerful new abilities. ` + 
 			`For more information, enter \`!help nemesis\`.`);
-		output.push(this.generatePlayerDescription(player));
+		output.push(await this.generatePlayerDescription(player));
 
 		return output;
 	},
@@ -1689,7 +1699,7 @@ module.exports = {
 					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 				} else {
 					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
-					if(player.config.AutoTrain) {
+					if(target.config.AutoTrain) {
 						output += `\n**${target.name}** has started training.`;
 					}
 				}
@@ -1701,7 +1711,7 @@ module.exports = {
 					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 				} else {
 					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
-					if(player.config.AutoTrain) {
+					if(target.config.AutoTrain) {
 						output += `\n**${target.name}** has started training.`;
 					}
 				}
@@ -1957,9 +1967,13 @@ module.exports = {
 		if(nemesis && nemesis.id) searchMultiplier += 1;
 		searchMultiplier *= (10 / Math.max(world.population, 10)) * (effectiveTime / (hour * 72));
 		let searchChance = (0.03 + player.actionLevel * 0.005) * searchMultiplier;
-		if(world.lostOrbs == 0) searchChance = 0;
+		if(world.lostOrbs == 0 || 
+			world.arc.type == enums.ArcTypes.Tournament ||
+			world.arc.type == enums.ArcTypes.DarkTournament) {
+			searchChance = 0;
+		}
 
-		output = await this.searchOrbs(player, nemesis, searchChance);
+		output = await this.searchOrbs(player, nemesis, searchChance, world);
 		if(!output && !player.npc) {
 			// Reset search multiplier with the orb-only modifiers removed - no bonus for underling or nemesis presence
 			searchMultiplier = 1;
@@ -1985,6 +1999,9 @@ module.exports = {
 			output = [];
 			if(world.lostOrbs == 0) {
 				output.push(`${player.name} searches the world, but there are no orbs left to find.`);
+			} else if (world.arc.type == enums.ArcTypes.Tournament ||
+				world.arc.type == enums.ArcTypes.DarkTournament) {
+				output.push(`${player.name} searches the world, but the orbs have vanished from the world for now.`);
 			} else {
 				output.push(`${player.name} searches the world, but finds nothing of value.`);
 			}
@@ -1998,7 +2015,7 @@ module.exports = {
 		
 		return output;
 	},
-	async searchOrbs(player, nemesis, searchChance) {
+	async searchOrbs(player, nemesis, searchChance, world) {
 		const now = new Date().getTime();
 		const roll = Math.random();
 		let output = [];
@@ -2019,6 +2036,11 @@ module.exports = {
 			}
 			if(existingOrbs && existingOrbs.count == 6) {
 				output.push("You've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.");
+			}
+			if(world.lostOrbs == 5 && world.arc.type == enums.ArcTypes.Filler) {
+				// This was the third orb - start a new Orb Hunt
+				await sql.newArc(world.channel, enums.ArcTypes.OrbHunt);
+				output.push("The hunt for the orbs is heating up! A new **Orb Hunt Arc** has begun!");
 			}
 		} else {
 			console.log(`${player.name} failed to find an orb on roll ${Math.floor(roll * 1000) / 10} out of chance ${Math.floor(searchChance * 1000) / 10}`);			
@@ -2261,6 +2283,10 @@ module.exports = {
 					await sql.setPlayer(player);
 				}
 				break;
+		}
+
+		if(world.arc.type == enums.ArcTypes.OrbHunt) {
+			await sql.newArc(channel, enums.ArcTypes.Filler);
 		}
 		
 		await sql.scatterOrbs(channel);
@@ -2922,23 +2948,25 @@ module.exports = {
 		return embed;
 	},
 	async worldInfo(channel) {
-		let world = await sql.getWorld(channel);
+		const world = await sql.getWorld(channel);
 		const now = new Date().getTime();
 		let embed = new Discord.RichEmbed();
-		let output = `This world has existed for ${this.getTimeString(now - world.startTime)},`;
+		let output = `This world has existed for ${this.getTimeString(now - world.startTime)}.`;
 
-		let age = 'Age of Beginnings';
-		if(world.heat > 3000) age = 'Age of the Infinite';
-		else if(world.heat > 2500) age = 'Age of Gods';
-		else if(world.heat > 2000) age = 'Age of Myths';
-		else if(world.heat > 1500) age = 'Age of Legends';
-		else if(world.heat > 1000) age = 'Age of Heroes';
-		else if(world.heat > 500) age = 'Age of Warriors';
-
-		output += ` and is currently in the ${age}.`;
 		if(world.resets > 0) {
 			output += ` It has been reset ${world.resets} ${world.resets == 1 ? 'time' : 'times'}.`;
 		}
+
+		if(world.arc) {
+			const arcType = enums.ArcTypes.Name[world.arc.type];
+			output += `\nThe current arc is a **${arcType} Arc**, and has been ongoing for ${this.getTimeString(now - world.arc.startTime)}.`;
+		}
+
+		if(world.lastArc && world.lastArc.type != enums.ArcTypes.Filler) {
+			const arcType = enums.ArcTypes.Name[world.lastArc.type];
+			output += `\nThe previous arc was a **${arcType} Arc**, and lasted for ${this.getTimeString(now - world.lastArc.startTime)}.`;
+		}
+
 		if(world.lostOrbs == 0) {
 			output += '\nThere are no magic orbs hidden in the wild.';
 		} else if(world.lostOrbs == 1) {
@@ -2950,12 +2978,6 @@ module.exports = {
 
 		for(var cooldown of world.cooldowns) {
 			switch(cooldown.type) {
-				case enums.Cooldowns.NextNemesis:
-					output += `\nA new Nemesis can't rise for another ${this.getTimeString(cooldown.endTime - now)}.`;
-					break;
-				case enums.Cooldowns.NextTournament:
-					output += `\nA new tournament can't start for another ${this.getTimeString(cooldown.endTime - now)}.`;
-					break;
 				case enums.Cooldowns.Ruin:
 					output += `\nUnless the Nemesis is defeated, the universe will end in ${this.getTimeString(cooldown.endTime - now)}!`;
 					break;
@@ -3331,12 +3353,7 @@ module.exports = {
 				case enums.TournamentStatuses.Complete:
 					output += `TOURNAMENT COMPLETE\n`;
 					output += `The grand champion was **${tournament.players[0].name}!**\n`;
-					const nextTournament = world.cooldowns.find(c => c.type == enums.Cooldowns.NextTournament);
-					if(nextTournament) {
-						output += `A new tournament can begin in ${this.getTimeString(nextTournament.endTime - now)}.`;
-					} else {
-						output += `Enter \`!tourney single\` to begin a new tournament.`;
-					}
+					output += `Enter \`!tourney single\` to begin a new tournament.`;
 					break;
 			}
 		}
@@ -3383,6 +3400,7 @@ module.exports = {
 			.setDescription(`**${player.name}** is starting a ${enums.TournamentTypes.Name[type]} tournament! Enter \`!tourney join\`.\n` +
 				`The tournament will begin when the organizer starts it with \`!tourney start\`. Up to 16 players can join.`);
 		
+		await sql.newArc(channel, enums.ArcTypes.Tournament);
 		return embed;
 	},
 	async joinTournament(player, tournament) {
@@ -3439,7 +3457,7 @@ module.exports = {
 			if(roundTimer) {
 				await this.deleteStatusById(null, roundTimer.id);
 			}
-			await sql.addStatus(tournament.channel, null, enums.Statuses.Cooldown, 24 * hour, enums.Cooldowns.NextTournament);
+			await sql.newArc(tournament.channel, enums.ArcTypes.Filler);
 		} else {
 			output = `${winner.name} advances to the next round of the tournament!`;
 		}

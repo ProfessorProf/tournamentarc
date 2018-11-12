@@ -629,10 +629,12 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
-					let cooldown = world.cooldowns.find(c => c.type == enums.Cooldowns.NextNemesis);
-					if(cooldown) {
-						let timeString = tools.getTimeString(cooldown.endTime - now);
-						errors.push(`A new Nemesis won't rise for at least ${timeString}.`);
+					if(world.arc.type == enums.ArcTypes.OrbHunt ||
+						world.arc.type == enums.ArcTypes.Tournament) {
+						errors.push(`A nemesis can't rise until the current arc is over.`);
+					}
+					if(world.lastArc.type == enums.ArcTypes.Nemesis) {
+						errors.push(`There can't be two Nemesis arcs in a row.`);
 					}
 					if(player.isNemesis) {
 						errors.push(`**${player.name}** is already a Nemesis.`);
@@ -651,9 +653,6 @@ module.exports = {
 					}
 					if(glory < 250) {
 						errors.push(`**${player.name}** must be at least Rank S to become a Nemesis.`);
-					}
-					if(world.lostOrbs < 5) {
-						errors.push(`The power of the orbs is preventing the rise of a new Nemesis.`)
 					}
 				}
 				break;
@@ -1064,18 +1063,19 @@ module.exports = {
 					switch(args[0]) {
 						case 'single':
 						//case 'royale':
+							if(world.lastArc.type == enums.ArcTypes.Tournament) {
+								errors.push(`There can't be two Tournament arcs in a row.`);
+							}
+							if(world.arc.type == enums.ArcTypes.Nemesis ||
+								world.arc.type == enums.ArcTypes.OrbHunt) {
+								errors.push(`You can't start a tournament until the current arc ends.`);
+							}
 							const players = await sql.getPlayers(channel);
 							if(players.length < 4) {
 								errors.push(`You need at least four players for a tournament.`);
 							}
 							if(glory < 100) {
 								errors.push(`**${player.name}** must be at least Rank B to organize a tournament.`);
-							}
-							
-							let cooldown = world.cooldowns.find(c => c.type == enums.Cooldowns.NextTournament);
-							if(cooldown) {
-								let timeString = tools.getTimeString(cooldown.endTime - now);
-								errors.push(`A new Tournament can't begin for another ${timeString}.`);
 							}
 							break;
 						case 'join':
