@@ -20,7 +20,6 @@ module.exports = {
                 .addField('!help underlings', 'Help with commands related to underlings: !join, !recruit, !exile.')
                 .addField('!help wish', 'Help with commands related to orbs and wishes: !search, !give, !wish.')
                 .addField('!help rank', 'Help with Rank, Glory, and how to increase them.')
-                .addField('!help latentpower', 'Help with the mysterious latent power hiding within.')
                 .addField('!help tournament', 'Help with commands related to martial arts tournaments.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
@@ -65,13 +64,6 @@ Rank S+  400 Glory
 Rank S++ 700 Glory
 Rank ??? 1000 Glory
 \`\`\``);
-                    break;
-                case 'latentpower':
-                    output.setTitle('Latent Power')
-                        .setDescription('This mysterious trait represents not your current strength, but how quickly you can become stronger.\n' +
-                            "The higher your latent power, the more power you'll gain from training and journeys. To figure out your potential, fight repeated battles." +
-                            "Training, journeying, defeating powerful foes, and some special events can increase your latent power over time. " +
-                            "Don't worry if your latent power is low - the lower it starts, the faster it rises over time.");
                     break;
                 case 'garden':
                     if(player && player.isNemesis) {

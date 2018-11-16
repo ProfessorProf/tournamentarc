@@ -175,7 +175,14 @@ async function handleMessage(message) {
 
 		if(update.updates) {
 			for(var u of update.updates) {
-				if(u) message.channel.send(u);
+				if(u) {
+					if(u.target) {
+						const targetChannel = client.channels.find(x => x.id == u.target);
+						targetChannel.send(u.message);
+					} else {
+						message.channel.send(u);
+					}
+				}
 			}
 			if(update.pings) {
 				message.channel.send(update.pings);
@@ -194,7 +201,7 @@ async function handleMessage(message) {
 	let player = await sql.getPlayerByUsername(channel, username);
 	let target = await sql.getPlayer(channel, targetName);
 	
-	const errors = await validation.validate(channel, player, target, cmd, args);
+	const errors = await validation.validate(channel, username, player, target, cmd, args);
 	if(errors) {
 		if(overrideErrors) {
 			errors.push('(Override Errors)');
@@ -236,17 +243,17 @@ async function handleMessage(message) {
 			output.messages = await tools.unfight(player);
 			break;
 		case 'garden':
-			output.messages = await tools.displayGarden(channel);
+			output.messages = await tools.displayGarden(player, username);
 			output.informational = true;
 			break;
 		case 'plant':
-			output.messages = await tools.plant(player, args[0]);
+			output.messages = await tools.plant(player, username, args[0]);
 			break;
 		case 'water':
 			output.messages = await tools.water(channel, player);
 			break;
 		case 'pick':
-			output.messages = await tools.pick(player, args[0]);
+			output.messages = await tools.pick(player, username, args[0]);
 			break;
 		case 'use':
 			output.messages = await tools.useItem(player, target, args[0]);
@@ -350,7 +357,7 @@ async function handleMessage(message) {
 			output.informational = true;
 			break;
 		case 'event':
-			output.messages = await tools.event(player);
+			output.messages = await tools.event(player, args.join(' '));
 			break;
 		case 'help':
 			output.messages = await help.showHelp(player, args[0]);
@@ -394,6 +401,10 @@ async function handleMessage(message) {
 			if(m) {
 				if(output.informational && output.private) {
 					message.author.send(m);
+				} else if(m.target) {
+					// Send the message to a different channel
+					const targetChannel = client.channels.find(x => x.id == m.target);
+					targetChannel.send(m.message);
 				} else {
 					message.channel.send(m);
 				}

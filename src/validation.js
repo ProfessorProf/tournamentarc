@@ -7,10 +7,11 @@ let hour = (60 * 60 * 1000);
 
 module.exports = {
     // Returns an error string if the command is illegal
-    async validate(channel, player, target, cmd, args) {
+    async validate(channel, username, player, target, cmd, args) {
 		let world = await sql.getWorld(channel);
-		let nemesis = await sql.getNemesis(channel)
-		let garden = await sql.getGarden(channel)
+		let nemesis = await sql.getNemesis(channel);
+		const tournament = await sql.getTournament(channel);
+		let garden = await sql.getGarden(channel);
 		let glory = player ? player.glory : 0;
 		if(player && player.fusedPlayers.length == 2) {
 			glory /= 2;
@@ -75,6 +76,15 @@ module.exports = {
 					if(defeated) {
 						errors.push(`**${player.name}** cannot fight for another ${tools.getTimeString(defeated.endTime - now)}.`);
 					}
+					if(world.arc.type == enums.ArcTypes.DarkTournament) {
+						const nemesisInTournament = tournament.players.find(p => p.id == nemesis.id);
+						if(!nemesisInTournament && player.isNemesis) {
+							errors.push(`You must wait for the finals to challenge humanity.`);
+						}
+						if(!nemesisInTournament && target && target.isNemesis) {
+							errors.push(`You cannot face the Nemesis until the tournament finals.`);
+						}
+					}
 					if(target) {
 						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
@@ -85,8 +95,23 @@ module.exports = {
 						if(targetDefeated) {
 							errors.push(`**${target.name}** cannot fight for another ${tools.getTimeString(targetDefeated.endTime - now)}.`);
 						}
+						const offer = player.offers.find(o => o.playerId == target.id && 
+							(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
+						if(!offer) {
+							// You're issuing a challenge - validate the cooldown
+							const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Challenge);
+							if(cooldown) {
+								errors.push(`**${player.name}** cannot initiate a fight for another ${tools.getTimeString(cooldown.endTime - now)}.`);
+							}
+						}
 					} else if(args.length > 0) {
 						errors.push(`The player "${args[0]}" could not be found.`);
+					} else {
+						// You're issuing an open challenge - validate the cooldown
+						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Challenge);
+						if(cooldown) {
+							errors.push(`**${player.name}** cannot initiate a fight for another ${tools.getTimeString(cooldown.endTime - now)}.`);
+						}
 					}
 				}
 				break;
@@ -102,7 +127,10 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNemesis(errors, player);
-					if(nemesis) {
+					if(nemesis && player.isNemesis) {
+						if(world.arc.type == enums.ArcTypes.DarkTournament) {
+							errors.push(`You cannot use this ability during a tournament.`);
+						}
 						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Attack);
 						if(cooldown) {
 							let timeString = tools.getTimeString(cooldown.endTime - now);
@@ -132,7 +160,10 @@ module.exports = {
 				this.validatePlayerRegistered(errors, player);
 				if(player) {
 					this.validateNemesis(errors, player);
-					if(nemesis) {
+					if(nemesis && player.isNemesis) {
+						if(world.arc.type == enums.ArcTypes.DarkTournament) {
+							errors.push(`You cannot use this ability during a tournament.`);
+						}
 						const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Destroy);
 						if(cooldown) {
 							let timeString = tools.getTimeString(cooldown.endTime - now);
@@ -417,27 +448,18 @@ module.exports = {
 					if((plantType == -1 || !plantKnown) && darkPlantType == -1 && args[0]) {
 						errors.push("You've never heard of that plant.");
 					}
-					const plantCount = garden.plants.filter(p => p && enums.Items.Type[p.type] != enums.ItemTypes.DarkPlant).length;
-					if(plantType != -1 && darkPlantType == -1 && plantCount >= garden.slots) {
+					const publicPlantCount = garden.plants.filter(p => p && p.slot > -1).length;
+					const plantOwner = tools.isFusion(player) ? player.fusedPlayers.find(p => p.username == username) : player;
+					const myPlant = garden.plants.find(p => p.planterId == plantOwner.id && p.slot == -1);
+					if(myPlant && plantType != -1 && darkPlantType == -1 && publicPlantCount >= garden.slots) {
 						errors.push("There isn't room to plant anything new in the garden - try `!pick` to take something from it first.");
 					}
-					const myPlants = garden.plants.filter(p => {
-						if(p.planterId == player.id) return true;
-						for(const fp of player.fusedPlayers) {
-							if(fp.id == p.planterId) return true;
-						}
-						return false;
-					});
-					if(myPlants && myPlants.length > 0) {
-						const myPlant = myPlants[0];
-						if(enums.Items.Type[myPlant.type] == enums.ItemTypes.DarkPlant) {
-							errors.push(`The ${enums.Items.Name[myPlant.type]} in the garden must finish growing before you can plant again.`);
-						} else {
-							errors.push(`The ${enums.Items.Name[myPlant.type]} in slot ${myPlant.slot + 1} must finish growing before you can plant again.`);
-						}
+					if(myPlant && plantType == -1 && darkPlantType != -1) {
+						errors.push("The Nemesis can't use the public garden.");
 					}
-					if(darkPlantType != -1 && garden.plants.find(p => p.slot == 99)) {
-						errors.push("There can only be one dark plant in the garden at a time.");
+					const myPublicPlant = garden.plants.find(p => p.planterId == plantOwner.id && p.slot > -1)
+					if(myPublicPlant) {
+						errors.push(`The ${enums.Items.Name[myPublicPlant.type]} in slot ${myPublicPlant.slot + 1} must finish growing before you can plant again.`);
 					}
 				}
 				break;
@@ -701,6 +723,8 @@ module.exports = {
 					}
 					if(orbCount < 7) {
 						errors.push('Insufficient orbs.');
+					} else if(world.arc.type == enums.ArcTypes.Tournament) {
+						errors.push(`You can't use the orbs until the tournament is over.`);
 					}
 					const wishUsed = player.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed);
 					if(wishUsed) {
@@ -720,6 +744,8 @@ module.exports = {
 									errors.push("The Nemesis can't wish for that.");
 								}
 								break;
+							case 'games':
+							case 'chaos':
 							case 'ruin':
 							case 'snap':
 								if(!player.isNemesis) {
@@ -794,6 +820,9 @@ module.exports = {
 									}
 									if(target.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)) {
 										errors.push("That person doesn't need any orbs.");
+									}
+									if(world.arc.type == enums.ArcTypes.Tournament) {
+										errors.push("You can't use or give away orbs until the tournament is over.");
 									}
 								}
 							} else {
@@ -975,16 +1004,34 @@ module.exports = {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
 					}
+					if(world.arc.type == enums.ArcTypes.DarkTournament) {
+						const nemesisInTournament = tournament.players.find(p => p.id == nemesis.id);
+						if(!nemesisInTournament && player.isNemesis) {
+							errors.push(`You must wait for the finals to challenge humanity.`);
+						}
+						if(!nemesisInTournament && target && target.isNemesis) {
+							errors.push(`You cannot face the Nemesis until the tournament finals.`);
+						}
+					}
 					if(target) {
 						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
 						if(player.name == target.name) {
 							errors.push('You cannot taunt yourself!');
 						}
+						const offer = player.offers.find(o => o.playerId == target.id && 
+							(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
+						if(!offer) {
+							// You're issuing a challenge - validate the cooldown
+							const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Challenge);
+							if(cooldown) {
+								errors.push(`**${player.name}** cannot initiate a fight for another ${tools.getTimeString(cooldown.endTime - now)}.`);
+							}
+						}
 						let targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
 						if(targetDefeated) {
 							let timeString = tools.getTimeString(targetDefeated.endTime - now);
-							errors.push('**' + target.name + '** cannot fight for another ' + timeString + '.');
+							errors.push(`**${target.name}** cannot fight for another ${timeString}.`);
 						}
 						let playerTaunt = player.offers.find(o => o.type == enums.OfferTypes.Taunt);
 						let targetTaunt = target.offers.find(o => o.type == enums.OfferTypes.Taunt);
@@ -1025,6 +1072,15 @@ module.exports = {
 						let timeString = tools.getTimeString(defeated.endTime - now);
 						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
 					}
+					if(world.arc.type == enums.ArcTypes.DarkTournament) {
+						const nemesisInTournament = tournament.players.find(p => p.id == nemesis.id);
+						if(!nemesisInTournament && player.isNemesis) {
+							errors.push(`You must wait for the finals to challenge humanity.`);
+						}
+						if(!nemesisInTournament && target && target.isNemesis) {
+							errors.push(`You cannot face the Nemesis until the tournament finals.`);
+						}
+					}
 					if(target) {
 						this.validateAnnihilation(errors, target);
 						this.validateJourney(errors, target);
@@ -1059,18 +1115,22 @@ module.exports = {
 			case 'tournament':
 				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
-					const tournament = await sql.getTournament(channel);
+					const players = await sql.getPlayers(channel);
 					switch(args[0]) {
 						case 'single':
-						//case 'royale':
 							if(world.lastArc.type == enums.ArcTypes.Tournament) {
 								errors.push(`There can't be two Tournament arcs in a row.`);
 							}
-							if(world.arc.type == enums.ArcTypes.Nemesis ||
-								world.arc.type == enums.ArcTypes.OrbHunt) {
+							if(world.arc.type == enums.ArcTypes.Nemesis) {
 								errors.push(`You can't start a tournament until the current arc ends.`);
 							}
-							const players = await sql.getPlayers(channel);
+							if(world.arc.type == enums.ArcTypes.OrbHunt) {
+								let orbs = player.items.find(i => i.type == enums.Items.Orb);
+								let orbCount = orbs ? orbs.count : 0;
+								if(orbCount < 7) {
+									errors.push(`You must gather all the orbs to start an orb tournament.`);
+								}
+							}
 							if(players.length < 4) {
 								errors.push(`You need at least four players for a tournament.`);
 							}
@@ -1094,6 +1154,7 @@ module.exports = {
 							if(tournament.status == enums.TournamentStatuses.Active) {
 								errors.push(`The tournament has already begun.`);
 							}
+							break;
 					}
 				}
 				break;
@@ -1258,6 +1319,8 @@ module.exports = {
 				return 8;
 			case 'zedge':
 				return 9;
+			case 'zeach':
+				return 10;
 			default:
 				return -1;
 		}

@@ -7,6 +7,9 @@ const hour = (60 * 60 * 1000);
 const updateSql = `
 ALTER TABLE Worlds ADD COLUMN Arc INTEGER;
 ALTER TABLE Episodes ADD COLUMN Arc INTEGER;
+ALTER TABLE Nemesis ADD COLUMN Form INTEGER;
+ALTER TABLE Nemesis ADD COLUMN Max_Forms INTEGER;
+CREATE TABLE IF NOT EXISTS Portals (ID INTEGER PRIMARY KEY, Channel TEXT, TargetChannel TEXT, EnergyBuffs INTEGER);
 CREATE TABLE IF NOT EXISTS Arcs (ID INTEGER PRIMARY KEY, Channel TEXT, Number INTEGER, Type INTEGER, Start_Time INTEGER, End_Time INTEGER)`;
 
 const initTablesSql = `
@@ -15,7 +18,7 @@ CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat RE
 CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
-	NPC INTEGER, Latent_Power REAL, Base_Latent_Power REAL, Known_Latent_Power);
+	NPC INTEGER);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Status (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Type INTEGER,
 	StartTime INTEGER, EndTime INTEGER, Rating REAL);
@@ -24,7 +27,7 @@ CREATE TABLE IF NOT EXISTS Items (ID INTEGER, Channel TEXT, Known INTEGER);
 CREATE TABLE IF NOT EXISTS Offers (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Target_ID INTEGER, Type INTEGER, Extra TEXT, Expires INTEGER);
 CREATE TABLE IF NOT EXISTS Gardens (Channel TEXT, Size_Level REAL, Growth_Level REAL, Research_Level REAL);
 CREATE TABLE IF NOT EXISTS Plants (ID INTEGER PRIMARY KEY, Channel TEXT, Plant_Type INTEGER, StartTime INTEGER, Slot INTEGER, Planter_ID INTEGER);
-CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Start_Time INTEGER, Nemesis_Type INTEGER, Last_Ruin_Update INTEGER, Base_Power REAL);
+CREATE TABLE IF NOT EXISTS Nemesis (Channel TEXT, Player_ID INTEGER, Start_Time INTEGER, Form INTEGER, Max_Forms INTEGER, Last_Ruin_Update INTEGER, Base_Power REAL);
 CREATE TABLE IF NOT EXISTS Underlings (Channel TEXT, Player_ID INTEGER, Defeats INTEGER);
 CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Episode INTEGER, Winner_ID INTEGER, Loser_ID INTEGER,
     Winner_Level REAL, Loser_Level REAL,
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS History (Channel TEXT, Battle_Time INTEGER, Episode I
 CREATE TABLE IF NOT EXISTS Tournaments (Channel TEXT, Organizer_ID INTEGER, Status INTEGER, Type INTEGER, 
     Round INTEGER, Reward INTEGER);
 CREATE TABLE IF NOT EXISTS TournamentPlayers (Channel TEXT, Player_ID INTEGER, Position INTEGER, Status INTEGER);
+CREATE TABLE IF NOT EXISTS Arcs (ID INTEGER PRIMARY KEY, Channel TEXT, Number INTEGER, Type INTEGER, Start_Time INTEGER, End_Time INTEGER);
 CREATE UNIQUE INDEX IF NOT EXISTS Worlds_Channel ON Worlds(Channel);
 CREATE UNIQUE INDEX IF NOT EXISTS Players_ID ON Players(ID); 
 CREATE UNIQUE INDEX IF NOT EXISTS Status_ChannelStatusRating ON Status(Channel, Player_ID, Type, Rating);
@@ -75,21 +79,18 @@ const updatePlayerSql = `UPDATE Players SET
     Glory = $glory,
 	Last_Active = $lastActive,
 	Last_Fought = $lastFought,
-	NPC = $npc,
-	Latent_Power = $latentPower,
-	Base_Latent_Power = $baseLatentPower,
-	Known_Latent_Power = $knownLatentPower
+	NPC = $npc
 WHERE ID = $id AND Channel = $channel`;
 
 const insertPlayerSql = `INSERT INTO Players (Username, User_ID, Name, Channel, Power_Level,
 	Action_Level, Garden_Level, Glory, Last_Active, Last_Fought,
-	NPC, Latent_Power, Base_Latent_Power) 
+	NPC) 
 VALUES ($username, $userId, $name, $channel, $powerLevel, $actionLevel, $gardenLevel, $glory, 
-	$lastActive, $lastFought, $npc, $latentPower, $latentPower)`;
+	$lastActive, $lastFought, $npc)`;
 
 const updateNemesisSql = `INSERT OR REPLACE INTO Nemesis 
-(Channel, Player_ID, Nemesis_Type, Start_Time, Last_Ruin_Update, Base_Power)
-VALUES ($channel, $playerId, $type, $startTime, $lastRuinUpdate, $basePower)`;
+(Channel, Player_ID, Form, Max_Forms, Start_Time, Last_Ruin_Update, Base_Power)
+VALUES ($channel, $playerId, $form, $maxForms, $startTime, $lastRuinUpdate, $basePower)`;
 
 module.exports = {
 	// Sets up tables and such for an empty DB.
@@ -140,12 +141,6 @@ module.exports = {
 		for(const channel of channels) {
 			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (10, $channel, 0)`, {$channel: channel});
 			await sql.run(`INSERT OR REPLACE INTO Items (ID, Channel, Known) VALUES (11, $channel, 0)`, {$channel: channel});
-			const players = await this.getPlayers(channel);
-			for(const player of players) {
-				const latentPower = Math.random() * 0.4;
-				await sql.run(`UPDATE Players SET Base_Latent_Power = $latentPower, Latent_Power = $latentPower WHERE ID = $id`, 
-					{$latentPower: latentPower, $id: player.id});
-			}
 		}
 	},
 	// Debug commands to run arbitrary SQL. Be careful, admin.
@@ -226,6 +221,15 @@ module.exports = {
 			return null;
 		}
 	},
+	async getWorlds() {
+		const worldRows = await sql.all(`SELECT Channel FROM Worlds`);
+		let worlds = [];
+		for(let i in worldRows) {
+			const worldRow = worldRows[i];
+			worlds.push(await this.getWorld(worldRow.Channel));
+		}
+		return worlds;
+	},
 	async setWorld(world) {
 		await sql.run(`UPDATE Worlds SET Heat = $heat, Resets = $resets, 
 			Last_Wish = $lastWish, Start_Time = $startTime WHERE Channel = $channel`,
@@ -251,8 +255,7 @@ module.exports = {
 				$glory: player.glory, 
 				$lastActive: player.lastActive,
 				$lastFought: player.lastFought,
-				$npc: player.npc,
-				$latentPower: player.latentPower
+				$npc: player.npc
 			});
 		let playerId = result.lastID;
 		for(var i in player.config) {
@@ -290,10 +293,7 @@ module.exports = {
             $glory: player.glory,
 			$lastActive: player.lastActive,
 			$lastFought: player.lastFought,
-			$npc: player.npc,
-			$latentPower: player.latentPower,
-			$baseLatentPower: player.baseLatentPower,
-			$knownLatentPower: player.knownLatentPower
+			$npc: player.npc
 		});
 		for(var i in player.config) {
 			await this.setConfig(player.channel, player.id, i, player.config[i]);
@@ -371,9 +371,6 @@ module.exports = {
 			gardenLevel: row.Garden_Level,
 			actionLevel: row.Action_Level,
 			npc: row.NPC,
-			latentPower: row.Latent_Power,
-			baseLatentPower: row.Base_Latent_Power,
-			knownLatentPower: row.Known_Latent_Power,
 			config: {},
 			cooldowns: statusRows.filter(s => s.Type == enums.Statuses.Cooldown).map(c => { return {
 				id: c.ID,
@@ -561,7 +558,8 @@ module.exports = {
 			const nemesis = {
 				id: row.Player_ID,
 				channel: row.Channel,
-				type: row.Nemesis_Type,
+				form: row.Form,
+				maxForms: row.Max_Forms,
 				startTime: row.Start_Time,
 				lastRuinUpdate: row.Last_Ruin_Update,
 				basePower: row.Base_Power
@@ -597,7 +595,8 @@ module.exports = {
         await sql.run(updateNemesisSql, {
 			$channel: channel,
             $playerId: nemesis.id,
-			$type: nemesis.type,
+			$form: nemesis.form,
+			$maxForms: nemesis.maxForms,
 			$startTime: nemesis.startTime,
 			$lastRuinUpdate: nemesis.lastRuinUpdate,
 			$basePower: nemesis.basePower
@@ -629,7 +628,7 @@ module.exports = {
 				id: i.ID,
 				known: i.Known
 			}});
-			garden.slots = Math.min(Math.floor(garden.sizeLevel + 3), 8);
+			garden.slots = Math.min(Math.floor(garden.sizeLevel), 6);
 
 			return garden;
 		} else {
@@ -985,14 +984,17 @@ module.exports = {
 						await sql.run(`UPDATE TournamentPlayers SET Position = $position, Status = $status WHERE Player_ID = $id`, 
 							{$id: player.id, $position: player.position, $status: player.status});
 					} else {
-						await this.joinTournament(tournament.channel, player.id);
+						await this.joinTournament(tournament.channel, player.id, player.position);
 					}
 				}
 			}
+		} else {
+			await sql.run(`DELETE FROM TournamentPlayers WHERE Channel = $channel`, {$channel: tournament.channel});
 		}
 	},
-	async joinTournament(channel, id) {
-		await sql.run(`INSERT OR REPLACE INTO TournamentPlayers (Channel, Player_ID, Position) VALUES ($channel, $id, 0)`, {$channel: channel, $id: id});
+	async joinTournament(channel, id, position) {
+		await sql.run(`INSERT OR REPLACE INTO TournamentPlayers (Channel, Player_ID, Position) VALUES ($channel, $id, $position)`, 
+			{$channel: channel, $id: id, $position: position});
 	},
 	async eliminatePlayer(id) {
 		await sql.run(`DELETE FROM TournamentPlayers WHERE Player_ID = $id`, {$id: id});
@@ -1033,5 +1035,31 @@ module.exports = {
 		const result = await sql.run(`INSERT INTO Arcs (Channel, Number, Type, Start_Time) VALUES ($channel, $number, $type, $now)`,
 			{$channel: channel, $number: number, $type: type, $now: now});
 		await sql.run(`UPDATE Worlds SET Arc = $arc WHERE Channel = $channel`, {$arc: result.lastID, $channel: channel});
+	},
+	async getPortal(channel) {
+		const portal = await sql.get(`SELECT * FROM Portals WHERE Channel = $channel`, {$channel: channel});
+		if(!portal) return null;
+		return {
+			id: portal.ID,
+			channel: portal.Channel,
+			targetChannel: portal.TargetChannel,
+			energyBuffs: portal.EnergyBuffs
+		};
+	},
+	async newPortal(channel, targetChannel) {
+		await sql.run(`INSERT OR REPLACE INTO Portals (Channel, TargetChannel, EnergyBuffs) VALUES ($channel, $targetChannel, 0)`,
+			{$channel: channel, $targetChannel: targetChannel});
+		await sql.run(`INSERT OR REPLACE INTO Portals (Channel, TargetChannel, EnergyBuffs) VALUES ($channel, $targetChannel, 0)`,
+			{$channel: targetChannel, $targetChannel: channel});
+	},
+	async setPortal(portal) {
+		await sql.run(`UPDATE Portals SET TargetChannel = $targetChannel, EnergyBuffs = $energyBuffs WHERE Channel = $channel`,
+			{$targetChannel: portal.targetChannel, $energyBuffs: portal.energyBuffs, $channel: portal.channel});
+	},
+	async deletePortal(channel, targetChannel) {
+		await sql.run(`DELETE FROM Portals WHERE Channel = $channel AND TargetChannel = $targetChannel`,
+			{$channel: channel, $targetChannel: targetChannel});
+		await sql.run(`DELETE FROM Portals WHERE Channel = $channel AND TargetChannel = $targetChannel`,
+			{$channel: channel, $targetChannel: targetChannel});
 	}
 }

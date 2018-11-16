@@ -13,6 +13,7 @@ module.exports = {
         Gourd: 10,
         Peach: 11,
         Trophy: 12,
+        Zeach: 13,
         Name: {
             0: 'orb',
             1: 'flower',
@@ -26,7 +27,8 @@ module.exports = {
             9: 'zedge',
             10: 'gourd',
             11: 'peach',
-            12: 'trophy'
+            12: 'trophy',
+            13: 'zeach'
         },
         An: {
             0: true
@@ -44,7 +46,8 @@ module.exports = {
             9: 2,
             10: 1,
             11: 3,
-            12: 4
+            12: 4,
+            13: 2
         },
         GrowTime: {
             1: 18,
@@ -57,7 +60,8 @@ module.exports = {
             8: 3,
             9: 3,
             10: 18,
-            11: 36
+            11: 36,
+            13: 12
         },
         NeedsTarget: {
             1: true,
@@ -108,6 +112,7 @@ module.exports = {
         TrainingComplete: 16,
         Caught: 17,
         UltimateForm: 18,
+        GardenWish: 19,
         Name: {
             0: 'Defeated',
             1: 'Journey',
@@ -147,7 +152,8 @@ module.exports = {
             10: true,
             11: true,
             12: true,
-            18: true
+            18: true,
+            19: true
         }
     },
     NemesisTypes: {
@@ -160,7 +166,9 @@ module.exports = {
         Zorbmaster: 2,
         Zlower: 3,
         Zarrot: 4,
-        Zedge: 5
+        Zedge: 5,
+        Zeach: 6,
+        Phantom: 7
     },
     Cooldowns: {
         Action: 0,
@@ -184,6 +192,9 @@ module.exports = {
         NemesisUsed: 18,
         FusionUsed: 19,
         WishUsed: 20,
+        Chaos: 21,
+        Challenge: 22,
+        Portal: 23,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',
@@ -195,12 +206,14 @@ module.exports = {
             7: 'Auto-Search',
             8: 'Auto-Empower',
             9: 'Drain Garden',
-            13: 'Journey'
+            13: 'Journey',
+            22: 'Issue Challenge'
         },
         IsEvent: {
             15: true,
             16: true,
-            17: true
+            17: true,
+            23: true
         },
         IsNemesis: {
             2: true,
@@ -213,7 +226,8 @@ module.exports = {
     Events: {
         HotSpring: 15,
         Dojo: 16,
-        Guru: 17
+        Guru: 17,
+        Portal: 23
     },
     Configs: {
         AlwaysPrivate: 'AlwaysPrivate',
@@ -245,9 +259,11 @@ module.exports = {
     TournamentTypes: {
         SingleElimination: 0,
         BattleRoyale: 1,
+        DarkTournament: 2,
         Name: {
             0: 'single elimination',
-            1: 'battle royale'
+            1: 'battle royale',
+            2: 'dark'
         }
     },
     TournamentStatuses: {
