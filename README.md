@@ -14,9 +14,31 @@ Expanding this later:
 Writing this later.
 
 # Updates for S6:
+- New: A Season is now split into Arcs based on player activity.
+- Arcs: A Nemesis Arc begins when someone uses !nemesis, preventing tournaments.
+- Arcs: A Tournament Arc begins when someone starts a tournament, preventing orb searching or nemesis uprisings.
+- Arcs: An Orb Hunt Arc begins when someone finds the third magic orb, preventing tournaments or nemesis uprisings.
+- Wish: "gardening" wish now works differently.
+- Wish: Nemesis wish "burn" now destroys a random portion of all growing plants.
+- Wish: New nemesis wish "games" added.
+- Garden: Each player now has one free personal garden slot.
 - Garden: Plants no longer decay.
+- Garden: New dark plant "Zeach".
+- Nemesis: Dark Plants now only spawn one per batch, but are more powerful to compensate.
+- Tournaments: If you have all seven orbs, you can start a tournament and wager all the orbs on the result.
+- Events: Guru event now boosts gardening instead of latent power.
+- Events: Special rare "portal" event added.
+- Fighting: "Latent Power" mechanic removed.
+- Fighting: Players now gain a bonus to power level based on total number of defeats.
+- Fighting: There is now a 10 minute cooldown on initiating fight challenges.
 - Bugfix: Gourd trained the user, not the target.
 - Bugfix: Permanent statuses now carry properly into and out of fusion.
+- Bugfix: Nemesis timer was being displayed twice in some situations.
+- Bugfix: Couldn't use plants on yourself while on a journey.
+- Bugfix: History occasionally showed the wrong battle ratings for fights.
+- Bugfix: Redundant error messages displaying for trying to !train while already training.
+- Bugfix: !destroy crashed in some circumstances.
+- Bugfix: AutoTrain occasionally caused unexpected output.
 
 # New features for S5:
 - Garden: "!plant" no longer takes a garden action.
