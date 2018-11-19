@@ -30,7 +30,7 @@ Writing this later.
 - Events: Guru event now boosts gardening instead of latent power.
 - Events: Special rare "portal" event added.
 - Fighting: "Latent Power" mechanic removed.
-- Fighting: Players now gain a bonus to power level based on total number of defeats.
+- Fighting: Players now gain a bonus to power level based on their total number of defeats.
 - Fighting: There is now a 5 minute cooldown on initiating fight challenges.
 - Bugfix: Gourd trained the user, not the target.
 - Bugfix: Permanent statuses now carry properly into and out of fusion.

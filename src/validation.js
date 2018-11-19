@@ -483,6 +483,8 @@ module.exports = {
 						if(expandType != 'growth' && expandType != 'size' && expandType != 'research') {
 							errors.push("Your options are: `!expand growth`, `!expand size`, or `!expand research`.");
 						}
+					} else {
+						errors.push("Syntax: `!expand growth/size/research`");
 					}
 					if(glory < 50) {
 						errors.push(`**${player.name}** must be at least Rank C to expand the garden.`);

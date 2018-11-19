@@ -541,7 +541,7 @@ module.exports = {
 			const offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
 			if(!offer) {
-				await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 5 * 60 * 1000, enums.Cooldowns.Challenge);
+				await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 60 * 1000, enums.Cooldowns.Challenge);
 			}
 			if(!offer && !player2.isNemesis && !player2.isUnderling && !player2.npc) {
 				// If they haven't offered, send a challenge
@@ -567,7 +567,7 @@ module.exports = {
 				.setColor(0xff8040)
 				.setDescription(`**${player1.name}** wants to fight anyone! The next person to enter \`!fight ${player1.name}\` will accept the challenge and begin the battle.`);
 			output.push(embed);
-			await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 10 * 60 * 1000, enums.Cooldowns.Challenge);
+			await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 60 * 1000, enums.Cooldowns.Challenge);
 		}
 		return output;
 	},
