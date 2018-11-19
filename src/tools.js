@@ -73,13 +73,11 @@ module.exports = {
 			}
 		}
 		
-		if(player.gardenLevel >= 1) {
-			stats += '\nGardening Level: ' + Math.floor(player.gardenLevel);
-		}
+		const gardenPercent = Math.floor((player.gardenLevel - Math.floor(player.gardenLevel)) * 100);
+		stats += `\nGardening Level: ${Math.floor(player.gardenLevel)} (${gardenPercent}%)`;
 		
-		if(player.actionLevel >= 1) {
-			stats += '\nAction Level: ' + Math.floor(player.actionLevel);
-		}
+		const actionPercent = Math.floor((player.actionLevel - Math.floor(player.actionLevel)) * 100);
+		stats += `\nAction Level: ${Math.floor(player.actionLevel)} (${actionPercent}%)`;
 
 		embed.addField('Stats', stats);
 
@@ -543,7 +541,7 @@ module.exports = {
 			const offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
 			if(!offer) {
-				await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 10 * 60 * 1000, enums.Cooldowns.Challenge);
+				await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 5 * 60 * 1000, enums.Cooldowns.Challenge);
 			}
 			if(!offer && !player2.isNemesis && !player2.isUnderling && !player2.npc) {
 				// If they haven't offered, send a challenge
@@ -600,6 +598,7 @@ module.exports = {
 		this.addHeat(world, hours);
 		let newPowerLevel = this.newPowerLevel(world.heat);
 		newPowerLevel *= 1 + 0.05 * losses;
+		console.log(`${player.name} power +${5 * losses}% due to defeats`);
 		if (this.isFusion(player)) {
 			newPowerLevel *= 1.3;
 		}
@@ -859,7 +858,7 @@ module.exports = {
 		if(winner.isNemesis || winner.npc) {
 			// Weaken the enemy
 			if(winner.isNemesis || winner.npc == enums.NpcTypes.Zorbmaster) {
-				hours = Math.min(hours, 6);
+				hours = Math.max(hours, 6);
 			}
 
 			let underlings = await sql.getUnderlings(winner.channel);
@@ -1137,7 +1136,7 @@ module.exports = {
 		await sql.setPlayer(target);
 
 		return `**${nemesisPlayer.name}** breathes new life into **${target.name}**, reviving ${this.them(target.config.pronoun)}` +
-			` and increasing ${this.their(target.config.pronoun)} power level by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
+			` and increasing ${this.their(target.config.pronoun)} power level!`;
 	},
 	// Sends a player a recruitment offer to join the Nemesis.
     async joinNemesis(player) {
@@ -1147,6 +1146,7 @@ module.exports = {
 		let underlings = await sql.getUnderlings(channel);
 		let world = await sql.getWorld(channel);
 		
+		await this.completeTraining(player);
 		await sql.setUnderling(channel, player.id, true);
 		await sql.deleteOffer(nemesis.id, player.id, enums.OfferTypes.Recruit);
 
@@ -1243,7 +1243,7 @@ module.exports = {
 
 		const firstPick = Math.floor(Math.random() * plants.length);
 		const targets = Math.max(Math.floor(plants.length / 4), 2);
-		output += `The Nemesis lays waste to the garden!`;
+		let output = `The Nemesis lays waste to the garden!`;
 		for(let i = 0; i < targets; i++) {
 			const index = (i + firstPick) % plants.length;
 			if(plants[index]) {
@@ -1726,8 +1726,10 @@ module.exports = {
 					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 				} else {
 					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
-					if(target.config.AutoTrain) {
+					if(target.config.AutoTrain && !target.isUnderling) {
 						output += `\n**${target.name}** has started training.`;
+					} else if(target.isUnderling) {
+						output += await this.underlingPowerup(target);
 					}
 				}
 				break;
@@ -1738,8 +1740,10 @@ module.exports = {
 					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 				} else {
 					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
-					if(target.config.AutoTrain) {
+					if(target.config.AutoTrain && !target.isUnderling) {
 						output += `\n**${target.name}** has started training.`;
+					} else if(target.isUnderling) {
+						output += await this.underlingPowerup(target);
 					}
 				}
 				break;
@@ -2020,7 +2024,7 @@ module.exports = {
 				output = await this.searchMonsters(player, searchChance);
 			}
 			if(!output) {
-				searchChance = 1.02 * searchMultiplier * settings.EventFrequency;
+				searchChance = 0.02 * searchMultiplier * settings.EventFrequency;
 				output = await this.searchEvents(player, world, searchChance);
 			}
 		}
@@ -2149,7 +2153,6 @@ module.exports = {
 		const eventList = Object.keys(enums.Events).map(key => enums.Events[key]);
 		if(roll < searchChance && !existingEvent) {
 			let eventType = eventList[Math.floor(Math.random() * eventList.length)];
-			eventType = enums.Events.Portal;
 			switch(eventType) {
 				case enums.Events.HotSpring:
 					output.push(`${player.name} searches the world, and finds an enchanted hot spring! ` +
@@ -2341,6 +2344,20 @@ module.exports = {
 				}
 				break;
 			case 'games':
+				// Exile all underilngs
+				const underlings = await sql.getUnderlings(channel);
+				for(const underling of underlings) {
+					await sql.setUnderling(channel, underling.id, false);
+				}
+
+				// Shorten everyone's death timer to six hours
+				for(const p of players) {
+					const defeated = p.status.find(s => s.type == enums.Statuses.Dead);
+					if(defeated && defeated.endTime > now + 6 * hour) {
+						await this.healPlayer(p, (defeated.endTime - now) - 6 * hour);
+					}
+				}
+
 				output += `\nThe Nemesis has called for a tournament to determine the fate of the universe! Enter \`!tourney join\` to join - ` +
 					`the more contestants there are, the more time you'll have to save the universe! **Let the ${player.name} Games begin!**`;
 				await this.createTournament(channel, player, enums.TournamentTypes.DarkTournament);
@@ -2487,25 +2504,32 @@ module.exports = {
 			const now = new Date().getTime();
 			const hoursLeft = Math.ceil((ruinTime.endTime - now) / hour);
 			const lastHoursLeft = Math.ceil((ruinTime.endTime - nemesis.lastRuinUpdate) / hour);
+			const tournament = await sql.getTournament(channel);
 			if(hoursLeft != lastHoursLeft) {
 				// Reminder the players about their impending doom
-				if(hoursLeft > 0) {
+				if(hoursLeft > 0 && (!tournament || tournament.status == enums.TournamentStatuses.Active)) {
 					output.messages.push(`${hoursLeft} hours until the universe is destroyed!`);
 				}
 			}
 			if(hoursLeft <= 0) {
 				let player = await sql.getPlayerById(nemesis.id);
-				const tournament = await sql.getTournament(channel);
 				if(world.arc.type == enums.ArcTypes.DarkTournament && tournament && tournament.status == enums.TournamentStatuses.Recruiting) {
 					if(tournament.players.length >= 4) {
 						// Dark tournament begins
 						await this.startTournament(tournament);
-						const duration = tournament.players.length * 1.5 * hour;
+						const hours = tournament.players.length * 1.5;
 						await sql.deleteStatusById(ruinTime.id);
-						await sql.addStatus(channel, null, enums.Statuses.Cooldown, duration, enums.Cooldowns.Ruin);
+						await sql.addStatus(channel, null, enums.Statuses.Cooldown, hours * hour, enums.Cooldowns.Ruin);
 						output.messages.push(await this.displayTournament(await sql.getTournament(channel)));
-						output.messages.push(`The ${player.name} Games have begun! You have ${this.getTimeString(duration)} to finish the tournament and defeat the Nemesis!`);
+						output.messages.push(`The ${player.name} Games have begun! You have ${this.getTimeString(hours * hour)} to finish the tournament and defeat the Nemesis!`);
 						nemesis.lastRuinUpdate = now;
+
+						// Power up the Nemesis for the finale
+						const heatPerHour = Math.min(world.heat / ((now - world.startTime) / hour), 10);
+						console.log(`Heat per hour: ${heatPerHour}`);
+						const nemesisLevel = await this.newPowerLevel(world.heat + heatPerHour * hours) * 1.5;
+						player.level = Math.max(player.level + nemesisLevel / 4, nemesisLevel);
+						await sql.setPlayer(player);
 					} else {
 						await this.endWorld(channel);
 						output.message = `You failed to gather enough warriors! **${player.name}** finishes charging, and destroys the universe. May you fare better in the next life...` +
@@ -2549,10 +2573,13 @@ module.exports = {
 				case enums.Statuses.Dead:
 				    // Death
 					messages.push(`**${player.name}** is ready to fight.`);
-					if(player.config.AutoTrain) {
+					if(player.config.AutoTrain && !player.isUnderling) {
 						messages.push(`**${player.name}** has begun training.`);
 						await this.deleteStatus(player, enums.Statuses.Ready);
 						await sql.addStatus(channel, player.id, enums.Statuses.Training);
+					} else if(player.isUnderling) {
+						const message = await this.underlingPowerup(player);
+						if(message) messages.push(message);
 					} else {
 						await sql.addStatus(channel, player.id, enums.Statuses.Ready);
 					}
@@ -2629,19 +2656,19 @@ module.exports = {
 								break;
 							case enums.Cooldowns.Search:
 								// Search for orbs
-								if(nemesisPlayer) {
+								if(nemesisPlayer && world.arc.type == enums.ArcTypes.Nemesis) {
 									messages = messages.concat(await this.search(player));
 									await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour / 3, enums.Cooldowns.Search);
-								} else {
+								} else if(!nemesisPlayer) {
 									messages.push(`**${player.name}** searches for the Nemesis, to no avail.`);
 								}
 								break;
 							case enums.Cooldowns.Empower:
 								// Empower the Nemesis
-								if(nemesisPlayer) {
+								if(nemesisPlayer && world.arc.type == enums.ArcTypes.Nemesis) {
 									messages.push(await this.empower(player, nemesisPlayer));
 									await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, hour / 2, enums.Cooldowns.Empower);
-								} else {
+								} else if(!nemesisPlayer) {
 									messages.push(`**${player.name}** searches for the Nemesis, to no avail.`);
 								}
 								break;
@@ -3723,9 +3750,11 @@ module.exports = {
 				// Revive
 				await this.deleteStatusById(player, defeatedState.id);
 
-				if(player.config.AutoTrain) {
+				if(player.config.AutoTrain && !player.isUnderling) {
 					await this.deleteStatus(player, enums.Statuses.Ready);
 					await sql.addStatus(channel, player.id, enums.Statuses.Training);
+				} else if(player.isUnderling) {
+					await this.underlingPowerup(player);
 				} else {
 					await sql.addStatus(channel, player.id, enums.Statuses.Ready);
 				}
@@ -3748,7 +3777,7 @@ module.exports = {
 		if(!player.npc) {
 			if(!player.actionLevel) player.actionLevel = 0;
 			const oldActionLevel = Math.floor(player.actionLevel);
-			player.actionLevel += settings.ActionLevelSpeed / (1 + player.actionLevel);
+			player.actionLevel += (settings.ActionLevelSpeed / (1 + player.actionLevel)) * (Math.random() * 0.4 + 0.8);
 			const newActionLevel = Math.floor(player.actionLevel);
 			if(player.status.find(s => s.type == enums.Statuses.UltimateForm)) {
 				await sql.addStatus(player.channel, player.id, enums.Statuses.Cooldown, 10 * 60 * 1000, enums.Cooldowns.Action);
@@ -3763,7 +3792,7 @@ module.exports = {
 		if(!player.npc) {
 			if(!player.gardenLevel) player.gardenLevel = 0;
 			const oldGardenLevel = Math.floor(player.gardenLevel);
-			player.gardenLevel += settings.GardenLevelSpeed * multiplier / (1 + player.gardenLevel);
+			player.gardenLevel += (settings.GardenLevelSpeed * multiplier / (1 + player.gardenLevel)) * (Math.random() * 0.4 + 0.8);
 			const newGardenLevel = Math.floor(player.gardenLevel);
 			let cooldown = hour;
 			if(player.status.find(s => s.type == enums.Statuses.UltimateForm)) {
@@ -3950,5 +3979,14 @@ module.exports = {
 				` from Universe ${otherWorld.id} emerges from the portal! Defeat it to gain massive Glory!`
 		});
 		return messages;
+	},
+	async underlingPowerup(player) {
+		const revivePower = hour * (15 - 2.5 * player.underlingDefeats);
+		if(revivePower > 0) {
+			await this.completeTraining(player, revivePower);
+			return `${player.name} returns to the fight, more powerful than ever!`;
+		} else {
+			return null;
+		}
 	}
 }

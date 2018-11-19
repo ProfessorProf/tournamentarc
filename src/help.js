@@ -20,6 +20,7 @@ module.exports = {
                 .addField('!help underlings', 'Help with commands related to underlings: !join, !recruit, !exile.')
                 .addField('!help wish', 'Help with commands related to orbs and wishes: !search, !give, !wish.')
                 .addField('!help rank', 'Help with Rank, Glory, and how to increase them.')
+                .addField('!help arcs', 'Help with the Arc system.')
                 .addField('!help tournament', 'Help with commands related to martial arts tournaments.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
@@ -69,7 +70,7 @@ Rank ??? 1000 Glory
                     if(player && player.isNemesis) {
                         output.setTitle('Help: The Garden')
                             .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
-                                'After using most  gardening commands, you must wait three hours before using another.\n' +
+                                'After using most gardening commands, you must wait three hours before using another.\n' +
                                 'Enter `!help plants` for more info on available plant types.')
                             .addField('!garden', 'Display info about the garden.')
                             .addField('!plant', 'Plant a new plant in the garden.')
@@ -77,6 +78,7 @@ Rank ??? 1000 Glory
                     } else {
                         output.setTitle('Help: The Garden')
                             .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
+                                'Each player gets one personal garden slot, and you can expand garden size to add new slots anyone can use.\n' +
                                 'After using most gardening commands, you must wait an hour before using another.\n' +
                                 'Watering plants or expanding the garden boosts your Garden Level.\n' +
                                 'Enter `!help plants` for more info on available plant types.')
@@ -92,9 +94,10 @@ Rank ??? 1000 Glory
                     output.setTitle('Help: Plants')
                     output.setDescription('Enter `!help garden` for more info on growing, using and discovering plants.');
                     if(player && player.isNemesis) {
-                        output.addField('Zlower (3 hours)', 'Dark plant available only to the Nemesis. Spawns two plant underlings that periodically send the Nemesis energy.')
-                        output.addField('Zarrot (3 hours)', 'Dark plant available only to the Nemesis. Spawns three plant underlings that periodically search for orbs.')
+                        output.addField('Zlower (3 hours)', 'Dark plant available only to the Nemesis. Spawns a plant underling that periodically send the Nemesis energy.')
+                        output.addField('Zarrot (3 hours)', 'Dark plant available only to the Nemesis. Spawns a plant underling that periodically search for orbs.')
                         output.addField('Zedge (3 hours)', 'Dark plant available only to the Nemesis. Spawns a plant underling that periodically decays all plants in the garden.')
+                        output.addField('Zeach (12 hours)', 'Dark plant available only to the Nemesis. Spawns a plant underling that stops the Nemesis from losing power in battle.')
                     } else {
                         let garden = await sql.getGarden(player.channel);
                         let plants = garden.plantTypes.filter(t => t.known);
@@ -159,7 +162,7 @@ Rank ??? 1000 Glory
                     output.setDescription('The Nemesis:')
                         .addField('!nemesis', 'Become the Nemesis, a scourge who terrorize the galaxy! You gain new abilities, but lose access to non-combat actions. Power increases dramatically, and the whole server must band together to defeat you.')
                         .addField('Nemesis requirements', 'Must be Rank S or higher.\nMust be alive.\nThere can only be one Nemesis at a time.\n' +
-                            'No Nemesis can appear for 24 hours after a Nemesis is defeated.\nNo Nemesis can appear while there are 3 or more discovered orbs.')
+                            "You can't have two Nemesis Arcs in a row.\nNo Nemesis can appear during an Orb Hunt or Tournament Arc.")
                         .addField('Nemesis effects', "Power level is immense.\n" +
                             "Each time you win a battle, your power level will fall slightly. The harder the enemy fights, the more they'll weaken you.\n" +
                             "Anyone can fight you, even without a challenge.\n" +
@@ -182,7 +185,12 @@ Rank ??? 1000 Glory
                 case 'underlings':
                     output.setDescription('Underlings:')
                         .addField('!join', 'Accept a recruitment offer from the Nemesis, and become one of their underlings!')
-                        .addField('Underling properties', "When you join the Nemesis, you get a considerable boost to your Power Level.\nThe Nemesis can energize their underlings, boosting their Power Level even further.\nThe Nemesis can bring fallen underlings back to life.\nUnderlings have increased chances to find orbs while searching the world.\nIf the Nemesis is attacked, their power is increased for each active underling.\nEach time an underling falls in battle, the amount of power they grant to the Nemesis decreases by 20%.\nUnderlings can only use the commands !use, !empower and !give on the Nemesis.")
+                        .addField('Underling properties', "When you join the Nemesis, you get a considerable boost to your Power Level.\n" +
+                            "The Nemesis can energize their underlings, boosting their Power Level even further.\n" +
+                            "The Nemesis can bring fallen underlings back to life.\nUnderlings have increased chances to find orbs while searching the world.\n" +
+                            "If the Nemesis is attacked, their power is increased for each active underling.\n" +
+                            "Each time an underling falls in battle, their power increases, but the amount of power they grant to the Nemesis decreases by 20%.\n" +
+                            "Underlings can only use the commands !use, !empower and !give on the Nemesis.");
                     break;
                 case 'wish':
                     output.setTitle('Help: Wishes')
@@ -195,7 +203,8 @@ Rank ??? 1000 Glory
                         .addField('!wish resurrection', 'Raise the dead! All fallen players are instantly revived, and their Power Levels increase by 20%.')
                         .addField('!wish gardening', 'Become the master of gardening! Gardening Level increases by 12.')
                         .addField('!wish ruin', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.')
-                        .addField('!wish snap', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.');
+                        .addField('!wish snap', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.')
+                        .addField('!wish games', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.');
                     break;
                 case 'tournament':
                     output.setTitle('Help: Tournaments')
@@ -205,6 +214,15 @@ Rank ??? 1000 Glory
                             "Once a single elimination tournament starts, each round lasts for 24 hours or until every match in the round is resolved.")
                         .addField('!tourney join', "Sign up for a tournament that's recruiting for players. A tournament requires at least four players, but can't have more than sixteen.")
                         .addField('!tourney start', "Start the tournament with the current set of players!");
+                case 'arcs':
+                    output.setTitle('Help: Arcs')
+                        .setDescription("The flow of the game is now divided into different kinds of arcs! Depending on the current arc, certain actions may be prohibited.")
+                        .addField('Filler Arc', "Nothing special. A new arc will begin based on your actions!")
+                        .addField('Orb Hunt Arc', "Once the third orb is found, an Orb Hunt Arc begins! Nemesis and Tournament actions are blocked until someone gathers the orbs and makes a wish. " +
+                            "If you gather all seven, you can make a wish or you can start a tournament with the orbs as the prize!")
+                        .addField('Nemesis Arc', "A nemesis rises to menace the galaxy! Tournament actions are blocked until the Nemesis is defeated or makes a wish.")
+                        .addField('Tournament Arc', "Fight to determine the strongest! A Nemesis can't rise and orbs can't be round until the tournament ends.")
+                        .addField('??? Arc', "There may be other kinds of arcs yet to be discovered...");
                 default:
                     if(this.addHelpField(output, topic)) {
                         return output;

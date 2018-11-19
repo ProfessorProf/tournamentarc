@@ -47,7 +47,7 @@ client.on('ready', () => {
 			const c = channels[i];
 			
 			const update = await tools.updateWorld(c);
-			if(update.updates) {
+			if(update.updates && update.updates.length > 0) {
 				updatedChannels.push(c);
 				const channel = client.channels.find(x => x.id == c);
 				if(channel) {

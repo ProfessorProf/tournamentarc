@@ -25,12 +25,13 @@ Writing this later.
 - Garden: Plants no longer decay.
 - Garden: New dark plant "Zeach".
 - Nemesis: Dark Plants now only spawn one per batch, but are more powerful to compensate.
+- Nemesis: Underlings can no longer train, but come back stronger each time.
 - Tournaments: If you have all seven orbs, you can start a tournament and wager all the orbs on the result.
 - Events: Guru event now boosts gardening instead of latent power.
 - Events: Special rare "portal" event added.
 - Fighting: "Latent Power" mechanic removed.
 - Fighting: Players now gain a bonus to power level based on total number of defeats.
-- Fighting: There is now a 10 minute cooldown on initiating fight challenges.
+- Fighting: There is now a 5 minute cooldown on initiating fight challenges.
 - Bugfix: Gourd trained the user, not the target.
 - Bugfix: Permanent statuses now carry properly into and out of fusion.
 - Bugfix: Nemesis timer was being displayed twice in some situations.
@@ -39,6 +40,7 @@ Writing this later.
 - Bugfix: Redundant error messages displaying for trying to !train while already training.
 - Bugfix: !destroy crashed in some circumstances.
 - Bugfix: AutoTrain occasionally caused unexpected output.
+- Bugfix: Much cleaner logging.
 
 # New features for S5:
 - Garden: "!plant" no longer takes a garden action.

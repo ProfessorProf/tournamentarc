@@ -77,7 +77,7 @@ module.exports = {
 						errors.push(`**${player.name}** cannot fight for another ${tools.getTimeString(defeated.endTime - now)}.`);
 					}
 					if(world.arc.type == enums.ArcTypes.DarkTournament) {
-						const nemesisInTournament = tournament.players.find(p => p.id == nemesis.id);
+						const nemesisInTournament = tournament.players.find(p => p && p.id == nemesis.id);
 						if(!nemesisInTournament && player.isNemesis) {
 							errors.push(`You must wait for the finals to challenge humanity.`);
 						}
@@ -226,6 +226,9 @@ module.exports = {
 							if(!player.status.find(s => s.type == enums.Statuses.Ready)) {
 								errors.push(`**${player.name}** must lose a fight before they can begin training.`);
 							}
+						}
+						if(player.isUnderling) {
+							errors.push(`Underlings gain power by reviving, not by training.`);
 						}
 					}
 				}
@@ -655,7 +658,8 @@ module.exports = {
 						world.arc.type == enums.ArcTypes.Tournament) {
 						errors.push(`A nemesis can't rise until the current arc is over.`);
 					}
-					if(world.lastArc.type == enums.ArcTypes.Nemesis) {
+					if(world.lastArc.type == enums.ArcTypes.Nemesis ||
+						world.lastArc.type == enums.ArcTypes.DarkTournament) {
 						errors.push(`There can't be two Nemesis arcs in a row.`);
 					}
 					if(player.isNemesis) {
@@ -1005,7 +1009,7 @@ module.exports = {
 						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
 					}
 					if(world.arc.type == enums.ArcTypes.DarkTournament) {
-						const nemesisInTournament = tournament.players.find(p => p.id == nemesis.id);
+						const nemesisInTournament = tournament.players.find(p => p && p.id == nemesis.id);
 						if(!nemesisInTournament && player.isNemesis) {
 							errors.push(`You must wait for the finals to challenge humanity.`);
 						}
@@ -1073,7 +1077,7 @@ module.exports = {
 						errors.push(`**${player.name}** cannot fight for another ${timeString}.`);
 					}
 					if(world.arc.type == enums.ArcTypes.DarkTournament) {
-						const nemesisInTournament = tournament.players.find(p => p.id == nemesis.id);
+						const nemesisInTournament = tournament.players.find(p => p && p.id == nemesis.id);
 						if(!nemesisInTournament && player.isNemesis) {
 							errors.push(`You must wait for the finals to challenge humanity.`);
 						}
@@ -1140,8 +1144,11 @@ module.exports = {
 							break;
 						case 'join':
 							this.validateNotNemesis(errors, player);
-							if(tournament.players.find(p => p.id == player.id)) {
+							if(tournament.players.find(p => p && p.id == player.id)) {
 								errors.push("You've already joined this tournament.");
+							}
+							if(tools.isFusion(player)) {
+								errors.push("A fusion can't join a tournament.");
 							}
 							break;
 						case 'start':

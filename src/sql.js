@@ -6,6 +6,7 @@ const hour = (60 * 60 * 1000);
 
 const updateSql = `
 ALTER TABLE Worlds ADD COLUMN Arc INTEGER;
+ALTER TABLE Worlds ADD COLUMN LastArc INTEGER;
 ALTER TABLE Episodes ADD COLUMN Arc INTEGER;
 ALTER TABLE Nemesis ADD COLUMN Form INTEGER;
 ALTER TABLE Nemesis ADD COLUMN Max_Forms INTEGER;
@@ -14,8 +15,8 @@ CREATE TABLE IF NOT EXISTS Arcs (ID INTEGER PRIMARY KEY, Channel TEXT, Number IN
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER,
-	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER, Offset INTEGER);
-CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT);
+	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER, Offset INTEGER, Arc INTEGER, LastArc INTEGER);
+CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT, Arc INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
     Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
 	NPC INTEGER);
@@ -130,7 +131,11 @@ module.exports = {
 	async update() {
 		const queries = updateSql.split(';');
 		for(const query of queries) {
-			await sql.run(query);
+			try {
+				await sql.run(query);
+			} catch(e) {
+				console.log(e);
+			}
 		}
 
 		let offset = (await sql.get(`SELECT Offset FROM Worlds ORDER BY ID`)).Offset;
