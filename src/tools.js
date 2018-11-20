@@ -1785,7 +1785,8 @@ module.exports = {
 			case enums.Items.Sedge:
 				output = await this.water(channel, null, 2 * hour);
 				let garden = await sql.getGarden(channel);
-				const expansion = (Math.random() * 15 + 15) * 5 / (100 * (3 + garden.growthLevel));
+				const world = await sql.getWorld(channel);
+				const expansion = ((Math.random() * 15 + 15) * 5 / (100 * (3 + garden.growthLevel))) * (10 / Math.max(10, world.population));
 				const percent = Math.floor(1000 * expansion) / 10;
 				console.log(`Sedge advanced garden level by ${percent}%`);
 				output += `\nThe garden's growth level increases with a rating of ${percent}%.`;
