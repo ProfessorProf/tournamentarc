@@ -30,6 +30,22 @@ module.exports = {
             12: 'trophy',
             13: 'zeach'
         },
+        NamePlural: {
+            0: 'orbs',
+            1: 'flowers',
+            2: 'roses',
+            3: 'carrots',
+            4: 'beans',
+            5: 'sedges',
+            6: 'ferns',
+            7: 'zlowers',
+            8: 'zarrots',
+            9: 'zedges',
+            10: 'gourds',
+            11: 'peaches',
+            12: 'trophies',
+            13: 'zeaches'
+        },
         An: {
             0: true
         },

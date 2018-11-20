@@ -1572,6 +1572,8 @@ module.exports = {
 			(10 / (garden.slots + 10)) * (10 / Math.max(10, world.population))
 			: fixedTime;
 		let output = player ? `${player.name} works on the garden.` : '';
+		let plantsUpdated = {};
+		let plantsFinished = [];
 		for(const i in garden.plants) {
 			let plant = garden.plants[i];
 			if(plant) {
@@ -1585,12 +1587,36 @@ module.exports = {
 					plant.startTime -= time;
 					const newProgress = ((now - plant.startTime) / duration) * 100;
 					const growth = Math.ceil((newProgress - oldProgress) * 10) / 10;
-					output += `\n${plant.name.replace(/^\w/, c => c.toUpperCase())} growth increases by ${growth}%.`;
+					if(plantsUpdated[plant.name]) {
+						plantsUpdated[plant.name].count++;
+					} else {
+						plantsUpdated[plant.name] = {
+							name: plant.name,
+							type: plant.type,
+							count: 1,
+							growth: growth
+						};
+					}
 					if(newProgress >= 100) {
-						output += ` It's ready to be picked!`;
+						plantsFinished.push(plant);
 					}
 					await sql.setPlant(plant);
 				}
+			}
+		}
+
+		for(const key in plantsUpdated) {
+			const p = plantsUpdated[key];
+			if(p.count == 1) {
+				output += `\nGrowth increases by ${p.growth}% for ${enums.Items.An[p.type] ? 'an' : 'a'} ${enums.Items.Name[p.type]}.`;
+			} else {
+				output += `\nGrowth increases by ${p.growth}% for ${p.count} ${enums.Items.NamePlural[p.type]}.`;
+			}
+		}
+		for(const p of plantsFinished) {
+			const player = await sql.getPlayerById(p.planterId);
+			if(player) {
+				output += `\n${player.name}'s ${p.name} is ready to be picked!`;
 			}
 		}
 		

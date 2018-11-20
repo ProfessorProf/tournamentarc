@@ -74,7 +74,7 @@ Rank ??? 1000 Glory
                                 'Enter `!help plants` for more info on available plant types.')
                             .addField('!garden', 'Display info about the garden.')
                             .addField('!plant', 'Plant a new plant in the garden.')
-                            .addField('!pick', 'Pick a finished plant from tohe garden.');
+                            .addField('!pick', 'Pick a finished plant from the garden.');
                     } else {
                         output.setTitle('Help: The Garden')
                             .setDescription('The garden is shared by the whole server - you can grow plants, then harvest them for various special abilities!\n' +
@@ -84,7 +84,7 @@ Rank ??? 1000 Glory
                                 'Enter `!help plants` for more info on available plant types.')
                             .addField('!garden', 'Display info about the garden.')
                             .addField('!plant', 'Plant a new plant in the garden.')
-                            .addField('!pick', 'Pick a finished plant from tohe garden.')
+                            .addField('!pick', 'Pick a finished plant from the garden.')
                             .addField('!expand', "Improve the garden's overall attributes.")
                             .addField('!water', 'Water all plants in the garden.')
                             .addField('!use plantname target', 'Use a plant on someone.');
@@ -221,7 +221,7 @@ Rank ??? 1000 Glory
                         .addField('Orb Hunt Arc', "Once the third orb is found, an Orb Hunt Arc begins! Nemesis and Tournament actions are blocked until someone gathers the orbs and makes a wish. " +
                             "If you gather all seven, you can make a wish or you can start a tournament with the orbs as the prize!")
                         .addField('Nemesis Arc', "A nemesis rises to menace the galaxy! Tournament actions are blocked until the Nemesis is defeated or makes a wish.")
-                        .addField('Tournament Arc', "Fight to determine the strongest! A Nemesis can't rise and orbs can't be round until the tournament ends.")
+                        .addField('Tournament Arc', "Fight to determine the strongest! A Nemesis can't rise and orbs can't be found until the tournament ends.")
                         .addField('??? Arc', "There may be other kinds of arcs yet to be discovered...");
                 default:
                     if(this.addHelpField(output, topic)) {
