@@ -1570,7 +1570,7 @@ module.exports = {
 
 		const time = player ? ((Math.random() * 20 + 10) * 60 * 1000) * (1 + 0.08 * player.gardenLevel) * 
 			(10 / (garden.slots + 10)) * (10 / Math.max(10, world.population))
-			: fixedTime;
+			: fixedTime * (10 / Math.max(10, world.population));
 		let output = player ? `${player.name} works on the garden.` : '';
 		let plantsUpdated = {};
 		let plantsFinished = [];
