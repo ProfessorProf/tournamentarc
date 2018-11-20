@@ -2450,7 +2450,12 @@ module.exports = {
 		for(const i in garden.plants) {
 			const p = garden.plants[i];
 			if(p && p.endTime > lastUpdate && p.endTime <= now) {
-				messages.push(`A ${p.name} has finished growing in the garden!`);
+				const player = await sql.getPlayerById(p.planterId);
+				if(p.slot == -1 && player) {
+					messages.push(`${player.name}'s ${p.name} has finished growing!`);
+				} else {
+					messages.push(`A ${p.name} has finished growing in the garden!`);
+				}
 			}
 		}
 
