@@ -9,5 +9,5 @@ module.exports = {
     GardenMaxSize: 8,
     MaxStealChance: 0.50,
     EventFrequency: 0.8,
-    PhantomStrength: 1
+    PhantomStrength: 4
 }
