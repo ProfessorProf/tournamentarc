@@ -210,7 +210,8 @@ module.exports = {
 					id: lastArcRow.ID,
 					number: lastArcRow.Number,
 					type: lastArcRow.Type, 
-					startTime: lastArcRow.Start_Time
+					startTime: lastArcRow.Start_Time,
+					endTime: lastArcRow.End_Time
 				};
 			} else {
 				world.lastArc = {
