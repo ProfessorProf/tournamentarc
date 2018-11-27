@@ -915,6 +915,7 @@ module.exports = {
 				const tourneyWinner = tournament.players.find(p => p && p.id == winner.id);
 				const tourneyLoser = tournament.players.find(p => p && p.id == loser.id);
 				if(tourneyWinner && tourneyLoser && 
+					tourneyWinner.status == enums.TournamentPlayerStatuses.Pending &&
 					((tourneyWinner.position % 2 == 0 && tourneyLoser.position == tourneyWinner.position + 1) ||
 					(tourneyLoser.position % 2 == 0 && tourneyWinner.position == tourneyLoser.position + 1))) {
 					// This was a tournament match!
