@@ -315,6 +315,7 @@ module.exports = {
 						} else {
 							// If there's no plant specified, then it defaults to picking the first thing in the garden
 							const plant = garden.plants.find(p => {
+								if(p.slot == -1 && p.planterId != player.id) return false;
 								if(p && p.endTime < now) {
 									let heldPlants = player.items.find(i => i.type == p.type);
 									if(heldPlants && heldPlants.count >= 3) {
@@ -461,7 +462,7 @@ module.exports = {
 						errors.push("The Nemesis can't use the public garden.");
 					}
 					const myPublicPlant = garden.plants.find(p => p.planterId == plantOwner.id && p.slot > -1)
-					if(myPublicPlant) {
+					if(myPublicPlant && myPlant) {
 						errors.push(`The ${enums.Items.Name[myPublicPlant.type]} in slot ${myPublicPlant.slot + 1} must finish growing before you can plant again.`);
 					}
 				}

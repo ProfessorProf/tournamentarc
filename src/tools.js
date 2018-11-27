@@ -1540,7 +1540,7 @@ module.exports = {
 
 		let slot = -1;
 		// Is the private slot occupied?
-		let myPlant = garden.plants.find(p => p.planterId == player.id && slot == -1);
+		let myPlant = garden.plants.find(p => p.planterId == player.id && p.slot == -1);
 		if(myPlant) {
 			// Which spot is open?
 			slot = 0;
@@ -2101,7 +2101,7 @@ module.exports = {
 			if(existingOrbs && existingOrbs.count == 6) {
 				output.push("You've gathered all seven magic orbs! Enter `!help wish` to learn about your new options.");
 			}
-			if(world.lostOrbs == 5 && world.arc.type == enums.ArcTypes.Filler) {
+			if(world.lostOrbs <= 5 && world.arc.type == enums.ArcTypes.Filler) {
 				// This was the third orb - start a new Orb Hunt
 				await sql.newArc(world.channel, enums.ArcTypes.OrbHunt);
 				output.push("The hunt for the orbs is heating up! A new **Orb Hunt Arc** has begun!");
@@ -3128,7 +3128,7 @@ module.exports = {
 
 		if(world.lastArc && world.lastArc.type != enums.ArcTypes.Filler) {
 			const arcType = enums.ArcTypes.Name[world.lastArc.type];
-			output += `\nThe previous arc was a **${arcType} Arc**, and lasted for ${this.getTimeString(now - world.lastArc.startTime)}.`;
+			output += `\nThe previous arc was a **${arcType} Arc**, and lasted for ${this.getTimeString(world.lastArc.endTime - world.lastArc.startTime)}.`;
 		}
 
 		if(world.lostOrbs == 0) {
@@ -3819,7 +3819,7 @@ module.exports = {
 			return newActionLevel > oldActionLevel;
 		}
 	},
-	async gardenLevelUp(player, multiplier) {
+	async gardenLevelUp(player, multiplier, suppressCooldown) {
 		if(!multiplier) multiplier = 1;
 		if(!player.npc) {
 			if(!player.gardenLevel) player.gardenLevel = 0;
@@ -3836,7 +3836,9 @@ module.exports = {
 			if(player.isNemesis) {
 				cooldown *= 3;
 			}
-			await sql.addStatus(player.channel, player.id, enums.Statuses.Cooldown, cooldown, enums.Cooldowns.Garden);
+			if(!suppressCooldown) {
+				await sql.addStatus(player.channel, player.id, enums.Statuses.Cooldown, cooldown, enums.Cooldowns.Garden);
+			}
 			return newGardenLevel > oldGardenLevel;
 		}
 	},
@@ -3853,7 +3855,7 @@ module.exports = {
 					const defeated = await this.healPlayer(player, settings.HotSpringHours * hour);
 					if(defeated) {
 						output = `${player.name} takes some time to relax in a magical hot spring, ` +
-							`but still can't fight for another ${this.getTimeString(defeated.endTime - now)},`;
+							`but still can't fight for another ${this.getTimeString(defeated.endTime - now)}.`;
 					} else {
 						output = `${player.name} takes some time to relax in a magical hot spring, and is once again ready to fight!`;
 					}
@@ -3867,7 +3869,7 @@ module.exports = {
 					break;
 				case enums.Cooldowns.GuruEvent:
 					await this.killPlayer(player, hour * 6);
-					await this.gardenLevelUp(player, 2.5 + Math.random());
+					await this.gardenLevelUp(player, 2.5 + Math.random(), true);
 					await sql.setPlayer(player);
 					output = `${player.name} fights the guru, and is soundly thrashed! However, ${this.their(player.config.Pronoun)} gardening power may have awakened...`;
 					break;
@@ -3918,6 +3920,17 @@ module.exports = {
 	},
 	async killPlayer(player, duration) {
 		if(duration <= 0) return;
+
+		const defeatedState = player.status.find(s => s.type == enums.Statuses.Dead);
+		if(defeatedState) {
+			const now = new Date().getTime();
+			const newEndTime = now + duration;
+			if(defeatedState.endTime < newEndTime) {
+				defeatedState.endTime = newEndTime;
+				await sql.setStatus(defeatedState);
+				return;
+			}
+		}
 
 		const training = player.status.find(s => s.type == enums.Statuses.Training);
 		const journey = player.status.find(s => s.type == enums.Statuses.Journey);
