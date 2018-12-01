@@ -3938,8 +3938,8 @@ module.exports = {
 		
 		if(journey) {
 			const nemesis = await sql.getNemesis(player.channel);
-			const storedTrainingTime = status.rating;
-			const journeyTime = status.endTime - status.startTime;
+			const storedTrainingTime = journey.rating;
+			const journeyTime = journey.endTime - journey.startTime;
 			let journeyEffect = (Math.random() * 0.4 + 0.8);
 			if(nemesis) {
 				// Journeys that end during a Nemesis reign are amazing
