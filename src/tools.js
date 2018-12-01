@@ -1491,7 +1491,7 @@ module.exports = {
 		await sql.setHeat(channel, world.heat);
 		await sql.setPlayer(player);
 		await sql.setNemesis(channel, nemesis);
-		await sql.addStatus(channel, player, enums.Statuses.Cooldown, 7 * 24 * hour, enums.Cooldowns.NemesisUsed);
+		await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 7 * 24 * hour, enums.Cooldowns.NemesisUsed);
 		await sql.newArc(channel, enums.ArcTypes.Nemesis);
 
 		embed.setTitle('A NEMESIS RISES');
