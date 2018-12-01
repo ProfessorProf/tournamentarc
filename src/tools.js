@@ -770,13 +770,13 @@ module.exports = {
 		if(nemesisHistory) {
 			// The Nemesis is dead!
 			let nemesis = await sql.getNemesis(winner.channel);
-			if(nemesis.type == enums.NemesisTypes.FirstForm) {
+			if(nemesis.form < nemesis.maxForms) {
 				// Reveal true form
 				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.Pronoun} revealed ${this.their(loser.config.Pronoun)} true form!\n` +
 					`The real battle begins here!\n`;
 				template = enums.FightSummaries.NemesisTrueForm;
-				nemesis.type = 2;
-				loser.level = nemesis.basePower * (Math.random() + 2.5);
+				loser.level = nemesis.basePower * Math.max(Math.random() + 3.0 - nemesis.form * 0.5, 1.5);
+				nemesis.form++;
 				await this.deleteStatus(nemesis, enums.Statuses.Cooldown);
 				hours = 0;
 				trueForm = true;
@@ -1472,12 +1472,14 @@ module.exports = {
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
 			player.level = this.newPowerLevel(world.heat) * 4;
-			nemesis.type = enums.NemesisTypes.FirstForm;
+			nemesis.maxForms = 2;
 		} else {
 			// A normal Nemesis
 			player.level = this.newPowerLevel(world.heat) * 10;
 			nemesis.type = enums.NemesisTypes.Basic;
+			nemesis.maxForms = 2;
 		}
+		nemesis.form = 1;
 		player.level *= Math.max(10, world.population) / 10;
 		nemesis.basePower = player.level;
 		
