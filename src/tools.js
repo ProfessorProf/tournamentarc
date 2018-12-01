@@ -2290,6 +2290,7 @@ module.exports = {
 		switch(wish.toLowerCase()) {
 			case 'power':
 				player.level *= Math.random() + 1.5;
+				await sql.addStatus(channel, p.id, enums.Statuses.PowerWish);
 				output += '\nYou can feel great power surging within you!';
 				await sql.setPlayer(player);
 				break;
