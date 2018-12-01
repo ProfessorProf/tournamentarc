@@ -629,6 +629,7 @@ module.exports = {
 		let level1 = this.getPowerLevel(player1);
 		let level2 = this.getPowerLevel(player2);
 
+		let underlingPowered = false;
 		if(player2.isNemesis) {
 			// Someone attacked the Nemesis, summon underlings!
 			let underlingsMessages = [];
@@ -648,6 +649,7 @@ module.exports = {
 				}
 			}
 			if(underlingsMessages.length > 0) {
+				underlingPowered = true;
 				embed.addField('The Nemesis summons underlings!', underlingsMessages.join('\n'));
 			}
 		}
@@ -860,7 +862,7 @@ module.exports = {
 			output += `\n${loser.name} loses ${gloryPenalty} Glory.`
 		}
 		
-		if(winner.isNemesis || winner.npc) {
+		if((winner.isNemesis && !underlingPowered) || winner.isUnderling || winner.npc) {
 			// Weaken the enemy
 			if(winner.isNemesis || winner.npc == enums.NpcTypes.Zorbmaster) {
 				hours = Math.max(hours, 6);
