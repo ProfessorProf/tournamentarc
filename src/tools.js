@@ -772,12 +772,17 @@ module.exports = {
 			let nemesis = await sql.getNemesis(winner.channel);
 			if(nemesis.form < nemesis.maxForms) {
 				// Reveal true form
-				output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.Pronoun} revealed ${this.their(loser.config.Pronoun)} true form!\n` +
-					`The real battle begins here!\n`;
+				if(nemesis.form + 1 == nemesis.maxForms) {
+					output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.Pronoun} revealed ${this.their(loser.config.Pronoun)} true final form!\n` +
+						`The real battle begins here!\n`;
+				} else {
+					output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.Pronoun} revealed another, more powerful form!\n` +
+						`The reign of the nemesis continues!\n`;
+				}
 				template = enums.FightSummaries.NemesisTrueForm;
 				loser.level = nemesis.basePower * Math.max(Math.random() + 3.0 - nemesis.form * 0.5, 1.5);
 				nemesis.form++;
-				await this.deleteStatus(nemesis, enums.Statuses.Cooldown);
+				await this.deleteStatus(loser, enums.Statuses.Cooldown);
 				hours = 0;
 				trueForm = true;
 				console.log(`Nemesis reveals true form after ${this.getTimeString(now - nemesis.startTime)}`);
@@ -1121,7 +1126,7 @@ module.exports = {
 		await sql.addStatus(channel, target.id, enums.Statuses.Energized, hour * 3);
 		await sql.addStatus(channel, nemesis.id, enums.Statuses.Cooldown, hour * 3, enums.Cooldowns.Energize);
 
-		return `**${nemesisPlayer.name}** grants **${target.name}** a fragment of their mighty power!\n` +
+		return `**${nemesisPlayer.name}** grants **${target.name}** a fragment of ${this.their(nemesisPlayer.pronoun)} mighty power!\n` +
 			`${target.name}'s power level increases by ${numeral(increase.toPrecision(2)).format('0,0')}!`;
 	},
 	// Revive a dead underling.
@@ -1469,18 +1474,18 @@ module.exports = {
 			};
 		}
 		
+		let nemesisLevel = 0;
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
-			player.level = this.newPowerLevel(world.heat) * 4;
-			nemesis.maxForms = 2;
+			nemesisLevel = this.newPowerLevel(world.heat) * 4;
+			nemesis.maxForms = 3;
 		} else {
 			// A normal Nemesis
-			player.level = this.newPowerLevel(world.heat) * 10;
-			nemesis.type = enums.NemesisTypes.Basic;
+			nemesisLevel= this.newPowerLevel(world.heat) * 10;
 			nemesis.maxForms = 2;
 		}
 		nemesis.form = 1;
-		player.level *= Math.max(10, world.population) / 10;
+		player.level += Math.max(10, world.population) / 10 * nemesisLevel;
 		nemesis.basePower = player.level;
 		
 		await sql.setHeat(channel, world.heat);
