@@ -742,13 +742,13 @@ module.exports = {
 		
 		const nemesisHistory = players[1].isNemesis ? await sql.getNemesisHistory(channel) : null;
 		const outcome = await this.handleFightOutcome(world, players[0], players[1], skills[0], skills[1], 
-			taunted && players[1].id == player2.id, nemesisHistory);
+			taunted && players[1].id == player2.id, nemesisHistory, underlingPowered);
 		embed.addField('Results', outcome);
 
 		return embed;
 	},
 	// Process updates based on who won and lost a fight.
-	async handleFightOutcome(data, winner, loser, winnerSkill, loserSkill, taunted, nemesisHistory) {
+	async handleFightOutcome(data, winner, loser, winnerSkill, loserSkill, taunted, nemesisHistory, underlingPowered) {
 		const now = new Date().getTime();
 		let output = '';
 		
@@ -4041,6 +4041,7 @@ module.exports = {
 		const revivePower = hour * (15 - 2.5 * player.underlingDefeats);
 		if(revivePower > 0) {
 			await this.completeTraining(player, revivePower);
+			await sql.setPlayer(player);
 			return `${player.name} returns to the fight, more powerful than ever!`;
 		} else {
 			return null;
