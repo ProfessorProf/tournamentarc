@@ -1330,7 +1330,7 @@ module.exports = {
 			case 'zedge':
 				return 9;
 			case 'zeach':
-				return 10;
+				return 13;
 			default:
 				return -1;
 		}
