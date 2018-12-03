@@ -306,24 +306,41 @@ module.exports = {
 		}
 	},
 	// Fetches a player from the database by character name.
-    async getPlayer(channel, name) {
+    async getPlayer(channel, name, includeAnnihilated) {
 		if(!name) {
 			return null;
 		}
         // Exact name match
-		let row = await sql.get(`SELECT * FROM Players p WHERE Channel = $channel AND UPPER(p.name) = $name`, {$name: name.toUpperCase(), $channel: channel});
+		let row = await sql.get(this.generatePlayerQuery(includeAnnihilated, `UPPER(p.name) = $name`), {$name: name.toUpperCase(), $channel: channel});
 		if(!row) {
 			// Starts With name match
-			row = await sql.get(`SELECT * FROM Players p WHERE Channel = $channel AND UPPER(p.name) LIKE ($namePattern)`, {$namePattern: name.toUpperCase() + '%', $channel: channel});
+			row = await sql.get(this.generatePlayerQuery(includeAnnihilated, `UPPER(p.name) LIKE ($namePattern)`), {$namePattern: name.toUpperCase() + '%', $channel: channel});
 		}
 		if(!row) {
 			// Contains name match
-			row = await sql.get(`SELECT * FROM Players p WHERE Channel = $channel AND UPPER(p.name) LIKE ($namePattern)`, {$namePattern: '%' + name.toUpperCase() + '%', $channel: channel});
+			row = await sql.get(this.generatePlayerQuery(includeAnnihilated, `UPPER(p.name) LIKE ($namePattern)`), {$namePattern: '%' + name.toUpperCase() + '%', $channel: channel});
 		}
+
+		if(!includeAnnihilated && !row) {
+			return await this.getPlayer(channel, name, true);
+		}
+
 		if(row) {
 			return await this.fusionCheck(row);
 		}
-    },
+	},
+	generatePlayerQuery(includeAnnihilated, pattern) {
+		if(includeAnnihilated) {
+			return `SELECT * FROM Players p WHERE Channel = $channel AND ${pattern}`;
+		} else {
+			return `SELECT p.* FROM Players p
+					LEFT JOIN Status s ON s.Player_ID = p.ID
+						AND s.Type = 15
+					WHERE p.Channel = $channel
+						AND s.ID IS NULL
+						AND ${pattern}`;
+		}
+	},
 	// Fetches a player from the database by user name.
     async getPlayerByUsername(channel, name) {
         // Get a player by username

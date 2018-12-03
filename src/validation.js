@@ -828,7 +828,7 @@ module.exports = {
 									if(target.cooldowns.find(c => c.type == enums.Cooldowns.WishUsed)) {
 										errors.push("That person doesn't need any orbs.");
 									}
-									if(world.arc.type == enums.ArcTypes.Tournament) {
+									if(world.arc.type == enums.ArcTypes.Tournament && world.lostOrbs == 0) {
 										errors.push("You can't use or give away orbs until the tournament is over.");
 									}
 								}

@@ -575,7 +575,7 @@ module.exports = {
 	async completeTraining(player, forcedValue) {
 		let world = await sql.getWorld(player.channel);
 		const now = new Date().getTime();
-		const trainingState = player.status.find(s => s.type == 2);
+		const trainingState = player.status.find(s => s.type == enums.Statuses.Training);
 		if (!trainingState && !forcedValue) {
 			// Not training, so no need to do anything
 			return;
