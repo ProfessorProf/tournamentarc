@@ -2651,8 +2651,10 @@ module.exports = {
 					break;
 				case enums.Statuses.Transform: 
 					// Transform - 4 hour KO
-					await this.killPlayer(player, hour * 4);
-					messages.push(`**${player.name}** is no longer transformed; ${player.config.Pronoun} can't fight for another 4 hours.`);
+					if(!player.isNemesis) {
+						await this.killPlayer(player, hour * 4);
+						messages.push(`**${player.name}** is no longer transformed; ${player.config.Pronoun} can't fight for another 4 hours.`);
+					}
 					break;
 				case enums.Statuses.SuperTransform: 
 					// Super Transform - 8 hour KO
@@ -3279,7 +3281,7 @@ module.exports = {
 				await this.addHeat(world, 10);
 				npc.level = this.newPowerLevel(world.heat) * 1.5;
 				break;
-			case enums.NpcTypes.Zedge:
+			case enums.NpcTypes.Zeach:
 				baseName = 'Zeach';
 				await this.addHeat(world, 20);
 				npc.level = this.newPowerLevel(world.heat) * 2;
