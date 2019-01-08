@@ -129,6 +129,7 @@ module.exports = {
         Caught: 17,
         UltimateForm: 18,
         GardenWish: 19,
+        Guarded: 20,
         Name: {
             0: 'Defeated',
             1: 'Journey',
@@ -147,7 +148,8 @@ module.exports = {
             14: 'Self Destruct',
             15: 'Annihilation',
             16: 'Training Complete',
-            18: 'Ultimate Form'
+            18: 'Ultimate Form',
+            20: 'Guarded'
         },
         Priority: {
             0: 600,
@@ -157,7 +159,8 @@ module.exports = {
             4: 200,
             5: 100,
             12: 450,
-            18: 475
+            18: 475,
+            20: 150
         },
         CopyToFusion: {
             4: true,
@@ -211,6 +214,7 @@ module.exports = {
         Chaos: 21,
         Challenge: 22,
         Portal: 23,
+        Raid: 24,
         Name: {
             0: 'World Actions',
             1: 'Garden Actions',
@@ -223,7 +227,8 @@ module.exports = {
             8: 'Auto-Empower',
             9: 'Drain Garden',
             13: 'Journey',
-            22: 'Issue Challenge'
+            22: 'Issue Challenge',
+            24: 'Raid'
         },
         IsEvent: {
             15: true,
@@ -236,7 +241,8 @@ module.exports = {
             3: true,
             4: true,
             5: true,
-            6: true
+            6: true,
+            24: true
         }
     },
     Events: {

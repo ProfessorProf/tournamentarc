@@ -306,27 +306,22 @@ module.exports = {
 				if(player) {
 					this.validateAnnihilation(errors, player);
 					this.validateJourney(errors, player);
+					const plantOwner = tools.isFusion(player) ? player.fusedPlayers.find(p => p.username == username) : player;
 					let plantName = args.length > 0 ? args[0] : null;
 					if(!plantName) {
-						if(player.isNemesis) {
-							// If there's no plant specified, then it defaults to picking the first thing in the garden
-							const plant = garden.plants.find(p => p && p.slot == 99 && p.endTime < now);
-							plantName = plant ? enums.Items.Name[plant.type] : null;
-						} else {
-							// If there's no plant specified, then it defaults to picking the first thing in the garden
-							const plant = garden.plants.find(p => {
-								if(p.slot == -1 && p.planterId != player.id) return false;
-								if(p && p.endTime < now) {
-									let heldPlants = player.items.find(i => i.type == p.type);
-									if(heldPlants && heldPlants.count >= 3) {
-										return false;
-									}
-									return true;
+						// If there's no plant specified, then it defaults to picking the first thing in the garden
+						const plant = garden.plants.find(p => {
+							if(p.slot == -1 && (p.planterId != plantOwner.id)) return false;
+							if(p && p.endTime < now) {
+								let heldPlants = player.items.find(i => i.type == p.type);
+								if(heldPlants && heldPlants.count >= 3) {
+									return false;
 								}
-								return false;
-							});
-							plantName = plant ? enums.Items.Name[plant.type] : null;
-						}
+								return true;
+							}
+							return false;
+						});
+						plantName = plant ? enums.Items.Name[plant.type] : null;
 					}
 					if(plantName) {
 						const knownPlants = garden.plantTypes.filter(t => t.known);
@@ -371,7 +366,14 @@ module.exports = {
 					}
 					const knownPlants = garden.plantTypes.filter(t => t.known);
 					const plantType = this.getPlantType(args[0]);
-					const hasPlant = player.items.find(i => i.type == plantType);
+					let items = player.items;
+					if(tools.isFusion(player)) {
+						let fusedPlayer = player.fusedPlayers.find(f => f.username == username);
+						if(fusedPlayer) {
+							items = items.concat(fusedPlayer.items);
+						}
+					}
+					const hasPlant = items.find(i => i.type == plantType);
 					const plantExists = plantType != -1;
 					const plantKnown = knownPlants.find(p => p.id == plantType);
 					if(args.length > 1) {
@@ -502,9 +504,11 @@ module.exports = {
 					this.validateNotNemesis(errors, player);
 					this.validateGardenTime(errors, player);
 					this.validateJourney(errors, player);
-					let plantCount = garden.plants.filter(p => p && p.endTime > now).length;
-					if(plantCount == 0) {
-						errors.push("There aren't any plants that need watering right now.");
+					let plants = garden.plants.filter(p => p && p.endTime > now && 
+						(p.slot != -1 || p.planterId == player.id ||
+						player.fusedPlayers.find(f => f.id == p.planterId)));
+					if(plants.length == 0) {
+						errors.push("There aren't any plants that you can water right now.");
 					}
 				}
 				break;
@@ -989,6 +993,75 @@ module.exports = {
 						if(cooldown) {
 							let timeString = tools.getTimeString(cooldown.endTime - now);
 							errors.push(`**${player.name}** cannot revive an underling for another ${timeString}.`);
+						}
+					} else {
+						errors.push('Must specify a valid target.');
+					}
+				}
+				break;
+			case 'raid':
+				// !raid validation
+				// - Must be registered
+				// - Must be the Nemesis
+				// - Lost orbs must exist
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateNemesis(errors, player);
+					if(world.lostOrbs == 0) {
+						errors.push(`There are no orbs left to seize.`);
+					}
+					const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Raid);
+					if(cooldown) {
+						let timeString = tools.getTimeString(cooldown.endTime - now);
+						errors.push(`**${player.name}** cannot raid a village for another ${timeString}.`);
+					}
+				}
+				break;
+			case 'guard':
+				// !guard validation
+				// - Must be registered
+				// - Must be a nemesis arc
+				// - Must not be the nemesis or an underling
+				// - Must not be guarded
+				// - Must be alive
+				this.validatePlayerRegistered(errors, player);
+				if(player) {
+					this.validateNotNemesis(errors, player);
+					const defeated = player.status.find(s => s.type == enums.Statuses.Dead);
+					if(defeated) {
+						errors.push(`**${player.name}** cannot protect anyone for another ${tools.getTimeString(defeated.endTime - now)}.`);
+					}
+					if(world.arc.type != enums.ArcTypes.Nemesis) {
+						errors.push(`This command can only be used during a nemesis arc.`);
+					}
+					const guarded = player.status.find(x => s.type == enums.Statuses.Guarded);
+					if(guarded) {
+						errors.push(`You can't guard someone else while being guarded!`);
+					}
+					const guarding = await sql.guarding(player);
+					if(guarding) {
+						errors.push(`You're already protecting **${guarding.name}**!`);
+					}
+					if(target) {
+						this.validateAnnihilation(errors, target);
+						this.validateJourney(errors, target);
+						if(target.isNemesis || target.isUnderling || target.npc) {
+							errors.push(`**${target.name}** doesn't need your protection!`);
+						}
+						if(target.id == player.id) {
+							errors.push(`You cannot guard yourself!`);
+						}
+						const targetDefeated = target.status.find(s => s.type == enums.Statuses.Dead);
+						if(targetDefeated) {
+							errors.push(`It's too late to protect **${target.name}**.`);
+						}
+						const targetGuarded = player.status.find(x => s.type == enums.Statuses.Guarded);
+						if(targetGuarded) {
+							errors.push(`**${target.name}** is already being guarded!`);
+						}
+						const targetGuarding = await sql.guarding(player);
+						if(targetGuarding) {
+							errors.push(`**${target.name}** is already guarding someone else!`);
 						}
 					} else {
 						errors.push('Must specify a valid target.');

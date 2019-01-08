@@ -9,13 +9,13 @@ const hour = (60 * 60 * 1000);
 
 module.exports = {
 	// Gets an Embed showing a player's status.
-	async getPlayerDescription(player, private) {
-		return this.generatePlayerDescription(player, private);
+	async getPlayerDescription(player, username, private) {
+		return this.generatePlayerDescription(player, username, private);
 	},
-	async getPlayerDescriptionById(id) {
-		return this.generatePlayerDescription(await sql.getPlayerById(id));
+	async getPlayerDescriptionById(id, username) {
+		return this.generatePlayerDescription(await sql.getPlayerById(id), username);
 	},
-	async generatePlayerDescription(player, private) {
+	async generatePlayerDescription(player, username, private) {
 		if(!player) {
 			console.log('Player not found');
 			return null;
@@ -44,7 +44,7 @@ module.exports = {
 			if(this.isFusion(player)) glory = Math.floor(glory / 2);
 			if(glory < 50) {
 				stats += 'Unranked Warrior\n';
-			} else if(glory< 100) {
+			} else if(glory < 100) {
 				stats += 'Rank C Warrior\n';
 			} else if(glory < 150) {
 				stats += 'Rank B Warrior\n';
@@ -144,6 +144,10 @@ module.exports = {
 					case enums.Statuses.Annihilation:
 						statuses.push(`Annihilated`);
 						break;
+					case enums.Statuses.Guarded:
+						const guardingPlayer = await sql.getPlayerById(s.rating);
+						statuses.push(`Protected by ${guardingPlayer.name} (${this.getTimeString(s.endTime - now)} remaining)`);
+						break;
 				}
 			}
 		}
@@ -156,12 +160,20 @@ module.exports = {
 		if(cooldowns.length > 0) {
 			embed.addField('Cooldowns', cooldowns.join('\n'));
 		}
-		const items = player.items.map(i => {
+
+		let items = player.items;
+		if(this.isFusion(player)) {
+			let fusedPlayer = player.fusedPlayers.find(f => f.username == username);
+			if(fusedPlayer) {
+				items = items.concat(fusedPlayer.items);
+			}
+		}
+		const itemDescriptions = items.map(i => {
 			const name = enums.Items.Name[i.type].replace(/^\w/, c => c.toUpperCase());
 			return `${name} (${i.count} held)`;
 		});
-		if(items.length > 0) {
-			embed.addField('Inventory', items.join('\n'));
+		if(itemDescriptions.length > 0) {
+			embed.addField('Inventory', itemDescriptions.join('\n'));
 		}
 
 		// Display Offers
@@ -195,6 +207,84 @@ module.exports = {
 		
 		return embed;
 	},
+	// Give advanced data about a player
+	async getPlayerDeepDescription(player) {
+		if(!player) {
+			console.log('Player not found');
+			return null;
+		}
+		let embed = new Discord.RichEmbed();
+		const now = new Date().getTime();
+		embed.setTitle(player.name.toUpperCase())
+			.setColor(0x00AE86);
+
+		if(player.isNemesis) {
+			embed.setDescription('NEMESIS');
+		} else if(this.isFusion(player)) {
+			embed.setDescription(`Fusion between ${player.fusedPlayers[0].name} and ${player.fusedPlayers[1].name}`);
+		} else if(player.npc) {
+			embed.setDescription('MONSTER');
+		} else if(player.isUnderling) {
+			const energyPercent = Math.max(100 - 20 * player.underlingDefeats, 0)
+			embed.setDescription(`UNDERLING\nProtecting the Nemesis at ${energyPercent}% power`);
+		}
+		
+		let stats = '';
+		if(player.legacyGlory > 0) {
+			// Display Legacy Glory
+			const legacyBonus = Math.floor(Math.sqrt(player.legacyGlory / 750) * 100);
+			stats += `\nYou have ${player.legacyGlory} Legacy Glory, granting you +${legacyBonus}% to all Glory gains (rounded down).`;
+		}
+		
+		const history = await sql.getHistory(player.id);
+		const losses = history.filter(h => h.loserId == player.id).length;
+
+		if(losses == 1) {
+			stats += `\nYou have fallen in battle once, granting you a 5% bonus to training gains.`;
+		} else if(losses == 2) {
+			stats += `\nYou have fallen in battle twice, granting you a 10% bonus to training gains.`;
+		} else if(losses > 2) {
+			stats += `\nYou have fallen in battle ${losses} times, granting you a ${losses * 5}% bonus to training gains.`;
+		}
+
+		if(player.gardenLevel > 0) {
+			const gardenPercent = Math.floor((player.gardenLevel - Math.floor(player.gardenLevel)) * 100);
+			stats += `\nGardening Level: ${Math.floor(player.gardenLevel)} (${gardenPercent}%)`;
+			stats += `\n!water causes +${player.gardenLevel * 8}% more growth than normal.` +
+				`\n!expand advances progress by +${player.gardenLevel * 8}% more than normal.`;
+		}
+		
+		if(player.actionLevel > 0) {
+		const actionPercent = Math.floor((player.actionLevel - Math.floor(player.actionLevel)) * 100);
+		stats += `\nAction Level: ${Math.floor(player.actionLevel)} (${actionPercent}%)`;
+			stats += `\n!search is ${Math.floor(player.actionLevel * 100 / 6)}% more likely to find orbs, and ${player.actionLevel * 20}% more likely to find flowers.` +
+				`\n!filler heals injured players by ${player.actionLevel * 2.5}% more than normal.` +
+				`\n!transform lasts ${Math.floor(player.actionLevel * 100 / 60)}% longer than normal.`;
+		}
+
+		if(stats == '') {
+			stats += 'You have no special traits yet.'
+		}
+
+		embed.addField('Stats', stats);
+
+		const cooldowns = player.cooldowns.map(c => {
+			switch(c.type) {
+				case enums.Cooldowns.NemesisUsed:
+					return `Nemesis: Ready in ${this.getTimeString(c.endTime - now)}`;
+				case enums.Cooldowns.FusionUsed:
+					return `Fusion: Ready in ${this.getTimeString(c.endTime - now)}`;
+				case enums.Cooldowns.WishUsed:
+					return `Wish: Ready in ${this.getTimeString(c.endTime - now)}`;
+			}
+			return null;
+		}).filter(c => c);
+		if(cooldowns.length > 0) {
+			embed.addField('Cooldowns', cooldowns.join('\n'));
+		}
+
+		return embed;
+	},
 	// Scout a player's estimated power level and status.
     async scoutPlayer(player) {
 		if(!player) {
@@ -226,12 +316,12 @@ module.exports = {
 			let seenLevel = this.getPowerLevel(player);
 			if(training) {
 				// Estimate post-training power level
-				let world = await sql.getWorld(player.channel);
+				const world = await sql.getWorld(player.channel);
 				let hours = trainingTime / hour;
 				if (hours > 72) {
 					hours = 72;
 				}
-				let newPowerLevel = Math.pow(100, 1 + (world.heat + hours) / 1000);
+				let newPowerLevel = Math.pow(150, 1 + (world.heat + hours) / 1000);
 				if (this.isFusion(player)) {
 					newPowerLevel *= 1.3;
 				}
@@ -450,12 +540,19 @@ module.exports = {
 	},
 	// Nemesis attack command.
 	async attack(player1, player2) {
+		let description = `**${player1.name}** attacks without warning, targeting **${player2.name}!**`
+		const guarded = player2.status.find(s => s.type == enums.Statuses.Guarded);
+		if(guarded && guarded.rating) {
+			let guard = await sql.getPlayerById(guarded.rating);
+			description += `\nHowever, ${guard.name} jumps in the way to protect ${this.them(player2.config.pronoun)}!`;
+			player2 = guard;
+		}
+
 		let embed = new Discord.RichEmbed();
-		
-		let title = player1.isNemesis ? 'NEMESIS INVASION' : 'MONSTER ATTACK'
+		const title = player1.isNemesis ? 'NEMESIS INVASION' : 'MONSTER ATTACK'
 		embed.setTitle(title)
 			.setColor(0xff0000);
-		embed.setDescription(`**${player1.name}** attacks without warning, targeting **${player2.name}!**`);
+		embed.setDescription(description);
 		
 		if(!player1.npc) {
 			await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 3 * hour, enums.Cooldowns.Attack);
@@ -541,7 +638,7 @@ module.exports = {
 			const offer = player1.offers.find(o => o.playerId == player2.id && 
 				(o.type == enums.OfferTypes.Fight || o.type == enums.OfferTypes.Taunt));
 			if(!offer) {
-				await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 60 * 1000, enums.Cooldowns.Challenge);
+				await sql.addStatus(player1.channel, player1.id, enums.Statuses.Cooldown, 30 * 1000, enums.Cooldowns.Challenge);
 			}
 			if(!offer && !player2.isNemesis && !player2.isUnderling && !player2.npc) {
 				// If they haven't offered, send a challenge
@@ -656,8 +753,14 @@ module.exports = {
 		embed.addField('Power Levels', `${player1.name}: ${numeral(level1.toPrecision(3)).format('0,0')}\n${player2.name}: ${numeral(level2.toPrecision(3)).format('0,0')}`);
 		
 		// Randomize, then adjust skill ratings
-		let skill1 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
-		let skill2 = (Math.random() + Math.random() + Math.random() + Math.random()) / 2;
+		let skill1 = 0;
+		let skill2 = 0;
+		for(let i = 0; i < settings.BattleDice; i++) {
+			skill1 += Math.random();
+			skill2 += Math.random();
+		}
+		skill1 *= 2 / settings.BattleDice;
+		skill2 *= 2 / settings.BattleDice;
 		
 		const history = await sql.getHistory(player1.id, player2.id);
 		if(history && history.length > 0) {
@@ -827,9 +930,9 @@ module.exports = {
 						if(rankUp) {
 							output += `${g.name}'s Rank has increased!\n`;
 						}
-						gloryPlayer.glory += g.glory;
+						gloryPlayer.glory += this.getGlory(gloryPlayer, g.glory);
 						if(winner.id == gloryPlayer.id) {
-							winner.glory += g.glory;
+							winner.glory += this.getGlory(winner, g.glory);
 						}
 						await sql.setPlayer(gloryPlayer);
 					}
@@ -844,6 +947,9 @@ module.exports = {
 		// Award glory to the winner
 		if(loser.isNemesis) glory *= 3;
 		if(loser.npc == enums.NpcTypes.Phantom) glory *= 4;
+
+		glory = this.getGlory(winner, glory);
+
 		const rankUp = this.rankUp(winner.glory, glory);
 		winner.glory += glory;
 		if(trueForm) {
@@ -1176,20 +1282,21 @@ module.exports = {
 			.setDescription(`The Nemesis uses ${this.their(player.config.Pronoun)} full power to destroy an entire planet!`)
 			.setColor(0xff0000);
 		
+		let output = '';
 		let targetPlayers = [];
 		for(const i in players) {
 			let p = players[i];
 			if(p && p.id != player.id && !p.status.find(s => s.type == enums.Statuses.Dead) && 
 				!p.status.find(s => s.type == enums.Statuses.Annihilation) &&
 				(!p.isUnderling || !player.isNemesis)) {
-				targetPlayers.push(p);
+					targetPlayers.push(p);
 			}
 		}
 		let targets = Math.max(2, Math.ceil(players.length / 4));
 		targets = Math.min(targets, targetPlayers.length);
-		const firstTarget = Math.floor(Math.random() * targetPlayers.length);
+		let firstTarget = Math.floor(Math.random() * targetPlayers.length);
+		firstTarget = 3;
 		
-		let output = '';
 		for(let i = 0; i < targets; i++) {
 			let target = targetPlayers[(firstTarget + i) % targetPlayers.length];
 			await this.completeTraining(target);
@@ -1202,6 +1309,16 @@ module.exports = {
 					output += `${target.name} disintegrates with a roar!`;
 				}
 			} else {
+				const guarded = target.status.find(s => s.type == enums.Statuses.Guarded);
+				if(guarded && guarded.rating) {
+					const guard = await sql.getPlayerById(guarded.rating);
+					output += `${guard.name} jumps in the way to protect ${target.name}!\n`;
+					const guardIndex = targetPlayers.findIndex(p => p.id == guard.id);
+					if(guardIndex > -1) {
+						targetPlayers.splice(guardIndex, 1);
+					}
+					target = guard;
+				}
 				if(target.status.find(s => s.type == enums.Statuses.UltimateForm)) {
 					await this.killPlayer(target, hour / 4);
 					output += `${target.name} cannot fight for another 15 minutes!`;
@@ -1341,7 +1458,7 @@ module.exports = {
 			console.log(`Created fusion of ${sourcePlayer.name} and ${targetPlayer.name} as ${name}`);
 			
 			return [`**${sourcePlayer.name}** and **${targetPlayer.name}** pulsate with a strange power as they perform an elaborate dance. Suddenly, there is a flash of light!`,
-				await this.getPlayerDescriptionById(fusionId)];
+				await this.getPlayerDescriptionById(fusionId, sourcePlayer.username)];
 		}
 
 		// Send an offer to the other player
@@ -1479,11 +1596,11 @@ module.exports = {
 		let nemesisLevel = 0;
 		if(Math.random() < 0.25) {
 			// A very special Nemesis
-			nemesisLevel = this.newPowerLevel(world.heat) * 4;
+			nemesisLevel = this.newPowerLevel(world.heat) * settings.NemesisPower;
 			nemesis.maxForms = 3;
 		} else {
 			// A normal Nemesis
-			nemesisLevel= this.newPowerLevel(world.heat) * 10;
+			nemesisLevel= this.newPowerLevel(world.heat) * settings.NemesisPower * 2.5;
 			nemesis.maxForms = 2;
 		}
 		nemesis.form = 1;
@@ -1519,7 +1636,7 @@ module.exports = {
 	},
 	// Generates a new power level based on the current Heat.
     newPowerLevel(heat) {
-		let level = Math.pow(150, 1 + heat / 1000) * (1 + Math.random() * 3);
+		let level = Math.pow(150, 1 + heat / 1000) * (1 + Math.random() * settings.PowerVariation);
         if(level > 1000000000000000000) level = 1000000000000000000; // JS craps out if we go higher than this
         return level;
 	},
@@ -1533,6 +1650,7 @@ module.exports = {
 	},
 	// Add a new plant to the garden.
 	async plant(player, username, plantName) {
+		const name = player.name;
 		if(this.isFusion(player)) {
 			player = player.fusedPlayers.find(p => p.username == username);
 		}
@@ -1563,7 +1681,7 @@ module.exports = {
 		}
 
 		await sql.addPlant(player, plantId, slot);
-		let output = `${player.name} plants a ${plantName.toLowerCase()} in the garden.`;
+		let output = `${name} plants a ${plantName.toLowerCase()} in the garden.`;
 		
 		if(player.isNemesis) {
 			await sql.addStatus(player.channel, player.id, enums.Statuses.Cooldown, 3 * hour, enums.Cooldowns.Garden);
@@ -1578,14 +1696,16 @@ module.exports = {
 		const world = await sql.getWorld(channel);
 		const now = new Date().getTime();
 
+		const plants = garden.plants.filter(p => p.slot != -1 || p.planterId == player.id ||
+			player.fusedPlayers.find(f => f.id == p.planterId));
 		const time = player ? ((Math.random() * 20 + 10) * 60 * 1000) * (1 + 0.08 * player.gardenLevel) * 
-			(10 / (garden.slots + 10)) * (10 / Math.max(10, world.population))
+			(10 / (garden.slots + 10)) * (10 / Math.max(10, world.population)) * settings.GardenWaterSpeed
 			: fixedTime * (10 / Math.max(10, world.population));
 		let output = player ? `${player.name} works on the garden.` : '';
 		let plantsUpdated = {};
 		let plantsFinished = [];
-		for(const i in garden.plants) {
-			let plant = garden.plants[i];
+		for(const i in plants) {
+			let plant = plants[i];
 			if(plant) {
 				if(fixedTime && plant.type == enums.Items.Sedge) {
 					// Sedges don't grow other Sedges
@@ -1683,6 +1803,7 @@ module.exports = {
 		return output;
 	},
 	async pick(player, username, plantType) {
+		const name = player.name;
 		if(this.isFusion(player)) {
 			player = player.fusedPlayers.find(p => p.username == username);
 		}
@@ -1692,7 +1813,8 @@ module.exports = {
 		const now = new Date().getTime();
 
 		// Find the plant
-		const plantList = garden.plants.filter(p => p.slot > -1 || p.planterId == player.id);
+		const plantList = garden.plants.filter(p => p.slot > -1 || p.planterId == player.id ||
+			player.fusedPlayers.find(f => f.id == p.planterId && f.username == username));
 		plantList.sort((a, b) => {
 			return a.slot - b.slot;
 		});
@@ -1737,10 +1859,14 @@ module.exports = {
 		} else {
 			// Transfer it into the inventory
 			await sql.addItems(channel, player.id, plant.type, 1);
-			return `${player.name} picks a ${plant.name.toLowerCase()}.`;
+			return `${name} picks a ${plant.name.toLowerCase()}.`;
 		}
 	},
-	async useItem(player, target, plantType) {
+	async useItem(player, username, target, plantType) {
+		const name = player.name;
+		if(this.isFusion(player)) {
+			player = player.fusedPlayers.find(p => p.username == username);
+		}
 		const channel = player.channel;
 		let plantItem = player.items.find(i => enums.Items.Name[i.type] == plantType.toLowerCase());
 		const now = new Date().getTime();
@@ -1759,9 +1885,9 @@ module.exports = {
 				defeatedState = await this.healPlayer(target, 6 * hour);
 				if(defeatedState) {
 					const duration = defeatedState.endTime - now;
-					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+					output = `**${name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 				} else {
-					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
+					output = `**${name}** heals **${target.name}** back to fighting shape!`;
 					if(target.config.AutoTrain && !target.isUnderling) {
 						output += `\n**${target.name}** has started training.`;
 					} else if(target.isUnderling) {
@@ -1773,9 +1899,9 @@ module.exports = {
 				defeatedState = await this.healPlayer(target, 12 * hour);
 				if(defeatedState) {
 					const duration = defeatedState.endTime - now;
-					output = `**${player.name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
+					output = `**${name}** heals **${target.name}**, but ${target.config.Pronoun} still won't be able to fight for ${this.getTimeString(duration)}.`;
 				} else {
-					output = `**${player.name}** heals **${target.name}** back to fighting shape!`;
+					output = `**${name}** heals **${target.name}** back to fighting shape!`;
 					if(target.config.AutoTrain && !target.isUnderling) {
 						output += `\n**${target.name}** has started training.`;
 					} else if(target.isUnderling) {
@@ -1930,7 +2056,8 @@ module.exports = {
 			if(this.isFusion(player)) {
 				await sql.deletePlayer(player.id);
 			} else {
-				player.glory = Math.floor(player.glory / 2);
+				player.legacyGlory += player.glory;
+				player.glory = 0;
 				player.level = this.newPowerLevel(0);
 				player.gardenLevel = 0;
 				player.actionLevel = 0;
@@ -1941,7 +2068,7 @@ module.exports = {
 			}
 		}
 
-		return 'Onwards, to a new adventure...! Some Glory is preserved, but all Power Levels and player status has been reverted.'
+		return 'Onwards, to a new adventure...! All Power Levels and player status has been reverted, but your Glory is preserved as Legacy Glory.';
 	},
 	// Register a new player.
 	async registerPlayer(channel, username, userId, name) {
@@ -1955,6 +2082,7 @@ module.exports = {
 			userId: userId,
 			channel: channel,
 			glory: 0,
+			legacyGlory: 0,
 			level: this.newPowerLevel(world.heat),
 			lastActive: now,
 			lastFought: now,
@@ -1965,7 +2093,7 @@ module.exports = {
 		await sql.addPlayer(player);
 		console.log(`Registered ${username} as ${name}`);
 		output.push(`Registered player ${name}!`);
-		output.push(await this.getPlayerDescription(await sql.getPlayerByUsername(channel, username)));
+		output.push(await this.getPlayerDescription(await sql.getPlayerByUsername(channel, username), username, false));
 
 		return output;
 	},
@@ -2217,12 +2345,12 @@ module.exports = {
 					await sql.newPortal(player.channel, otherWorld.channel);
 					output.push(`${player.name} searches the world, and finds a portal to Universe ${otherWorld.id}! ` +
 						`For the next 12 hours, active players can use \`!event\` to send energy through the portal or \`!event message\` to ` +
-						`send a message through. At the end of the event, your energy will become a phantom warrior to test Universe ${otherWorld.id}'s power.`);
+						`send a message along with the energy. At the end of the event, your energy will become a phantom warrior to test Universe ${otherWorld.id}'s power.`);
 					output.push({
 						target: otherWorld.channel,
 						message: `A mysterious portal has appeared, leading to Universe ${thisWorld.id}! ` +
 							`For the next 12 hours, active players can use \`!event\` to send energy through the portal or \`!event message\` to ` +
-							`send a message through. At the end of the event, your energy will become a phantom warrior to test Universe ${thisWorld.id}'s power.`
+							`send a message along with the energy. At the end of the event, your energy will become a phantom warrior to test Universe ${thisWorld.id}'s power.`
 					});
 					await sql.addStatus(otherWorld.channel, null, enums.Statuses.Cooldown, 12 * hour, eventType);
 					break;
@@ -2399,14 +2527,15 @@ module.exports = {
 				output += `\nThe Nemesis has called for a tournament to determine the fate of the universe! Enter \`!tourney join\` to join - ` +
 					`the more contestants there are, the more time you'll have to save the universe! **Let the ${player.name} Games begin!**`;
 				await this.createTournament(channel, player, enums.TournamentTypes.DarkTournament);
-				await sql.addStatus(channel, null, enums.Statuses.Cooldown, 6 * hour, enums.Cooldowns.Ruin);
+				await sql.addStatus(channel, null, enums.Statuses.Cooldown, 8 * hour, enums.Cooldowns.Ruin);
 				await sql.newArc(channel, enums.ArcTypes.DarkTournament);
 				nemesis.lastRuinUpdate = now;
 				await sql.setNemesis(channel, nemesis);
 				break;
 		}
 
-		if(world.arc.type == enums.ArcTypes.OrbHunt) {
+		if(world.arc.type == enums.ArcTypes.OrbHunt ||
+			world.arc.type == enums.ArcTypes.Tournament) {
 			await sql.newArc(channel, enums.ArcTypes.Filler);
 		}
 		
@@ -2447,6 +2576,7 @@ module.exports = {
 		const training = player.status.find(s => s.type == enums.Statuses.Training);
 		const trainingTime = training ? now - training.startTime : 0;
 
+		await this.deleteGuardingForPlayer(player.id); // Can't guard or be guarded while on a journey
 		await sql.addStatus(player.channel, player.id, enums.Statuses.Journey, hours * hour, trainingTime);
 		await this.deleteStatus(player, enums.Statuses.Ready);
 		await this.deleteStatus(player, enums.Statuses.Training);
@@ -2633,14 +2763,20 @@ module.exports = {
 					// Journey
 					const storedTrainingTime = status.rating;
 					const journeyTime = status.endTime - status.startTime;
-					let journeyEffect = (Math.random() * 0.4 + 0.8);
+					let journeyEffect = (Math.random() + 0.8);
 					if(nemesis) {
 						// Journeys that end during a Nemesis reign are amazing
 						journeyEffect += 0.5;
 					}
 					const time = journeyTime * journeyEffect + storedTrainingTime;
 					await this.completeTraining(player, time);
-					messages.push(`**${player.name}** returns from ${this.their(player.config.Pronoun)} training journey!`);
+					if(journeyEffect < 1) {
+						messages.push(`**${player.name}** returns from a rough training journey!`);
+					} else if(journeyEffect < 1.5) {
+						messages.push(`**${player.name}** returns from an ordinary training journey!`);
+					} else {
+						messages.push(`**${player.name}** returns from a **legendary** training journey!`);
+					}
 					await sql.addStatus(channel, player.id, enums.Statuses.Cooldown, 12 * hour, enums.Cooldowns.Journey);
 					await sql.setPlayer(player);
 					break;
@@ -2658,8 +2794,10 @@ module.exports = {
 					break;
 				case enums.Statuses.SuperTransform: 
 					// Super Transform - 8 hour KO
-					await this.killPlayer(player, hour * 8);
-					messages.push(`**${player.name}** is no longer transformed; ${player.config.Pronoun} can't fight for another 8 hours.`);
+					if(!player.isNemesis) {
+						await this.killPlayer(player, hour * 8);
+						messages.push(`**${player.name}** is no longer transformed; ${player.config.Pronoun} can't fight for another 8 hours.`);
+					}
 					break;
 				case enums.Statuses.UltimateForm: 
 					// Ultimate Transform - bye
@@ -3680,12 +3818,14 @@ module.exports = {
 				output = `The tournament is over! ${winner.name} is the world's strongest warrior!`;
 				const world = await sql.getWorld(tournament.channel);
 				if(world.lostOrbs) {
-					output += ` The new champion is awarded ${tournament.reward} Glory and a magic orb!`;
-					winnerPlayer.glory += tournament.reward;
+					const glory = this.getGlory(tournament.reward);
+					output += ` The new champion is awarded ${glory} Glory and a magic orb!`;
+					winnerPlayer.glory += glory;
 					await sql.addItems(tournament.channel, winner.id, enums.Items.Orb, 1);
 				} else {
-					output += ` The new champion is awarded ${tournament.reward * 2} Glory!`;
-					winnerPlayer.glory += tournament.reward * 2;
+					const glory = this.getGlory(tournament.reward * 2);
+					output += ` The new champion is awarded ${glory} Glory!`;
+					winnerPlayer.glory += glory;
 				}
 				if(tournament.type == enums.TournamentTypes.DarkTournament) {
 					if(winnerPlayer.isNemesis) {
@@ -3706,7 +3846,9 @@ module.exports = {
 				if(roundTimer) {
 					await this.deleteStatusById(null, roundTimer.id);
 				}
-				await sql.newArc(tournament.channel, enums.ArcTypes.Filler);
+				if(world.lostOrbs > 0) {
+					await sql.newArc(tournament.channel, enums.ArcTypes.Filler);
+				}
 			}
 		} else {
 			output = `${winner.name} advances to the next round of the tournament!`;
@@ -3810,12 +3952,18 @@ module.exports = {
 	},
 	async testMethod(player, param) {
 		let output = '';
-		let world = await sql.getWorld(channel);
-		let heat = parseInt(param);
-		if(heat != heat) heat = world.heat;
-		for(let i = 0; i < 10; i++) {
-			let level = this.newPowerLevel(heat);
-			output += numeral(level.toPrecision(2)).format('0,0') + '\n';
+		
+		let flawLibrary = [
+			{ cost: 2, levelUp: 1, speed: 1, id: 'slow', namePattern: '^slow$' },
+			{ cost: 3, levelUp: 2, speed: 0, id: 'weakPhysicalAttacker', namePattern: '^weak physical attack' },
+			{ cost: 3, levelUp: 2, speed: 0, id: 'weakEnergyAttacker', namePattern: '^weak energy attack' }
+		];
+		let techFlawList = ['slow', 'weak physical attack'];
+		for(const flawName in techFlawList) {
+			const flawData = flawLibrary.find(f => {
+				return flawName.match(f.namePattern);
+			});
+			if(flawData) techflaws.push(flawData);
 		}
 		return output;
 	},
@@ -3897,14 +4045,13 @@ module.exports = {
 							message: `${player.name} has sent a message from Universe ${world.id}: "${arg}"`
 						});
 						output = `${player.name} sends a message to Universe ${otherWorld.id}!`;
-					} else {
-						const energy = Math.floor(player.level / 100 * (10 / Math.max(10, world.population)) * settings.PhantomStrength);
-						portal.energyBuffs += energy;
-						player.level -= energy;
-						await sql.setPlayer(player);
-						await sql.setPortal(portal);
-						output = `${player.name} sends ${numeral(energy.toPrecision(2)).format('0,0')} energy into the portal!`
 					}
+					const energy = Math.floor(player.level / 100 * (10 / Math.max(10, world.population)) * settings.PhantomStrength);
+					portal.energyBuffs += energy;
+					player.level -= energy;
+					await sql.setPlayer(player);
+					await sql.setPortal(portal);
+					output = `${player.name} sends ${numeral(energy.toPrecision(2)).format('0,0')} energy into the portal!`
 					break;
 			}
 
@@ -3988,6 +4135,7 @@ module.exports = {
 			await sql.addStatus(player.channel, player.id, enums.Statuses.Dead, duration);
 		}
 		await sql.deleteOffersForPlayer(player.id);
+		await sql.deleteGuardingForPlayer(player.id);
 
 		await sql.setPlayer(player);
 	},
@@ -4048,5 +4196,23 @@ module.exports = {
 		} else {
 			return null;
 		}
+	},
+	async raid(player) {
+		await sql.addItems(player.channel, player.id, enums.Items.Orb, 1);
+		await sql.addStatus(player.channel, player.id, enums.Statuses.Cooldown, 6 * hour, enums.Cooldowns.Raid);
+
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`NEMESIS RAID`)
+			.setColor(0xff0000);
+		embed.setDescription(`**${player.name}** invades a peaceful village, taking their orb by force!`);
+		return embed;
+	},
+	async guard(player, target) {
+		await sql.addStatus(player.channel, target.id, enums.Statuses.Guarded, 6 * hour, player.id);
+		return `**${player.name}** swears to protect **${target.name}** from the nemesis! For the next six hours, ` +
+			`using !attack or !destroy on **${target.name}** will target **${player.name}** instead.`;
+	},
+	getGlory(player, amount) {
+		return Math.floor(amount * (1 + Math.sqrt(player.legacyGlory/750)));
 	}
 }

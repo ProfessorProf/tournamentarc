@@ -13,6 +13,23 @@ Expanding this later:
 # Database spec
 Writing this later.
 
+# Updates for S7:
+- Tweaks: Heat escalation speed reduced from 80% to 50%.
+- Tweaks: Event frequence reduced from 80% to 60%.
+- Tweaks: Phantom power multiplier increased from 4 to 10.
+- Tweaks: Battle Ratings are slightly less random.
+- Tweaks: Power Level gains are slightly less random.
+- Tweaks: Challenge timer reduced to 30 seconds.
+- Journey: For some reason I took out the part that says what kind of journey you had, but it's back now.
+- Journey: Returned journey gains to their pre-Latent Power levels.
+- Garden: !water now only waters your plant and the public slot plants.
+- Nemesis: Base power increased by 25%.
+- Nemesis: New nemesis command "raid" added.
+- Nemesis: New command "guard" to protect your friends from the nemesis.
+- Wish: Wish "games" now gives 8 hours for signups, instead of 6.
+- New: New command "deepcheck" lets you check more detailed information on your capabilities.
+- New: Past glory is saved as Legacy Glory, which multiplies all Glory gains.
+
 # Updates for S6:
 - New: A Season is now split into Arcs based on player activity.
 - Arcs: A Nemesis Arc begins when someone uses !nemesis, preventing tournaments.

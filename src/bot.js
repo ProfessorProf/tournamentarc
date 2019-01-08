@@ -225,7 +225,11 @@ async function handleMessage(message) {
 			output.messages = await tools.registerPlayer(channel, username, message.author.id, args[0]);
 			break;
 		case 'check':
-			output.messages = await tools.getPlayerDescription(player, output.private);
+			output.messages = await tools.getPlayerDescription(player, username, output.private);
+			output.informational = true;
+			break;
+		case 'deepcheck':
+			output.messages = await tools.getPlayerDeepDescription(player);
 			output.informational = true;
 			break;
 		case 'roster':
@@ -256,7 +260,7 @@ async function handleMessage(message) {
 			output.messages = await tools.pick(player, username, args[0]);
 			break;
 		case 'use':
-			output.messages = await tools.useItem(player, target, args[0]);
+			output.messages = await tools.useItem(player, username, target, args[0]);
 			break;
 		case 'expand':
 			output.messages = await tools.expand(player, args[0]);
@@ -287,6 +291,9 @@ async function handleMessage(message) {
 			break;
 		case 'revive':
 			output.messages = await tools.revive(target);
+			break;
+		case 'raid':
+			output.messages = await tools.raid(player);
 			break;
 		case 'train':
 			output.messages = await tools.train(player);
@@ -337,6 +344,9 @@ async function handleMessage(message) {
 		case 'taunt':
 			output.messages = await tools.taunt(player, target);
 			break;
+		case 'guard':
+			output.messages = await tools.guard(player, target);
+			break;
 		case 'journey':
 			output.messages = await tools.startJourney(player, args[0]);
 			break;
@@ -378,7 +388,7 @@ async function handleMessage(message) {
 			output.messages = await tools.ending(channel);
 			break;
 		case 'test':
-			output.messages = await tools.testMethod(channel, name, args[0]);
+			output.messages = await tools.testMethod(player, args[0]);
 			break;
 		case 'update':
 			await sql.update();

@@ -5,20 +5,14 @@ sql.open('./data.sqlite');
 const hour = (60 * 60 * 1000);
 
 const updateSql = `
-ALTER TABLE Worlds ADD COLUMN Arc INTEGER;
-ALTER TABLE Worlds ADD COLUMN LastArc INTEGER;
-ALTER TABLE Episodes ADD COLUMN Arc INTEGER;
-ALTER TABLE Nemesis ADD COLUMN Form INTEGER;
-ALTER TABLE Nemesis ADD COLUMN Max_Forms INTEGER;
-CREATE TABLE IF NOT EXISTS Portals (ID INTEGER PRIMARY KEY, Channel TEXT, TargetChannel TEXT, EnergyBuffs INTEGER);
-CREATE TABLE IF NOT EXISTS Arcs (ID INTEGER PRIMARY KEY, Channel TEXT, Number INTEGER, Type INTEGER, Start_Time INTEGER, End_Time INTEGER)`;
+ALTER TABLE Players ADD COLUMN Legacy_Glory INTEGER`;
 
 const initTablesSql = `
 CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY, Channel TEXT, Heat REAL, Resets INTEGER,
 	Last_Wish INTEGER, Last_Update INTEGER, Start_Time INTEGER, Episode INTEGER, Offset INTEGER, Arc INTEGER, LastArc INTEGER);
 CREATE TABLE IF NOT EXISTS Episodes (ID INTEGER, Channel TEXT, Air_Date INTEGER, Summary TEXT, Arc INTEGER);
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Power_Level REAL, Fusion_ID INTEGER,
-    Action_Level REAL, Garden_Level REAL, Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
+    Action_Level REAL, Garden_Level REAL, Glory INTEGER, Legacy_Glory INTEGER, Last_Active INTEGER, Last_Fought INTEGER, 
 	NPC INTEGER);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Status (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Type INTEGER,
@@ -77,7 +71,8 @@ const updatePlayerSql = `UPDATE Players SET
     Garden_Level = $gardenLevel,
     Action_Level = $actionLevel,
     Garden_Level = $gardenLevel,
-    Glory = $glory,
+	Glory = $glory,
+	Legacy_Glory = $legacyGlory,
 	Last_Active = $lastActive,
 	Last_Fought = $lastFought,
 	NPC = $npc
@@ -296,7 +291,8 @@ module.exports = {
             $powerLevel: player.level,
             $gardenLevel: player.gardenLevel,
             $actionLevel: player.actionLevel,
-            $glory: player.glory,
+			$glory: player.glory,
+			$legacyGlory: player.legacyGlory,
 			$lastActive: player.lastActive,
 			$lastFought: player.lastFought,
 			$npc: player.npc
@@ -389,6 +385,7 @@ module.exports = {
 			channel: row.Channel,
 			level: row.Power_Level,
 			glory: row.Glory,
+			legacyGlory: row.Legacy_Glory,
 			lastActive: row.NPC ? now : row.Last_Active,
 			lastFought: row.NPC ? now : row.Last_Fought,
 			gardenLevel: row.Garden_Level,
@@ -661,6 +658,11 @@ module.exports = {
 	// Delete all offers for a player who was just defeated.
 	async deleteOffersForPlayer(playerId) {
 		await sql.run(`DELETE FROM Offers WHERE Player_ID = $playerId OR Target_ID = $playerId`, {$playerId: playerId});
+	},
+	// Delete all guarding of or from a player who was just defeated.
+	async deleteGuardingForPlayer(playerId) {
+		await sql.run(`DELETE FROM Status WHERE Type = $type AND (Player_ID = $playerId OR Rating = $playerId)`, 
+			{$playerId: playerId, $type: enums.Statuses.Guarded});
 	},
 	// Delete all open offers of a given type
 	async deleteOpenOffers(playerId, type) {
@@ -1084,5 +1086,10 @@ module.exports = {
 			{$channel: channel, $targetChannel: targetChannel});
 		await sql.run(`DELETE FROM Portals WHERE Channel = $channel AND TargetChannel = $targetChannel`,
 			{$channel: channel, $targetChannel: targetChannel});
+	},
+	async guarding(player) {
+		const guarding = await sql.get(`SELECT * FROM Status WHERE Type = $type AND Rating = $rating`, {$type: enums.Statuses.Guarded, $rating: player.id});
+		if(!guarding) return null;
+		return await this.getPlayerById(player.channel, guarding.Player_ID);
 	}
 }

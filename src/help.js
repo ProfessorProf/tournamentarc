@@ -12,11 +12,11 @@ module.exports = {
         if(!topic) {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
-                .addField('!help info', 'Help with informational commands: !check, !scan, !roster, !episode, !graveyard, !history.')
+                .addField('!help info', 'Help with informational commands: !check, !deepcheck, !scan, !roster, !episode, !graveyard, !history.')
                 .addField('!help actions', 'Help with commands related to world actions: !search, !empower, !transform, !filler.')
                 .addField('!help garden', 'Help with commands related to the garden: !garden, !expand, !water, !plant, !pick, !use.')
-                .addField('!help battle', 'Help with commands related to combat: !fight, !unfight, !taunt, !train, !journey.')
-                .addField('!help nemesis', 'Help with commands related to the Nemesis: !nemesis, !recruit, !exile, !attack, !destroy, !burn, !energize, !revive.')
+                .addField('!help battle', 'Help with commands related to combat: !fight, !unfight, !taunt, !train, !journey, !guard, !selfdestruct.')
+                .addField('!help nemesis', 'Help with commands related to the Nemesis: !nemesis, !recruit, !exile, !attack, !destroy, !burn, !energize, !revive, !raid.')
                 .addField('!help underlings', 'Help with commands related to underlings: !join, !recruit, !exile.')
                 .addField('!help wish', 'Help with commands related to orbs and wishes: !search, !give, !wish.')
                 .addField('!help rank', 'Help with Rank, Glory, and how to increase them.')
@@ -37,6 +37,7 @@ module.exports = {
                     output.setTitle('Help: Info Commands')
                         .setDescription('To get more info on any command, enter `!help commandname`.')
                         .addField('!check', 'Display information about your character.')
+                        .addField('!deepcheck', 'Display obscure information about your character.')
                         .addField('!scan target', 'Scan another player to learn their basic stats.')
                         .addField('!roster', 'Display basic info on all active players.')
                         .addField('!graveyard', 'Display all defeated players.')
@@ -140,6 +141,7 @@ Rank ??? 1000 Glory
                         .addField('!unfight', 'Cancel all outgoing battle challenges.')
                         .addField('!train', 'Begin training to increase your power level.')
                         .addField('!journey hours', 'Go on a long journey to hone your skills.')
+                        .addField('!guard target', "Protects a player from the Nemesis's attacks.")
                         .addField('!selfdestruct', 'Sacrifice yourself to defeat a powerful foe.');
                     break;
                 case 'actions':
@@ -179,7 +181,8 @@ Rank ??? 1000 Glory
                             '**!revive**: Resurrect a defeated underling.\n' +
                             "**!attack**: Fight a player, even if they haven't challenged you.\n" +
                             '**!destroy**: Destroy a planet.\n' +
-                            '**!burn**: Attack the garden.');
+                            '**!burn**: Attack the garden.\n' +
+                            '**!raid**: Gain an orb.');
                     break;
                 case 'underling':
                 case 'underlings':
@@ -193,18 +196,23 @@ Rank ??? 1000 Glory
                             "Underlings can only use the commands !use, !empower and !give on the Nemesis.");
                     break;
                 case 'wish':
-                    output.setTitle('Help: Wishes')
-                        .setDescription("Seven magic orbs are waiting to be found! If you collect all seven, then you can make a wish, giving you incredible powers. " +
-                            "You can only make a wish once every seven days, and after you do, the orbs are lost again. After someone makes a wish, the orbs are harder to find for three days.")
-                        .addField('!give', "Gives one of your magic orbs to another player. You can only do this if you've already used up your wish, or if you're an underling.")
-                        .addField('!steal itemname target', 'Attempt to steal an item from an evil player.')
-                        .addField('!wish power', 'Become incredibly powerful! Your Power Level increases dramatically, and you gain a huge bonus to your Latent Power.')
-                        .addField('!wish immortality', "Become immortal! No matter how you die, you'll revive in one hour. Lasts until the next season.")
-                        .addField('!wish resurrection', 'Raise the dead! All fallen players are instantly revived, and their Power Levels increase by 20%.')
-                        .addField('!wish gardening', 'Become the master of gardening! Gardening Level increases by 12.')
-                        .addField('!wish ruin', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.')
-                        .addField('!wish snap', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.')
-                        .addField('!wish games', 'Requires rank S+. Only the Nemesis can make this wish. Prevent this at any cost.');
+                    if(player && player.isNemesis) {
+                        output.setTitle('Help: Wishes')
+                            .setDescription("...")
+                                .addField('!wish snap', 'Requires rank S+. Destroy 50% of all life in the galaxy.')
+                                .addField('!wish games', 'Requires rank S+. Force your enemies to fight each other for the sake of the galaxy.')
+                                .addField('!wish ruin', 'Requires rank S+. Destroy the galaxy in six hours.');
+                    } else {
+                        output.setTitle('Help: Wishes')
+                            .setDescription("Seven magic orbs are waiting to be found! If you collect all seven, then you can make a wish, giving you incredible powers. " +
+                                "You can only make a wish once every seven days, and after you do, the orbs are lost again. After someone makes a wish, the orbs are harder to find for three days.")
+                            .addField('!give', "Gives one of your magic orbs to another player. You can only do this if you've already used up your wish, or if you're an underling.")
+                            .addField('!steal itemname target', 'Attempt to steal an item from an evil player.')
+                            .addField('!wish power', 'Become incredibly powerful! Your Power Level increases dramatically, and you gain a huge bonus to your Latent Power.')
+                            .addField('!wish immortality', "Become immortal! No matter how you die, you'll revive in one hour. Lasts until the next season.")
+                            .addField('!wish resurrection', 'Raise the dead! All fallen players are instantly revived, and their Power Levels increase by 20%.')
+                            .addField('!wish gardening', 'Become the master of gardening! Gardening Level increases by 12.');
+                    }
                     break;
                 case 'tournament':
                     output.setTitle('Help: Tournaments')
@@ -243,6 +251,10 @@ Rank ??? 1000 Glory
                 break;
             case 'check':
                 embed.addField('!check', 'Displays info about your character - current power level, Glory, action levels, status, offers, and cooldowns. Usable by anyone.\n' +
+                    'Requirements: Must be registered.');
+                break;
+            case 'deepcheck':
+                embed.addField('!deepcheck', 'Displays info about your character - Legacy Glory, Glory bonus, defeat bonuses, long-term cooldowns, and the effects of your Garden/Action Level. Usable by anyone.\n' +
                     'Requirements: Must be registered.');
                 break;
             case 'scan':
@@ -306,6 +318,10 @@ Rank ??? 1000 Glory
             case 'revive':
                 embed.addField('!revive target', "Resurrects a fallen underling immediately, and increases their power level by 20%.\n" +
                     "Requirements: Must be the Nemesis. Target must be an underling. Can only be used once every 24 hours.");
+                break;
+            case 'raid':
+                embed.addField('!raid', "Raids a village in order to seize one of the lost orbs by force.\n" +
+                    "Requirements: Must be the Nemesis. Can only be used once every 6 hours.");
                 break;
             case 'expand':
                 embed.addField('!expand type', 'Requires Rank C. Work on upgrading the garden! Amount is based on your Garden Level. ' +
@@ -398,6 +414,14 @@ Rank ??? 1000 Glory
                     "Your power is increased massively, but you won't come back from this one with a simple rest...\n" +
                     "**Do not use this command unless you are comfortable with being gone for a long time!**\n" +
                     "Requirements: Must be Rank A. Must be alive. Target must be alive. Must not be the Nemesis.");
+                break;
+            case 'guard':
+                embed.addField('!guard target', "Swear to protect another player from the Nemesis. For the next 6 hours, " +
+                    "if that player comes under fire from the !attack or !destroy commands, you'll take the attack in their place. " +
+                    "Does not protect them from fights they engage in on their own.\n" +
+                    "If you or the target dies for any reason, the guard effect will end.\n" +
+                    "Requirements: Must be alive. Target must be alive. Neither you nor the target can be the Nemesis or an Underling. " +
+                    "Target must not be guarding or guarded by someone else. You must not be guarding or guarded by someone else.");
                 break;
             case 'filler':
                 embed.addField('!filler target', "Creates a randomized filler episode! If you specify a target, they'll be " +
