@@ -233,7 +233,7 @@ module.exports = {
 		if(player.legacyGlory > 0) {
 			// Display Legacy Glory
 			const legacyBonus = Math.floor(Math.sqrt(player.legacyGlory / 750) * 100);
-			stats += `\nYou have ${player.legacyGlory} Legacy Glory, granting you +${legacyBonus}% to all Glory gains (rounded down).`;
+			stats += `\nYou have ${Math.floor(player.legacyGlory)} Legacy Glory, granting you +${legacyBonus}% to all Glory gains (rounded down).`;
 		}
 		
 		const history = await sql.getHistory(player.id);
@@ -250,15 +250,15 @@ module.exports = {
 		if(player.gardenLevel > 0) {
 			const gardenPercent = Math.floor((player.gardenLevel - Math.floor(player.gardenLevel)) * 100);
 			stats += `\nGardening Level: ${Math.floor(player.gardenLevel)} (${gardenPercent}%)`;
-			stats += `\n!water causes +${player.gardenLevel * 8}% more growth than normal.` +
-				`\n!expand advances progress by +${player.gardenLevel * 8}% more than normal.`;
+			stats += `\n!water causes +${Math.floor(player.gardenLevel) * 8}% more growth than normal.` +
+				`\n!expand advances progress by +${Math.floor(player.gardenLevel) * 8}% more than normal.`;
 		}
 		
 		if(player.actionLevel > 0) {
 		const actionPercent = Math.floor((player.actionLevel - Math.floor(player.actionLevel)) * 100);
 		stats += `\nAction Level: ${Math.floor(player.actionLevel)} (${actionPercent}%)`;
 			stats += `\n!search is ${Math.floor(player.actionLevel * 100 / 6)}% more likely to find orbs, and ${player.actionLevel * 20}% more likely to find flowers.` +
-				`\n!filler heals injured players by ${player.actionLevel * 2.5}% more than normal.` +
+				`\n!filler heals injured players by ${Math.floor(player.actionLevel * 2.5)}% more than normal.` +
 				`\n!transform lasts ${Math.floor(player.actionLevel * 100 / 60)}% longer than normal.`;
 		}
 
