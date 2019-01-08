@@ -247,14 +247,14 @@ module.exports = {
 			stats += `\nYou have fallen in battle ${losses} times, granting you a ${losses * 5}% bonus to training gains.`;
 		}
 
-		if(player.gardenLevel > 0) {
+		if(player.gardenLevel >= 1) {
 			const gardenPercent = Math.floor((player.gardenLevel - Math.floor(player.gardenLevel)) * 100);
 			stats += `\nGardening Level: ${Math.floor(player.gardenLevel)} (${gardenPercent}%)`;
 			stats += `\n!water causes +${Math.floor(player.gardenLevel) * 8}% more growth than normal.` +
 				`\n!expand advances progress by +${Math.floor(player.gardenLevel) * 8}% more than normal.`;
 		}
 		
-		if(player.actionLevel > 0) {
+		if(player.actionLevel >= 1) {
 		const actionPercent = Math.floor((player.actionLevel - Math.floor(player.actionLevel)) * 100);
 		stats += `\nAction Level: ${Math.floor(player.actionLevel)} (${actionPercent}%)`;
 			stats += `\n!search is ${Math.floor(player.actionLevel * 100 / 6)}% more likely to find orbs, and ${player.actionLevel * 20}% more likely to find flowers.` +
