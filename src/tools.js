@@ -2576,7 +2576,7 @@ module.exports = {
 		const training = player.status.find(s => s.type == enums.Statuses.Training);
 		const trainingTime = training ? now - training.startTime : 0;
 
-		await this.deleteGuardingForPlayer(player.id); // Can't guard or be guarded while on a journey
+		await sql.deleteGuardingForPlayer(player.id); // Can't guard or be guarded while on a journey
 		await sql.addStatus(player.channel, player.id, enums.Statuses.Journey, hours * hour, trainingTime);
 		await this.deleteStatus(player, enums.Statuses.Ready);
 		await this.deleteStatus(player, enums.Statuses.Training);
