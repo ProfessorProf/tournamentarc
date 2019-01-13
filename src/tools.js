@@ -257,7 +257,7 @@ module.exports = {
 		if(player.actionLevel >= 1) {
 		const actionPercent = Math.floor((player.actionLevel - Math.floor(player.actionLevel)) * 100);
 		stats += `\nAction Level: ${Math.floor(player.actionLevel)} (${actionPercent}%)`;
-			stats += `\n!search is ${Math.floor(player.actionLevel * 100 / 6)}% more likely to find orbs, and ${player.actionLevel * 20}% more likely to find flowers.` +
+			stats += `\n!search is ${Math.floor(player.actionLevel * 100 / 6)}% more likely to find orbs, and ${Math.floor(player.actionLevel) * 20}% more likely to find flowers.` +
 				`\n!filler heals injured players by ${Math.floor(player.actionLevel * 2.5)}% more than normal.` +
 				`\n!transform lasts ${Math.floor(player.actionLevel * 100 / 60)}% longer than normal.`;
 		}
@@ -1919,7 +1919,7 @@ module.exports = {
 				output = `**${target.name}** eats the bean, and ${this.their(target.config.Pronoun)} power increases by ${numeral(levelBoost.toPrecision(2)).format('0,0')}!`;
 				break;
 			case enums.Items.Sedge:
-				output = await this.water(channel, null, 2 * hour);
+				output = await this.water(channel, player, 2 * hour);
 				let garden = await sql.getGarden(channel);
 				const world = await sql.getWorld(channel);
 				const expansion = ((Math.random() * 15 + 15) * 5 / (100 * (3 + garden.growthLevel))) * (10 / Math.max(10, world.population));
