@@ -865,6 +865,9 @@ module.exports = {
 		const intensity = Math.max(winnerSkill, loserSkill);	// Effective 0-2
 		let hours = Math.ceil(difference * intensity * 3);		// Effective 0-12
 		hours = Math.max(Math.min(hours, 12), 1);				// Cap it at range 1-12 for now
+		if(loser.glory < 250) {
+			hours = Math.ceil(hours * loser.glory / 250);		// Reduce death time for low-glory players
+		}
 		
 		let trueForm = false;
 		let nemesisEnded = false;
