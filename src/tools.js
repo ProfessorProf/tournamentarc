@@ -853,6 +853,7 @@ module.exports = {
 	// Process updates based on who won and lost a fight.
 	async handleFightOutcome(data, winner, loser, winnerSkill, loserSkill, taunted, nemesisHistory, underlingPowered) {
 		const now = new Date().getTime();
+		const world = await sql.getWorld(winner.channel);
 		let output = '';
 		
 		// Loser gains the Ready status, winner loses ready status if training
@@ -878,7 +879,7 @@ module.exports = {
 		if(nemesisHistory) {
 			// The Nemesis is dead!
 			let nemesis = await sql.getNemesis(winner.channel);
-			if(nemesis.form < nemesis.maxForms) {
+			if(nemesis.form < nemesis.maxForms && world.arc.type != enums.ArcTypes.DarkTournament) {
 				// Reveal true form
 				if(nemesis.form + 1 == nemesis.maxForms) {
 					output += `For a moment, it seemed like ${loser.name} had lost... but then ${loser.config.Pronoun} revealed ${this.their(loser.config.Pronoun)} true final form!\n` +
