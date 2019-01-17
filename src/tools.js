@@ -1175,7 +1175,7 @@ module.exports = {
 		await sql.addEpisode(winner.channel, summary);
 
 		// Save changes
-		await this.killPlayer(loser, hours * hour);
+		await this.killPlayer(loser, hours * hour + 1);
 		await sql.setPlayer(loser);
 		await sql.setPlayer(winner);
 		
