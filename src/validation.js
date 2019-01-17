@@ -877,6 +877,9 @@ module.exports = {
 					if(target.npc) {
 						errors.push("You can't recruit NPCs.");
 					}
+					if(world.arc.type == enums.ArcTypes.DarkTournament) {
+						errors.push(`Not while the games are underway.`);
+					}
 				}
 				const underlingIds = await sql.getUnderlings(channel);
 				const players = await sql.getPlayers(channel);
@@ -910,6 +913,9 @@ module.exports = {
 						}
 						if(tools.isFusion(player)) {
 							errors.push("A Fusion can't join the Nemesis.");
+						}
+						if(world.arc.type == enums.ArcTypes.DarkTournament) {
+							errors.push(`Not while the games are underway.`);
 						}
 					}
 				}
@@ -1009,6 +1015,9 @@ module.exports = {
 					this.validateNemesis(errors, player);
 					if(world.lostOrbs == 0) {
 						errors.push(`There are no orbs left to seize.`);
+					}
+					if(world.arc.type == enums.ArcTypes.DarkTournament) {
+						errors.push(`Not while the games are underway.`);
 					}
 					const cooldown = player.cooldowns.find(c => c.type == enums.Cooldowns.Raid);
 					if(cooldown) {
