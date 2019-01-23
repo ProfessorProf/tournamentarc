@@ -1975,7 +1975,7 @@ module.exports = {
 		let modifier = 1;
 		let percent = 0;
 
-		switch(type) {
+		switch(type.toLowerCase()) {
 			case 'growth':
 				modifier = Math.min(1.5, Math.pow((averageLevel + 2) / (garden.growthLevel + 2), 3));
 				expansion *= modifier * 3 / (100 * (3 + garden.growthLevel));
