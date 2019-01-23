@@ -3822,12 +3822,12 @@ module.exports = {
 				output = `The tournament is over! ${winner.name} is the world's strongest warrior!`;
 				const world = await sql.getWorld(tournament.channel);
 				if(world.lostOrbs) {
-					const glory = this.getGlory(tournament.reward);
+					const glory = this.getGlory(winnerPlayer, tournament.reward);
 					output += ` The new champion is awarded ${glory} Glory and a magic orb!`;
 					winnerPlayer.glory += glory;
 					await sql.addItems(tournament.channel, winner.id, enums.Items.Orb, 1);
 				} else {
-					const glory = this.getGlory(tournament.reward * 2);
+					const glory = this.getGlory(winnerPlayer, tournament.reward * 2);
 					output += ` The new champion is awarded ${glory} Glory!`;
 					winnerPlayer.glory += glory;
 				}
