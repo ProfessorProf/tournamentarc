@@ -982,7 +982,7 @@ module.exports = {
 			let vulnerable = true;
 			for(var u of underlings) {
 				var underling = await sql.getPlayerById(u.id);
-				if(underling.npc == enums.NpcTypes.Zeach) {
+				if(underling.npc == enums.NpcTypes.Zeach && !underling.status.find(s => s.type == enums.Statuses.Annihilation)) {
 					vulnerable = false;
 					break;
 				}
@@ -1755,7 +1755,7 @@ module.exports = {
 		}
 		
 		// Update garden level
-		if(player) {
+		if(player && !fixedTime) {
 			if(await this.gardenLevelUp(player)) {
 				output += '\nGardening level increased!';
 			}
