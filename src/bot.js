@@ -250,7 +250,7 @@ async function handleMessage(message) {
 			output.informational = args.length == 0;
 			break;
 		case 'aid':
-			output.messages = await tools.aid(channel, player, target);
+			output.messages = await tools.aid(player, target, args[1]);
 			break;
 		case 'config':
 			output.messages = await tools.config(player, args[0], args[1]);

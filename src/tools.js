@@ -1319,7 +1319,6 @@ module.exports = {
 		}
 	},
 	async aid(player, fighter, amount) {
-		const tournament = await sql.getTournament(player.channel);
 		if(fighter) {
 			if(amount > player.coins) amount = player.coins;
 			player.coins -= amount;
