@@ -1,9 +1,9 @@
 {
-  "name": "powerlevel-bot",
+  "name": "tournament-arc",
   "version": "1.0.0",
-  "description": "My own Discord bot",
+  "description": "Tournament Arc bot",
   "main": "bot.js",
-  "author": "Alan Gordon",
+  "author": "Quinn Gordon",
   "dependencies": {
     "discord.io": "^2.5.3",
     "discord.js": "^11.3.2",

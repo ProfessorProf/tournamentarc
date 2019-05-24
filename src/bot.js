@@ -192,16 +192,17 @@ async function handleMessage(message) {
 		if(update.abort) return;
 	}
 
-	let targetName;
-	if(cmd == 'use' || cmd == 'give' || cmd == 'steal') {
-		targetName = args.length > 1 ? args[1] : null;
-	} else {
-		targetName = args.length > 0 ? args[0] : null;
+	if(args.length > 1 && !isNaN(args[0])) {
+		const swap = args[0];
+		args[0] = args[1];
+		args[1] = swap;
 	}
+
+	let targetName = args.length > 0 ? args[0] : null;
 	let player = await sql.getPlayerByUsername(channel, username);
-	let target = await sql.getPlayer(channel, targetName);
+	let target = await sql.getFighter(channel, targetName);
 	
-	const errors = await validation.validate(channel, username, player, target, cmd, args);
+	const errors = await validation.validate(channel, player, target, cmd, args);
 	if(errors) {
 		if(overrideErrors) {
 			errors.push('(Override Errors)');
@@ -225,149 +226,35 @@ async function handleMessage(message) {
 			output.messages = await tools.registerPlayer(channel, username, message.author.id, args[0]);
 			break;
 		case 'check':
-			output.messages = await tools.getPlayerDescription(player, username, output.private);
+			output.messages = await tools.getPlayerDescription(player, username);
 			output.informational = true;
 			break;
-		case 'deepcheck':
-			output.messages = await tools.getPlayerDeepDescription(player);
+		case 'fighter':
+			output.messages = await tools.scanFighter(target);
 			output.informational = true;
 			break;
-		case 'roster':
-			output.messages = await tools.displayRoster(channel);
+		case 'next':
+			output.messages = await tools.nextFighters(channel);
 			output.informational = true;
 			break;
-		case 'scan':
-			output.messages = await tools.scoutPlayer(target);
+		case 'players':
+			output.messages = await tools.displayPlayers(channel);
 			output.informational = true;
 			break;
-		case 'fight':
-			output.messages = await tools.tryFight(player, target);
-			break;
-		case 'unfight':
-			output.messages = await tools.unfight(player);
-			break;
-		case 'garden':
-			output.messages = await tools.displayGarden(player, username);
+		case 'fighters':
+			output.messages = await tools.displayFighters(channel);
 			output.informational = true;
 			break;
-		case 'plant':
-			output.messages = await tools.plant(player, username, args[0]);
+		case 'bet':
+			output.messages = await tools.bet(player, target, args[1]);
+			output.informational = args.length == 0;
 			break;
-		case 'water':
-			output.messages = await tools.water(channel, player);
-			break;
-		case 'pick':
-			output.messages = await tools.pick(player, username, args[0]);
-			break;
-		case 'use':
-			output.messages = await tools.useItem(player, username, target, args[0]);
-			break;
-		case 'expand':
-			output.messages = await tools.expand(player, args[0]);
-			break;
-		case 'nemesis':
-			output.messages = await tools.setNemesis(player);
-			break;
-		case 'attack':
-			output.messages = await tools.attack(player, target);
-			break;
-		case 'destroy':
-			output.messages = await tools.destroy(player);
-			break;
-		case 'burn':
-			output.messages = await tools.burn(channel);
-			break;
-		case 'recruit':
-			output.messages = await tools.recruit(channel, target);
-			break;
-		case 'join':
-			output.messages = await tools.joinNemesis(player);
-			break;
-		case 'exile':
-			output.messages = await tools.exile(target);
-			break;
-		case 'energize':
-			output.messages = await tools.energize(target);
-			break;
-		case 'revive':
-			output.messages = await tools.revive(target);
-			break;
-		case 'raid':
-			output.messages = await tools.raid(player);
-			break;
-		case 'train':
-			output.messages = await tools.train(player);
-			break;
-		case 'season':
-			output.messages = await tools.resetData(channel);
-			break;
-		case 'search':
-			output.messages = await tools.search(player);
-			break;
-		case 'scores':
-			output.messages = await tools.displayScores(channel);
-			output.informational = true;
-			break;
-		case 'fuse':
-			output.messages = await tools.fuse(player, target, args[1]);
-			break;
-		case 'wish':
-			output.messages = await tools.wish(player, args[0]);
-			break;
-		case 'research':
-			output.messages = await tools.expand(player, 'research');
-			break;
-		case 'transform':
-			output.messages = await tools.transform(player);
-			break;
-		case 'empower':
-			output.messages = await tools.empower(player, target);
-			break;
-		case 'give':
-			output.messages = await tools.give(player, target, args[0]);
-			break;
-		case 'steal':
-			output.messages = await tools.steal(player, target, args[0]);
-			break;
-		case 'history':
-			output.messages = await tools.history(player, target);
-			output.informational = true;
-			break;
-		case 'graveyard':
-			output.messages = await tools.graveyard(channel);
-			output.informational = true;
-			break;
-		case 'world':
-			output.messages = await tools.worldInfo(channel);
-			output.informational = true;
-			break;
-		case 'taunt':
-			output.messages = await tools.taunt(player, target);
-			break;
-		case 'guard':
-			output.messages = await tools.guard(player, target);
-			break;
-		case 'journey':
-			output.messages = await tools.startJourney(player, args[0]);
-			break;
-		case 'return':
-			output.messages = await tools.return(player);
-			break;
-		case 'selfdestruct':
-			output.messages = await tools.selfDestruct(player, target, username);
-			break;
-		case 'filler':
-			output.messages = await tools.filler(player, target);
-			break;
-		case 'episode':
-			output.messages = await tools.getEpisode(channel, args[0]);
+		case 'aid':
+			output.messages = await tools.aid(channel, player, target);
 			break;
 		case 'config':
 			output.messages = await tools.config(player, args[0], args[1]);
 			output.informational = true;
-			break;
-		case 'event':
-			output.messages = await tools.event(player, args.join(' '));
 			break;
 		case 'help':
 			output.messages = await help.showHelp(player, args[0]);
@@ -378,23 +265,20 @@ async function handleMessage(message) {
 			output.messages = await tools.tournament(player, args[0]);
 			output.informational = args.length == 0;
 			break;
-		case 'debug':
-			await sql.execute(args.join(' '));
+		case 'give':
+			output.messages = await tools.give(player, args[0], args[1]);
 			break;
 		case 'clone':
 			await sql.clone(player, args[0]);
 			break;
-		case 'ending':
-			output.messages = await tools.ending(channel);
+		case 'debug':
+			await sql.execute(args.join(' '));
 			break;
 		case 'test':
 			output.messages = await tools.testMethod(player, args[0]);
 			break;
 		case 'update':
 			await sql.update();
-			break;
-		case 'importchannel':
-			await sql.importChannel(channel, args[0]);
 			break;
 	}
 
