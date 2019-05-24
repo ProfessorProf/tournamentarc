@@ -75,7 +75,7 @@ module.exports = {
 				}
 				break;
 			case 'bet':
-				const amount = 0;
+				let amount = 0;
 				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
 					amount = parseInt(args[1]);
