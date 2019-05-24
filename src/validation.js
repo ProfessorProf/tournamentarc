@@ -75,9 +75,10 @@ module.exports = {
 				}
 				break;
 			case 'bet':
+				const amount = 0;
 				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
-					const amount = parseInt(args[1]);
+					amount = parseInt(args[1]);
 					if(amount != amount || amount < 0) {
 						errors.push('Invalid amount of coins.');
 					} else if(amount != Math.floor(amount)) {
@@ -95,6 +96,9 @@ module.exports = {
 						errors.push(`The tournament is already over.`);
 					}
 					if(target) {
+						if(amount > 0 && amount < tournament.round * 10) {
+							errors.push(`Minimum bet is ${tournament.round * 10} coins.`);
+						}
 						if(tournament.status == enums.TournamentStatuses.Active &&
 							tournament.nextAttack != tournament.nextMatch) {
 							errors.push(`You can't place any bets once the battle has started.`);

@@ -561,9 +561,6 @@ module.exports = {
 				case 'ping':
 					player.config.Ping = this.readConfigBoolean(value, player.config.Ping);
 					break;
-				case 'autotrain':
-					player.config.AutoTrain = this.readConfigBoolean(value, player.config.autoTrain);
-					break;
 				case 'pronoun':
 					if(value.toLowerCase() == 'he') {
 						player.config.Pronoun = 'he';
@@ -586,7 +583,6 @@ module.exports = {
 			.setColor(0x00AE86);
 		let output = `AlwaysPrivate: ${config.AlwaysPrivate ? 'On' : 'Off'}\n`;
 		output += `Ping: ${config.Ping ? 'On' : 'Off'}\n`;
-		output += `AutoTrain: ${config.AutoTrain ? 'On' : 'Off'}\n`;
 		output += `Pronoun: ${config.Pronoun}`;
 		embed.setDescription(output);
 
@@ -1327,9 +1323,9 @@ module.exports = {
 		if(fighter) {
 			if(amount > player.coins) amount = player.coins;
 			player.coins -= amount;
-			target.aidLevel += amount;
+			fighter.aidLevel += amount;
 			await sql.setPlayer(player);
-			await sql.setFighter(target);
+			await sql.setFighter(fighter);
 			return `${player.name} has invested ${amount} coins in ${fighter.name}'s training.`;3
 		}
 	},
