@@ -570,7 +570,7 @@ module.exports = {
 	},
 	async addBet(channel, playerId, fighterId, amount) {
 		const existingBet = await sql.get(`SELECT * FROM Bets WHERE Player_ID = $playerId`,
-			{ $playerId: playerId, $fighterId: fighterId });
+			{ $playerId: playerId });
 		if(existingBet) {
 			await sql.run(`UPDATE Players SET Coins = Coins + $amount WHERE ID = $id`, 
 				{ $id: playerId, $amount: existingBet.Amount });
