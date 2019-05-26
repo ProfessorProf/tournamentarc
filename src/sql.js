@@ -569,7 +569,7 @@ module.exports = {
 		await sql.run(`DELETE FROM TournamentFighters WHERE Fighter_ID = $id`, {$id: id});
 	},
 	async addBet(channel, playerId, fighterId, amount) {
-		const existingBet = await sql.get(`SELECT * FROM Bets WHERE Player_ID = $playerId AND Fighter_ID = $fighterId`,
+		const existingBet = await sql.get(`SELECT * FROM Bets WHERE Player_ID = $playerId`,
 			{ $playerId: playerId, $fighterId: fighterId });
 		if(existingBet) {
 			await sql.run(`UPDATE Players SET Coins = Coins + $amount WHERE ID = $id`, 

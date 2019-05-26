@@ -323,8 +323,6 @@ module.exports = {
 			prepText += `${fighter2.name} reaps the benefits of ${this.their(fighter2.gender)} special training!`;
 			power2 += Math.min(5, aidBonus2 - aidBonus1);
 		}
-		fighter1.aidLevel = 0;
-		fighter2.aidLevel = 0;
 
 		// Get style modifiers
 		const matchup1 = fighter1.style.matchups.find(m => m.id == fighter2.style.id);
@@ -416,7 +414,7 @@ module.exports = {
 	async handleFightOutcome(channel, winner, loser, winnerScore, loserScore) {
 		const tournament = await sql.getTournament(channel);
 
-		let output = await this.tournamentMatch(tournament, winner, winnerScore - loserScore);
+		let output = await this.tournamentMatch(tournament, winner, loser, winnerScore - loserScore);
 		
 		// Save changes
 		await sql.setFighter(loser);
@@ -1102,7 +1100,7 @@ module.exports = {
 		let odds = Math.min(20, Math.max(1.1, Math.floor(ratio * 10) / 10));
 		return odds;
 	},
-	async tournamentMatch(tournament, winnerFighter, powerDifference) {
+	async tournamentMatch(tournament, winnerFighter, loserFighter, powerDifference) {
 		let winner = tournament.fighters.find(f => f && f.id == winnerFighter.id);
 		const winnerPosition = winner.position;
 		const loserPosition = winnerPosition % 2 == 0 ? winnerPosition + 1 : winnerPosition - 1;
@@ -1127,6 +1125,9 @@ module.exports = {
 			// Battle over!
 			winner.status = enums.TournamentFighterStatuses.Won;
 			loser.status = enums.TournamentFighterStatuses.Lost;
+
+			winnerFighter.aidLevel = 0;
+			loserFighter.aidLevel = 0;
 
 			if(tournament.fighters.length == 2) {
 				await sql.eliminateFighter(loser.id);

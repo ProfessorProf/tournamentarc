@@ -13,7 +13,7 @@ module.exports = {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
                 .addField('!help info', 'Help with informational commands: !check, !fighter, !fighters, !players, !next, !tournament.')
-                .addField('!help actions', 'Help with other commands: !tournament, !bet, !give.')
+                .addField('!help actions', 'Help with other commands: !aid, !bet, !give.')
                 .addField('!help battle', 'Help with the mechanics of combat.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
