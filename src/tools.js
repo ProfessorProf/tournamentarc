@@ -317,10 +317,10 @@ module.exports = {
 		const aidBonus1 = Math.floor(aid1/aid2) * 5;
 		const aidBonus2 = Math.floor(aid2/aid1) * 5;
 		if(aidBonus1 > aidBonus2) {
-			prepText += `${fighter1.name} reaps the benefits of ${this.their(fighter1.gender)} special training!`;
+			prepText += `\n${fighter1.name} reaps the benefits of ${this.their(fighter1.gender)} special training!`;
 			power1 += Math.min(5, aidBonus1 - aidBonus2);
 		} else if(aidBonus2 > aidBonus1) {
-			prepText += `${fighter2.name} reaps the benefits of ${this.their(fighter2.gender)} special training!`;
+			prepText += `\n${fighter2.name} reaps the benefits of ${this.their(fighter2.gender)} special training!`;
 			power2 += Math.min(5, aidBonus2 - aidBonus1);
 		}
 
@@ -1296,26 +1296,38 @@ module.exports = {
 			return `${player.name} has bet ${amount} coins on ${fighter.name}'s victory.`;
 		} else {
 			// Display betting info
+			let embed = new Discord.RichEmbed();
+			
 			for(let i = 0; i < tournament.fighters.length; i += 2) {
 				const leftFighter = tournament.fighters[i];
 				const rightFighter = tournament.fighters[i+1];
 	
+				embed.setTitle(`Betting: ${leftFighter.name} VS ${rightFighter.name}`)
+				.setColor(0x00AE86);
+
 				if(leftFighter && rightFighter) {
 					if(leftFighter.status == enums.TournamentFighterStatuses.Pending) {
-						let embed = new Discord.RichEmbed();
-						embed.setTitle(`Betting Rates: ${leftFighter.name} VS ${rightFighter.name}`)
-							.setColor(0x00AE86);
-						
 						let description = '';
 						description += `Bet on ${leftFighter.name}: x${leftFighter.odds} returns`;
 						description += `\nBet on ${rightFighter.name}: x${rightFighter.odds} returns`;
 						description += `\nMinimum bet: ${tournament.round * 10} coins`;
 
 						embed.setDescription(description);
-						return embed;
+						break;
 					}
 				}
 			}
+			const bets = await sql.getBets(player.channel);
+			let betLines = [];
+			for(const bet of bets) {
+				const p = await sql.getPlayerById(bet.playerId);
+				const f = await sql.getFighterById(bet.fighterId);
+				betLines.push(`${p.name}: ${bet.amount} coins on ${f.name}`);
+			}
+			if(betLines.length > 0) {
+				embed.addField('Outstanding Bets', betLines.join('\n'));
+			}
+			return embed;
 		}
 	},
 	async aid(player, fighter, amount) {
