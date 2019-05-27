@@ -1105,7 +1105,6 @@ module.exports = {
 		const winnerPosition = winner.position;
 		const loserPosition = winnerPosition % 2 == 0 ? winnerPosition + 1 : winnerPosition - 1;
 		let loser = tournament.fighters[loserPosition];
-		const loserFighter = await sql.getFighterById(loser.id);
 
 		if(powerDifference > 9) {
 			winner.score += 2;
