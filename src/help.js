@@ -1,6 +1,4 @@
 const Discord = require("discord.js");
-const sql = require('./sql.js');
-const enums = require('./enum.js');
 
 // Logic for displaying help topics.
 module.exports = {
@@ -13,7 +11,7 @@ module.exports = {
             output.setDescription('To start playing right away, enter `!reg name`! To learn more about a command, enter `!help command`. For more game info:')
                 .addField('!help basic', "Help with the game's basic commands: !reg, !check, !config.")
                 .addField('!help info', 'Help with informational commands: !check, !fighter, !fighters, !players, !next, !tournament.')
-                .addField('!help actions', 'Help with other commands: !aid, !bet, !give.')
+                .addField('!help actions', 'Help with other commands: !sponsor, !bet, !give.')
                 .addField('!help battle', 'Help with the mechanics of combat.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
@@ -30,7 +28,7 @@ module.exports = {
                     output.setTitle('Help: Actions')
                         .setDescription('To get more info on any command, enter `!help commandname`.')
                         .addField('!bet name amount', `Bet coins on a fighter's victory.`)
-                        .addField('!aid name amount', `Invest coins in a fighter's training.`)
+                        .addField('!sponsor name', `Sponsor a fighter for the duration of the tournament.`)
                         .addField('!give name amount', `Give coins to another player.`);
                     break;
                 case 'info':
@@ -115,8 +113,9 @@ module.exports = {
                 embed.addField('!bet', 'Displays info about betting odds on the upcoming match.');
                 embed.addField('!bet name amount', 'Bet coins on a fighter in the upcoming match.');
                 break;
-            case 'aid':
-                embed.addField('!aid name amount', `Invest coins in a fighter's training, boosting their strength in their next battle.`);
+            case 'sponsor':
+                embed.addField('!sponsor name', `Become a fighter's sponsor. Sponsoring a fighter is free, but you can only sponsor one fighter, and you can't back out or change fighters for the duration of the tournament.\n` +
+                    `A fighter will gain one strength for each sponsor they receive, up to a maximum bonus of three. Each time a fighter you've sponsored wins a battle, you'll gain gold - however, you otherwise cannot bet on matches that include that fighter.`);
                 break;
             case 'give':
                 embed.addField('!give name amount', `Give coins to another player`);

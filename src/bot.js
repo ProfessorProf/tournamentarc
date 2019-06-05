@@ -31,7 +31,7 @@ client.on('ready', () => {
 						const downtime = now - world.lastUpdate
 						console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
 						if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
-							await sql.fastForward(c, downtime);
+							// await sql.fastForward(c, downtime);
 							channel.send(`Bot was offline for about ${tools.getTimeString(downtime)}.`);
 						}
 					}
@@ -249,8 +249,8 @@ async function handleMessage(message) {
 			output.messages = await tools.bet(player, target, args[1]);
 			output.informational = args.length == 0;
 			break;
-		case 'aid':
-			output.messages = await tools.aid(player, target, args[1]);
+		case 'sponsor':
+			output.messages = await tools.sponsor(player, target);
 			break;
 		case 'config':
 			output.messages = await tools.config(player, args[0], args[1]);

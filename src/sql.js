@@ -10,14 +10,15 @@ const initTablesSql = `CREATE TABLE IF NOT EXISTS Worlds (ID INTEGER PRIMARY KEY
 CREATE TABLE IF NOT EXISTS Players (ID INTEGER PRIMARY KEY, Username TEXT, User_ID TEXT, Name TEXT, Channel TEXT, Coins INTEGER, Last_Active INTEGER);
 CREATE TABLE IF NOT EXISTS Config (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Key TEXT, Value TEXT);
 CREATE TABLE IF NOT EXISTS Fighters (ID INTEGER PRIMARY KEY, Channel TEXT, Name TEXT, Strength INTEGER, Gender TEXT, Orientation TEXT, Style INTEGER, 
-	Aid_Level INTEGER, Preferred_Mood INTEGER, Mood INTEGER);
+	Sponsors INTEGER, Preferred_Mood INTEGER, Mood INTEGER);
 CREATE TABLE IF NOT EXISTS FighterRelationships (Fighter_ID INTEGER, Related_Fighter_ID INTEGER, Type INTEGER);
 CREATE TABLE IF NOT EXISTS Styles (ID INTEGER PRIMARY KEY, Channel TEXT, Name TEXT);
 CREATE TABLE IF NOT EXISTS StyleMatchups (Attacker_ID INTEGER, Defender_ID INTEGER, Matchup INTEGER);
 CREATE TABLE IF NOT EXISTS Tournaments (Channel TEXT, Status INTEGER, Round INTEGER, Next_Match INTEGER, Next_Attack INTEGER);
-CREATE TABLE IF NOT EXISTS TournamentFighters (Channel TEXT, Fighter_ID INTEGER, Position INTEGER, Status INTEGER, Score INTEGER, Odds REAL);
-CREATE TABLE IF NOT EXISTS History (ID INTEGER PRIMARY KEY, Channel TEXT, Fight_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER);
+CREATE TABLE IF NOT EXISTS TournamentFighters (Channel TEXT, Fighter_ID INTEGER, Position INTEGER, Status INTEGER, Score INTEGER, Odds REAL, Bracket INTEGER);
+CREATE TABLE IF NOT EXISTS History (ID INTEGER PRIMARY KEY, Fight_Time INTEGER, Winner_ID INTEGER, Loser_ID INTEGER, Winner_Score INTEGER, Loser_Score INTEGER);
 CREATE TABLE IF NOT EXISTS Bets (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Fighter_ID INTEGER, Amount INTEGER);
+CREATE TABLE IF NOT EXISTS Sponsorships (ID INTEGER PRIMARY KEY, Channel TEXT, Player_ID INTEGER, Fighter_ID INTEGER);
 CREATE UNIQUE INDEX IF NOT EXISTS Worlds_Channel ON Worlds(Channel);
 CREATE UNIQUE INDEX IF NOT EXISTS Players_ID ON Players(ID); 
 CREATE UNIQUE INDEX IF NOT EXISTS Fighter_ID ON Players(ID); 
@@ -26,9 +27,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS FighterRelationships_FighterFighter ON Fighter
 CREATE UNIQUE INDEX IF NOT EXISTS Styles_ID ON Styles(ID);
 CREATE UNIQUE INDEX IF NOT EXISTS StyleMatchups_StyleStyle ON StyleMatchups(Attacker_ID, Defender_ID);
 CREATE UNIQUE INDEX IF NOT EXISTS Tournaments_Channel ON Tournaments(Channel);
-CREATE UNIQUE INDEX IF NOT EXISTS TournamentFighters_ChannelFighter ON TournamentFighters(Channel, Fighter_ID);
+CREATE UNIQUE INDEX IF NOT EXISTS TournamentFighters_ChannelFighterBracket ON TournamentFighters(Channel, Fighter_ID, Bracket);
 CREATE UNIQUE INDEX IF NOT EXISTS History_ID ON History(ID);
-CREATE UNIQUE INDEX IF NOT EXISTS Bet_Player ON Bets(Player_ID)`
+CREATE UNIQUE INDEX IF NOT EXISTS Bet_Player ON Bets(Player_ID);
+CREATE UNIQUE INDEX IF NOT EXISTS Sponsor_Player ON Sponsors(Player_ID)`
 
 const newChannelSql = `DELETE FROM Worlds WHERE Channel = $channel;
 INSERT OR REPLACE INTO Worlds (Channel, Start_Time, Last_Update) VALUES ($channel, $now, $now)`;
@@ -164,7 +166,7 @@ module.exports = {
 		const existingFighter = await sql.get(`SELECT ID FROM Fighters WHERE ID = $id`, { $id: fighter.id });
 		if(existingFighter) {
 			await sql.run(`UPDATE Fighters SET Channel = $channel, Name = $name, Strength = $strength, Preferred_Mood = $preferredMood,
-				Mood = $mood, Style = $style, Gender = $gender, Orientation = $orientation, Aid_Level = $aidLevel
+				Mood = $mood, Style = $style, Gender = $gender, Orientation = $orientation
 				WHERE ID = $id`,
 				{
 					$id: fighter.id,
@@ -175,13 +177,12 @@ module.exports = {
 					$mood: fighter.mood,
 					$style: fighter.style.id,
 					$gender: fighter.gender,
-					$orientation: fighter.orientation,
-					$aidLevel: fighter.aidLevel
+					$orientation: fighter.orientation
 				});
 			return fighter.id;
 		} else {
-			const result = await sql.run(`INSERT INTO Fighters (Channel, Name, Strength, Preferred_Mood, Mood, Style, Gender, Orientation, Aid_Level)
-				VALUES ($channel, $name, $strength, $preferredMood, $mood, $style, $gender, $orientation, $aidLevel)`,
+			const result = await sql.run(`INSERT INTO Fighters (Channel, Name, Strength, Preferred_Mood, Mood, Style, Gender, Orientation)
+				VALUES ($channel, $name, $strength, $preferredMood, $mood, $style, $gender, $orientation)`,
 				{
 					$channel: fighter.channel,
 					$name: fighter.name,
@@ -190,8 +191,7 @@ module.exports = {
 					$mood: fighter.mood,
 					$style: fighter.style.id,
 					$gender: fighter.gender,
-					$orientation: fighter.orientation,
-					$aidLevel: fighter.aidLevel
+					$orientation: fighter.orientation
 				});
 			let fighterId = result.lastID;
 			return fighterId;
@@ -231,10 +231,13 @@ module.exports = {
 	async getFighterInternal(fighterRow) {
 		if(fighterRow) {
 			const styleMatchups = await sql.all(`SELECT * FROM StyleMatchups WHERE Attacker_ID = $id`, { $id: fighterRow.Style });
-			const relationships = await sql.all(`SELECT fr.*, f.Name FROM FighterRelationships fr
+			const relationshipRows = await sql.all(`SELECT fr.*, f.Name FROM FighterRelationships fr
 				JOIN Fighters f ON fr.Related_Fighter_ID = f.ID
 				WHERE Fighter_ID = $id
 				ORDER BY fr.Type`, { $id: fighterRow.ID });
+			const sponsorshipRows = await sql.all(`SELECT s.*, p.Name FROM Sponsorships s
+				JOIN Players p ON s.Player_ID = p.ID
+				WHERE s.Fighter_ID = $id`, { $id: fighterRow.ID });
 			let fighter = {
 				id: fighterRow.ID,
 				channel: fighterRow.Channel,
@@ -244,13 +247,13 @@ module.exports = {
 				mood: fighterRow.Mood,
 				gender: fighterRow.Gender,
 				orientation: fighterRow.Orientation,
-				aidLevel: fighterRow.Aid_Level,
 				style: {
 					id: fighterRow.StyleId,
 					name: fighterRow.StyleName,
 					matchups: []
 				},
-				relationships: []
+				relationships: [],
+				sponsorships: []
 			}
 
 			for(const i in styleMatchups) {
@@ -261,12 +264,20 @@ module.exports = {
 				});
 			}
 
-			for(const i in relationships) {
-				const relationship = relationships[i];
+			for(const i in relationshipRows) {
+				const relationship = relationshipRows[i];
 				fighter.relationships.push({
 					id: relationship.Related_Fighter_ID,
 					type: relationship.Type,
 					name: relationship.Name
+				});
+			}
+
+			for(const i in sponsorshipRows) {
+				const sponsorship = sponsorshipRows[i];
+				fighter.sponsorships.push({
+					id: sponsorship.Player_ID,
+					name: sponsorship.Name
 				});
 			}
 
@@ -291,12 +302,22 @@ module.exports = {
 			});
 	},
 	async addRelationship(fighter, targetId, type) {
-		await sql.run(`INSERT OR REPLACE INTO FighterRelationships (Fighter_ID, Related_Fighter_ID, Type) VALUES ($id, $relatedId, $type)`,
-		{
-			$id: fighter.id,
-			$relatedId: targetId,
-			$type: type
-		});
+		const existingRelationship = await sql.get(`SELECT * FROM FighterRelationships WHERE Fighter_ID = $fighterId AND Related_Fighter_ID = $targetId`,
+			{ $fighterId: fighter.id, $targetId: targetId });
+		
+		if(existingRelationship) {
+			await sql.run(`UPDATE FighterRelationships 
+				SET Type = $type
+				WHERE Fighter_ID = $fighterId AND Related_Fighter_ID = $targetId`,
+			{ $fighterId: fighter.id, $targetId: targetId, $type: type });
+		} else {
+			await sql.run(`INSERT OR REPLACE INTO FighterRelationships (Fighter_ID, Related_Fighter_ID, Type) VALUES ($id, $relatedId, $type)`,
+			{
+				$id: fighter.id,
+				$relatedId: targetId,
+				$type: type
+			});
+		}
 	},
 	async deleteRelationship(fighter, targetId) {
 		await sql.run(`DELETE FROM FighterRelationships WHERE Fighter_ID = $id AND Related_Fighter_ID = $relatedId`,
@@ -353,6 +374,8 @@ module.exports = {
     async getPlayerInternal(row) {
 		const now = new Date().getTime();
 		const configRows = await sql.all(`SELECT * FROM Config WHERE Player_ID = $id`, {$id: row.ID});
+		const sponsorshipRow = await sql.get(`SELECT s.ID, f.Name FROM Sponsorships s
+			LEFT JOIN Fighters f ON f.ID = s.Fighter_ID WHERE Player_ID = $id`, {$id: row.ID});
 
 		let player = {
 			id: row.ID,
@@ -382,6 +405,13 @@ module.exports = {
 			} else {
 				player.config[i] = enums.Configs.Defaults[i];
 			}
+		}
+
+		if(sponsorshipRow) {
+			player.sponsored = {
+				id: sponsorshipRow.ID,
+				name: sponsorshipRow.Name
+			};
 		}
 		
 		return player;
@@ -446,8 +476,10 @@ module.exports = {
 
 		return styleId;
 	},
-	async addHistory(channel, winnerId, loserId) {
-		// TODO
+	async addHistory(winnerId, loserId, winnerScore, loserScore) {
+		await sql.run(`INSERT INTO History (Winner_ID, Winner_Score, Loser_ID, Loser_Score)
+			VALUES ($winnerId, $winnerScore, $loserId, $loserScore)`, 
+			{ $winnerId: winnerId, $winnerScore: winnerScore, $loserId: loserId, $loserScore: loserScore});
 	},
 	async resetWorld(channel) {
 		const now = new Date().getTime();
@@ -488,6 +520,16 @@ module.exports = {
 		await sql.run(`UPDATE Players SET Last_Active = $now WHERE ID = $id`, {$id: player.id, $now: now});
 	},
 	async getHistory(fighter1Id, fighter2Id) {
+		const history = fighter2Id ? await sql.all(`SELECT * FROM History WHERE (Winner_ID = $id1 AND Loser_ID = $id2) OR (Winner_ID = $id2 AND Loser_ID = $id1)`,
+			{ $id1: fighter1Id, $id2: fighter2Id })
+			: await sql.all(`SELECT * FROM History WHERE Winner_ID = $id1 OR Loser_ID = $id1`, { $id1: fighter1Id });
+		
+		return history.map(h => { return {
+			winnerId: h.Winner_ID,
+			loserId: h.Loser_ID,
+			winnerScore: h.Winner_Score,
+			loserScore: h.Loser_Score
+		}});
 	},
 	async fastForward(channel, time) {
 		await sql.run(`UPDATE Worlds SET Last_Update = Last_Update + $time WHERE Channel = $channel`,
@@ -504,7 +546,7 @@ module.exports = {
 		const tournamentRow = await sql.get(`SELECT * FROM Tournaments WHERE Channel = $channel`, {$channel: channel});
 		const fighterRows = await sql.all(`SELECT t.*, f.Name FROM TournamentFighters t
 			LEFT JOIN Fighters f ON f.ID = t.Fighter_ID
-			WHERE t.Channel = $channel ORDER BY t.Position`, {$channel: channel});
+			WHERE t.Channel = $channel ORDER BY t.Bracket, t.Position`, {$channel: channel});
 
 		if(!tournamentRow) {
 			return null;
@@ -521,7 +563,8 @@ module.exports = {
 				position: row.Position,
 				status: row.Status,
 				score: row.Score,
-				odds: row.Odds
+				odds: row.Odds,
+				bracket: row.Bracket
 			});
 		}
 
@@ -548,12 +591,13 @@ module.exports = {
 		if(tournament.fighters) {
 			for(const fighter of tournament.fighters) {
 				if(fighter) {
-					const existingFighter = await sql.get(`SELECT * FROM TournamentFighters WHERE Fighter_ID = $id`, {$id: fighter.id});
+					const existingFighter = await sql.get(`SELECT * FROM TournamentFighters WHERE Fighter_ID = $id AND Bracket = $bracket`, {$id: fighter.id, $bracket: bracket});
 					if(existingFighter) {
-						await sql.run(`UPDATE TournamentFighters SET Position = $position, Status = $status, Score = $score, Odds = $odds WHERE Fighter_ID = $id`, 
-							{ $id: fighter.id, $position: fighter.position, $status: fighter.status, $score: fighter.score, $odds: fighter.odds });
+						await sql.run(`UPDATE TournamentFighters SET Position = $position, Status = $status, Score = $score, Odds = $odds
+							WHERE Fighter_ID = $id AND Bracket = $bracket`, 
+							{ $id: fighter.id, $position: fighter.position, $status: fighter.status, $score: fighter.score, $odds: fighter.odds, $bracket: fighter.bracket });
 					} else {
-						await this.joinTournament(tournament.channel, fighter.id, fighter.position, fighter.odds);
+						await this.joinTournament(tournament.channel, fighter.id, fighter.position, fighter.odds, fighter.bracket);
 					}
 				}
 			}
@@ -561,9 +605,14 @@ module.exports = {
 			await sql.run(`DELETE FROM TournamentFighters WHERE Channel = $channel`, {$channel: tournament.channel});
 		}
 	},
-	async joinTournament(channel, id, position, odds) {
-		await sql.run(`INSERT OR REPLACE INTO TournamentFighters (Channel, Fighter_ID, Position, Score, Status, Odds) VALUES ($channel, $id, $position, 0, 0, $odds)`, 
-			{ $channel: channel, $id: id, $position: position, $odds: odds });
+	async joinTournament(channel, id, position, odds, bracket) {
+		const existingRow = await sql.get(`SELECT * FROM TournamentFighters WHERE Fighter_ID = $id AND Bracket = $bracket`);
+		if(existingRow) {
+			await sql.run(`DELETE FROM TournamentFighters WHERE Fighter_ID = $id AND Bracket = $bracket`);
+		}
+		await sql.run(`INSERT INTO TournamentFighters (Channel, Fighter_ID, Position, Score, Status, Odds, Bracket) 
+			VALUES ($channel, $id, $position, 0, 0, $odds, $bracket)`, 
+			{ $channel: channel, $id: id, $position: position, $odds: odds, $bracket: bracket });
 	},
 	async eliminateFighter(id) {
 		await sql.run(`DELETE FROM TournamentFighters WHERE Fighter_ID = $id`, {$id: id});
@@ -583,6 +632,16 @@ module.exports = {
 			await sql.run(`INSERT INTO Bets (Channel, Player_ID, Fighter_ID, Amount) VALUES ($channel, $playerId, $fighterId, $amount)`,
 				{ $channel: channel, $playerId: playerId, $fighterId: fighterId, $amount: amount });
 		}
+	},
+	async addSponsor(playerId, fighterId) {
+		const existingSponsorship = await sql.get(`SELECT * FROM Sponsorships WHERE Player_ID = $playerId`,
+			{ $playerId: playerId });
+		if(existingSponsorship) {
+			await sql.run(`DELETE FROM Sponsorships WHERE ID = $id`, { $id: existingSponsorship.ID });
+		}
+
+		await sql.run(`INSERT INTO Sponsorships (Player_ID, Fighter_ID) VALUES ($playerId, $fighterId)`,
+			{ $playerId: playerId, $fighterId: fighterId });
 	},
 	async getBets(channel) {
 		const betRows = await sql.all(`SELECT * FROM Bets WHERE Channel = $channel`, { $channel: channel });

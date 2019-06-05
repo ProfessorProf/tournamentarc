@@ -1,3 +1,3 @@
 module.exports = {
-    MatchMinutes: 60 * 12
+    MatchMinutes: 5
 }

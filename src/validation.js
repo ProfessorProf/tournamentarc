@@ -3,8 +3,6 @@ const sql = require('./sql.js');
 const auth = require('../auth.json');
 const enums = require('./enum.js');
 
-let hour = (60 * 60 * 1000);
-
 module.exports = {
     // Returns an error string if the command is illegal
     async validate(channel, player, target, cmd, args) {
@@ -64,7 +62,7 @@ module.exports = {
 					this.validatePlayerRegistered(errors, player);
 					switch(args[0]) {
 						case 'start':
-							if(player.username != auth.admin) {
+							if(!player || player.username != auth.admin) {
 								errors.push('Only the game master can begin the first tournament.');
 							}
 							if(tournament && tournament.status == enums.TournamentStatuses.Active) {
@@ -113,6 +111,9 @@ module.exports = {
 									if(target.id != leftFighter.id && target.id != rightFighter.id) {
 										errors.push(`That fighter isn't participating in the next battle.`);
 									}
+									if(player.sponsored.id == leftFighter.id || player.sponsored.id == rightFighter.id) {
+										errors.push(`You can't bet on a sponsored match.`);
+									}
 									break;
 								}
 							}
@@ -122,33 +123,26 @@ module.exports = {
 					errors.push(`There isn't a tournament going on.`);
 				}
 				break;
-			case 'aid':
+			case 'sponsor':
 				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
-					const amount = parseInt(args[1]);
-					if(amount != amount || amount < 0) {
-						errors.push('Invalid amount of coins.');
-					} else if(amount != Math.floor(amount)) {
-						errors.push('Amount must be an integer.');
-					}
 					if(!target) {
 						errors.push(`Couldn't find that fighter.`);
 					}
-					if(args.length == 1) {
-						errors.push('Format: `!aid amount fighter`');
-					}
+				} else {
+					errors.push('Format: `!sponsor fighter`');
 				}
 				if(tournament) {
+					if(player.sponsored) {
+						errors.push(`You already sponsored a fighter.`);
+					}
 					if(tournament.status == enums.TournamentStatuses.Complete) {
 						errors.push(`The tournament is already over.`);
 					}
 					if(target) {
 						if(tournament.status == enums.TournamentStatuses.Active &&
 							tournament.nextAttack != tournament.nextMatch) {
-							errors.push(`You can't aid while a battle is ongoing.`);
-						}
-						if(!tournament.fighters.find(f => f.id == target.id)) {
-							errors.push(`That fighter isn't in the tournament.`);
+							errors.push(`You sponsor fighters during a battle.`);
 						}
 					}
 				} else {

@@ -43,8 +43,8 @@ module.exports = {
             1: 'Tired',
             2: 'Worried',
             3: 'Calm',
-            4: 'Happy', 
-            5: 'Confident', 
+            4: 'Happy',
+            5: 'Confident',
             6: 'Determined'
         }
     },
@@ -53,5 +53,9 @@ module.exports = {
         Hate: 1,
         Rival: 2,
         Friend: 3
+    },
+    Brackets: {
+        Winners: 0,
+        Losers: 1
     }
 }
