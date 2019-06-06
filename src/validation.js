@@ -44,6 +44,7 @@ module.exports = {
 				}
 				break;
 			case 'check':
+			case 'config':
 				this.validatePlayerRegistered(errors, player);
 				break;
 			case 'reset':
