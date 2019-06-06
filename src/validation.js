@@ -58,8 +58,8 @@ module.exports = {
 				break;
 			case 'tourney':
 			case 'tournament':
+				this.validatePlayerRegistered(errors, player);
 				if(args.length > 0) {
-					this.validatePlayerRegistered(errors, player);
 					switch(args[0]) {
 						case 'start':
 							if(!player || player.username != auth.admin) {
@@ -70,6 +70,12 @@ module.exports = {
 							}
 							break;
 					}
+				}
+				break;
+			case 'fighter':
+			case 'history':
+				if(!target) {
+					errors.push(`Couldn't find that fighter.`);
 				}
 				break;
 			case 'bet':

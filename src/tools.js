@@ -3,6 +3,7 @@ const settings = require('./settings.js');
 const sql = require('./sql.js');
 const templates = require('./templates.js');
 const Discord = require("discord.js");
+const moment = require("moment");
 const hour = (60 * 60 * 1000);
 
 module.exports = {
@@ -54,8 +55,8 @@ module.exports = {
 		stats += `\nStyle: ${fighter.style.name}`;
 
 		const history = await sql.getHistory(fighter.id);
-		const wins = history.filter(h => h.winnerId == fighter.id).length;
-		const losses = history.filter(h => h.loserId == fighter.id).length;
+		const wins = history.filter(h => h.winner.id == fighter.id).length;
+		const losses = history.filter(h => h.loser.id == fighter.id).length;
 		stats += `\nRecord: ${wins}-${losses}`;
 
 		if(fighter.sponsorships.length > 0) {
@@ -84,6 +85,38 @@ module.exports = {
 		}
 
 		embed.setDescription(stats);
+
+		return embed;
+	},
+	async history(fighter) {
+		if(!fighter) {
+			console.log('Fighter not found');
+			return null;
+		}
+		let embed = new Discord.RichEmbed();
+		embed.setTitle(`${fighter.name.toUpperCase()} HISTORY`)
+			.setColor(0x00AE86);
+
+		let output = '';
+		const history = await sql.getHistory(fighter.id);
+		const wins = history.filter(h => h.winner.id == fighter.id).length;
+		const losses = history.filter(h => h.loser.id == fighter.id).length;
+		output += `Record: ${wins}-${losses}\n`;
+
+		for(const match of history) {
+			if(output.length > 1950) {
+				output += '\n...';
+				break;
+			}
+			const fightDate = moment(match.date).format('MMM Do');
+			if(match.winner.id == fighter.id) {
+				output += `\n${fightDate}: Beat ${match.loser.name} (${match.winner.score}-${match.loser.score})`;
+			} else {
+				output += `\n${fightDate}: Lost to ${match.winner.name} (${match.loser.score}-${match.winner.score})`;
+			}
+		}
+
+		embed.setDescription(output);
 
 		return embed;
 	},
@@ -131,10 +164,8 @@ module.exports = {
             }
             output += minutes + (minutes > 1 ? ' minutes' : ' minute');
         }
-        if(seconds) {
-            if(output) output += ' and ';
-            output += seconds + (seconds > 1 ? ' seconds' : ' second');
-        }
+		if(output) output += ' and ';
+		output += seconds + (seconds != 1 ? ' seconds' : ' second');
         
         return output;
 	},
@@ -429,7 +460,7 @@ module.exports = {
 		return embed;
 	},
 	// Process updates based on who won and lost a fight.
-	async handleFightOutcome(channel, winner, loser, winnerScore, loserScore) {
+	async handleFightOutcome(channel, winner, loser, winnerScore, loserScore,) {
 		const tournament = await sql.getTournament(channel);
 
 		let output = await this.tournamentMatch(tournament, winner, loser, winnerScore - loserScore);
@@ -706,10 +737,18 @@ module.exports = {
 		if(!tournament || tournament.status == enums.TournamentStatuses.Off) {
 			output = "There isn't a tournament going on.";
 		} else {
-			let names = tournament.fighters.filter(f => f).map(f => f.name);
+			let names = [...new Set(tournament.fighters.filter(f => f).map(f => f.name))];
 			switch(tournament.status) {
 				case enums.TournamentStatuses.Active:
-					if(tournament.fighters.length == 2) {
+					let winnerMatches = [];
+					let loserMatches = [];
+					let nextMatch = true;
+					let winnerBracket = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Winners);
+					let loserBracket = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Losers);
+					
+					if(winnerBracket.length == 2 && loserBracket.length == 0) {
+						output += `CHAMPIONSHIP FINALS\n`;
+					} else if(winnerBracket.length == 2 && loserBracket.length == 2) {
 						output += `FINAL ROUND\n`;
 					} else if(tournament.fighters.length == 4) {
 						output += `SEMIFINAL ROUND\n`;
@@ -718,15 +757,10 @@ module.exports = {
 					}
 					output += `Remaining Fighters: ${names.join(', ')}\n\n`;
 
-					let winnerMatches = [];
-					let loserMatches = [];
-					let nextMatch = true;
-					let winnerBracket = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Winners);
-					let loserBracket = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Losers);
 
 					for(let i = 0; i < winnerBracket.length; i += 2) {
-						const leftFighter = winnerBracket[i];
-						const rightFighter = winnerBracket[i+1];
+						const leftFighter = winnerBracket.find(f => f.position == i);
+						const rightFighter = winnerBracket.find(f => f.position == i + 1);
 
 						if(leftFighter && rightFighter) {
 							let match = '';
@@ -759,9 +793,9 @@ module.exports = {
 					embed.addField(`Winner's Bracket`, winnerMatches.join('\n'));
 
 					if(loserBracket.length > 0) {
-						for(let i = 0; i < loserBracket.length; i += 2) {
-							const leftFighter = loserBracket[i];
-							const rightFighter = loserBracket[i+1];
+						for(let i = 0; i < Math.max(...loserBracket.map(f => f.position)) + 1; i += 2) {
+							const leftFighter = loserBracket.find(f => f.position == i);
+							const rightFighter = loserBracket.find(f => f.position == i + 1);
 	
 							if(leftFighter && rightFighter) {
 								let match = '';
@@ -789,6 +823,9 @@ module.exports = {
 										match += ` (${rightFighter.name} won)`;
 								}
 								loserMatches.push(match);
+							} else if(leftFighter || rightFighter) {
+								let fighter = leftFighter ? leftFighter : rightFighter;
+								loserMatches.push(`${fighter.name}: Waiting for opponent`);
 							}
 						}
 						if(loserMatches.length > 0) {
@@ -1073,10 +1110,8 @@ module.exports = {
 		return odds;
 	},
 	async tournamentMatch(tournament, winnerFighter, loserFighter, powerDifference) {
-		let winner = tournament.fighters.find(f => f && f.id == winnerFighter.id);
-		const winnerPosition = winner.position;
-		const loserPosition = winnerPosition % 2 == 0 ? winnerPosition + 1 : winnerPosition - 1;
-		let loser = tournament.fighters[loserPosition];
+		let winner = tournament.fighters.find(f => f && f.id == winnerFighter.id && f.status == enums.TournamentFighterStatuses.Pending);
+		let loser = tournament.fighters.find(f => f && f.id == loserFighter.id && f.status == enums.TournamentFighterStatuses.Pending);
 
 		if(powerDifference > 9) {
 			winner.score += 2;
@@ -1096,15 +1131,20 @@ module.exports = {
 			// Battle over!
 			winner.status = enums.TournamentFighterStatuses.Won;
 
-			if(loser.bracket == enums.Brackets.Winners) {
+			if(loser.bracket == enums.Brackets.Winners && tournament.round < 3) {
 				// Add loser to loser's bracket match list
 				const losers = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Losers);
-				const loserPosition = losers.length == 0 ? 0 : Math.max(losers.map(f => f.position)) + 1;
+				let loserPosition = 0;
+				while(losers.find(f => f.position == loserPosition)) {
+					loserPosition++;
+				}
+
 				let loserBracketMatch = {
 					id: loser.id,
 					position: loserPosition,
 					bracket: enums.Brackets.Losers,
-					status: enums.TournamentFighterStatuses.Pending
+					status: enums.TournamentFighterStatuses.Pending,
+					score: 0
 				};
 				tournament.fighters.push(loserBracketMatch);
 				if(loserPosition % 2 == 1) {
@@ -1112,15 +1152,52 @@ module.exports = {
 					const foe = tournament.fighters.find(f => f && f.position == loserPosition - 1 && f.bracket == enums.Brackets.Losers);
 					
 					const mistake = this.roll() < 3;
-					loserBracketMatch.odds = this.getOdds(loserBracketMatch, foe, tournament.round, mistake);
-					foe.odds = this.getOdds(foe, loserBracketMatch, tournament.round, mistake);
+					loserBracketMatch.odds = this.getOdds(await sql.getFighterById(loserBracketMatch.id), 
+						await sql.getFighterById(foe.id), tournament.round, mistake);
+					loserBracketMatch.odds = this.getOdds(await sql.getFighterById(foe.id), 
+						await sql.getFighterById(loserBracketMatch.id), tournament.round, mistake);
+				}
+			} else if(winner.bracket == enums.Brackets.Losers && tournament.round > 2) {
+				// If there's any unpaired winner's bracket losers, add a new match for them
+				let unpairedFighters = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Winners && f.status == enums.TournamentFighterStatuses.Lost
+					&& !tournament.fighters.find(f2 => f2 && f2.bracket == enums.Brackets.Losers && f2.id == f.id));
+				if(unpairedFighters.length > 0) {
+					const losers = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Losers);
+					let nextPosition = 0;
+					while(losers.find(f => f.position == nextPosition)) {
+						nextPosition++;
+					}
+					const nextFighter = unpairedFighters[0];
+					const winnerTournamentFighter = {
+						id: winner.id,
+						position: nextPosition,
+						bracket: enums.Brackets.Losers,
+						status: enums.TournamentFighterStatuses.Pending,
+						score: 0
+					};
+					const nextTournamentFighter = {
+						id: nextFighter.id,
+						position: nextPosition + 1,
+						bracket: enums.Brackets.Losers,
+						status: enums.TournamentFighterStatuses.Pending,
+						score: 0
+					};
+					// Set odds on new match
+					const mistake = this.roll() < 3;
+					winnerTournamentFighter.odds = this.getOdds(await sql.getFighterById(winnerTournamentFighter.id), 
+						await sql.getFighterById(nextTournamentFighter.id), tournament.round, mistake);
+					nextTournamentFighter.odds = this.getOdds(await sql.getFighterById(nextTournamentFighter.id), 
+						await sql.getFighterById(winnerTournamentFighter.id), tournament.round, mistake);
+
+					tournament.fighters.push(winnerTournamentFighter);
+					tournament.fighters.push(nextTournamentFighter);
 				}
 			}
 			loser.status = enums.TournamentFighterStatuses.Lost;
 
 			if(tournament.fighters.length == 2) {
 				await sql.eliminateFighter(loser.id);
-				tournament.fighters.splice(loserPosition, 1);
+				tournament.fighters = [winner];
 				winner.position = 0
 				output += `The tournament is over! ${winner.name} is the world's strongest warrior!`;
 				tournament.status = enums.TournamentStatuses.Complete;
@@ -1162,13 +1239,13 @@ module.exports = {
 				// Declared rivalries
 				if(!loserWinnerRelationship
 					&& this.roll() < 5) {
-					output += `\n${loser} declared ${winner} ${this.their(loser.gender)} rival!`;
+					output += `\n${loser.name} declared ${winner.name} ${this.their(loser.gender)} rival!`;
 					await sql.addRelationship(loser, winner.id, enums.Relationships.Rival);
 				}
 
 				if(!winnerLoserRelationship
 					&& this.roll() < 5) {
-					output += `\n${winner} declared ${loser} ${this.their(winner.gender)} rival!`;
+					output += `\n${winner.name} declared ${loser.name} ${this.their(winner.gender)} rival!`;
 					await sql.addRelationship(winner, loser.id, enums.Relationships.Rival);
 				}
 
@@ -1176,20 +1253,20 @@ module.exports = {
 				if(winnerLoserRelationship &&
 					winnerLoserRelationship.type == enums.Relationships.Love &&
 					(!loserWinnerRelationship || loserWinnerRelationship.type != enums.Relationships.Love) &&
-					this.roll < 8) {
-					output += `\n${winner} confessed ${this.their(winner.gender)} feelings for ${loser}! What a shock!`;
+					this.roll() < 15) {
+					output += `\n${winner.name} confessed ${this.their(winnerFighter.gender)} feelings for ${loser.name}! What a shock!`;
 
-					let loveOdds = 9;
-					loveOdds += loser.mood - 3; // Odds are affected by the confessee's mood
+					let loveOdds = 12;
+					loveOdds += loserFighter.mood - 3; // Odds are affected by the confessee's mood
 
-					switch(loser.orientation) {
+					switch(loserFighter.orientation) {
 						case 'Men':
-							if(winner.gender == 'Female') {
+							if(winnerFighter.gender == 'Female') {
 								loveOdds = 0;
 							}
 							break;
 						case 'Women':
-							if(winner.gender == 'Male') {
+							if(winnerFighter.gender == 'Male') {
 								loveOdds = 0;
 							}
 							break;
@@ -1199,34 +1276,34 @@ module.exports = {
 					}
 
 					if(loserWinnerRelationship && loserWinnerRelationship.type == enums.Relationships.Hate) {
-						loveOdds -= 10;
+						loveOdds -= 12;
 					}
 
 					if(this.roll() < loveOdds) {
-						output += `\n${loser} accepted ${winner}'s feelings!`;
+						output += `\n${loser.name} accepted ${winner.name}'s feelings!`;
 						await sql.addRelationship(loser, winner.id, enums.Relationships.Love);
 					} else {
-						output += `\n${loser} didn't accept ${winner}'s feelings...`
+						output += `\n${loser.name} didn't accept ${winner.name}'s feelings...`
 					}
 				}
 
 				if(loserWinnerRelationship &&
 					loserWinnerRelationship.type == enums.Relationships.Love &&
 					(!winnerLoserRelationship || winnerLoserRelationship.type != enums.Relationships.Love) &&
-					this.roll < 8) {
-					output += `\n${loser} confessed ${this.their(loser.gender)} feelings for ${winner}! What a shock!`;
+					this.roll() < 15) {
+					output += `\n${loser.name} confessed ${this.their(loserFighter.gender)} feelings for ${winner.name}! What a shock!`;
 	
-					let loveOdds = 13;
-					loveOdds += winner.mood - 3; // Odds are affected by the confessee's mood
+					let loveOdds = 16;
+					loveOdds += winnerFighter.mood - 3; // Odds are affected by the confessee's mood
 	
-					switch(winner.orientation) {
+					switch(winnerFighter.orientation) {
 						case 'Men':
-							if(loser.gender == 'Female') {
+							if(loserFighter.gender == 'Female') {
 								loveOdds = 0;
 							}
 							break;
 						case 'Women':
-							if(loser.gender == 'Male') {
+							if(loserFighter.gender == 'Male') {
 								loveOdds = 0;
 							}
 							break;
@@ -1236,14 +1313,14 @@ module.exports = {
 					}
 	
 					if(winnerLoserRelationship && winnerLoserRelationship.type == enums.Relationships.Hate) {
-						loveOdds -= 10;
+						loveOdds -= 12;
 					}
 	
 					if(this.roll() < loveOdds) {
-						output += `\n${winner} accepted ${loser}'s feelings!`;
+						output += `\n${winner.name} accepted ${loser.name}'s feelings!`;
 						await sql.addRelationship(loser, winner.id, enums.Relationships.Love);
 					} else {
-						output += `\n${winner} didn't accept ${loser}'s feelings...`
+						output += `\n${winner.name} didn't accept ${loser.name}'s feelings...`
 					}
 				}
 			}
@@ -1348,6 +1425,15 @@ module.exports = {
 			}
 		}
 
+		newFighters.sort((a,b) => a.bracket * 1000 + a.position - (b.bracket * 1000 + b.position));
+		for(let i = 0; i < newFighters.length; i++) {
+			const fighter = newFighters[i];
+			if(newFighters.find(f => f.id == fighter.id && f.bracket == fighter.bracket && f.position > fighter.position)) {
+				newFighters.splice(i, 1);
+				i--;
+			}
+		}
+
 		if(newFighters[0].bracket != newFighters[1].bracket) {
 			// It's time for the championship finals!
 			newFighters[0].position = 0;
@@ -1359,9 +1445,22 @@ module.exports = {
 			newFighters[0].status = enums.TournamentFighterStatuses.Pending;
 			newFighters[1].status = enums.TournamentFighterStatuses.Pending;
 		} else {
+			let nextPosition = 0;
 			for(const f of newFighters) {
 				if(f) {
-					f.position = Math.floor(f.position / 2);
+					if(f.bracket == enums.Brackets.Losers) {
+						if(tournament.round == 1) {
+							f.position -= f.position % 2;
+						} else {
+							while(newFighters.find(f => f.bracket == enums.Brackets.Losers && f.position == nextPosition)) {
+								nextPosition++;
+							}
+							f.position = nextPosition;
+							nextPosition++;
+						}
+					} else {
+						f.position = Math.floor(f.position / 2);
+					}
 					f.status = enums.TournamentFighterStatuses.Pending;
 					f.score = 0;
 				}
@@ -1373,16 +1472,18 @@ module.exports = {
 		// Generate odds
 		for(let i = 0; i < tournament.fighters.length; i += 2) {
 			const mistake = this.roll() < 3;
-			const thisFighter = tournament.fighters.find(f => f.position == i);
-			const otherFighter = tournament.fighters.find(f => f.position == i + 1);
-			const thisF = await sql.getFighterById(thisFighter.id);
-			const otherF = await sql.getFighterById(otherFighter.id);
-			thisFighter.odds = this.getOdds(thisF, otherF, tournament.round, mistake);
-			otherFighter.odds = this.getOdds(otherF, thisF, tournament.round, mistake);
+			const thisFighter = tournament.fighters[i];
+			const otherFighter = tournament.fighters.find(f => f.position == thisFighter.position + 1 && f.bracket == thisFighter.bracket);
+			if(thisFighter && otherFighter) {
+				const thisF = await sql.getFighterById(thisFighter.id);
+				const otherF = await sql.getFighterById(otherFighter.id);
+				thisFighter.odds = this.getOdds(thisF, otherF, tournament.round, mistake);
+				otherFighter.odds = this.getOdds(otherF, thisF, tournament.round, mistake);
+			}
 		}
 
 		// Give money to broke players
-		let players = await sql.getPlayers(channel);
+		let players = await sql.getPlayers(tournament.channel);
 		for(const player of players) {
 			if(player.coins < tournament.round * 10) {
 				player.coins = tournament.round * 10;
@@ -1391,9 +1492,9 @@ module.exports = {
 		}
 
 		if(tournament.fighters.length == 2) {
-			return ` It's time for the tournament finals!`;
+			return `\nIt's time for the tournament finals!`;
 		} else {
-			return ` It's time for the next round of the tournament!`;
+			return `\nIt's time for the next round of the tournament!`;
 		}
 	},
 	async bet(player, fighter, amount) {

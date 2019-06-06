@@ -233,6 +233,10 @@ async function handleMessage(message) {
 			output.messages = await tools.scanFighter(target);
 			output.informational = true;
 			break;
+		case 'history':
+			output.messages = await tools.history(target);
+			output.informational = true;
+			break;
 		case 'next':
 			output.messages = await tools.nextFighters(channel);
 			output.informational = true;
