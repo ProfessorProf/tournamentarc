@@ -46,6 +46,7 @@ module.exports = {
 
 		let stats = '';
 		stats += `Gender: ${fighter.gender}`;
+		stats += `\nAttracted to: ${fighter.orientation}`;
 		stats += `\nMood: ${enums.Moods.Name[fighter.mood]}`;
 		stats += `\nStrength: ${fighter.strength}`;
 		if(fighter.sponsorships.length > 0) {
@@ -1004,19 +1005,22 @@ module.exports = {
 					if(relationshipType == enums.Relationships.Love) {
 						switch(fighter.orientation) {
 							case 'Men':
-								if(targetFighter.gender = 'Female') validRelationship = false;
+								if(targetFighter.gender == 'Female') validRelationship = false;
 								break;
 							case 'Women':
-								if(targetFighter.gender = 'Male') validRelationship = false;
+								if(targetFighter.gender == 'Male') validRelationship = false;
 								break;
 						}
 						if(mutual) {
 							switch(targetFighter.orientation) {
 								case 'Men':
-									if(fighter.gender = 'Female') validRelationship = false;
+									if(fighter.gender == 'Female') validRelationship = false;
 									break;
 								case 'Women':
-									if(fighter.gender = 'Male') validRelationship = false;
+									if(fighter.gender == 'Male') validRelationship = false;
+									break;
+								case 'Nobody':
+									validRelationship = false;
 									break;
 							}
 						}
