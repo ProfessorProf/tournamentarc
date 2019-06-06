@@ -80,8 +80,8 @@ module.exports = {
 				break;
 			case 'bet':
 				let amount = 0;
+				this.validatePlayerRegistered(errors, player);
 				if(args.length > 0) {
-					this.validatePlayerRegistered(errors, player);
 					amount = parseInt(args[1]);
 					if(amount != amount || amount < 0) {
 						errors.push('Invalid amount of coins.');
@@ -130,8 +130,8 @@ module.exports = {
 				}
 				break;
 			case 'sponsor':
-				if(args.length > 0) {
 					this.validatePlayerRegistered(errors, player);
+				if(args.length > 0) {
 					if(!target) {
 						errors.push(`Couldn't find that fighter.`);
 					}
