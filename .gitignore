@@ -3,3 +3,4 @@
 *.sqlite-journal
 data/*
 auth.json
+package-lock.json
