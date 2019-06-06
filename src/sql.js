@@ -141,6 +141,9 @@ module.exports = {
 					$coins: player.coins,
 					$lastActive: player.lastActive
 				});
+			for(var i in player.config) {
+				this.setConfig(player.channel, player.id, i, player.config[i]);
+			}
 			return player.id;
 		} else {
 			const result = await sql.run(`INSERT INTO Players (Username, User_ID, Name, Channel, Coins, Last_Active)
@@ -292,7 +295,11 @@ module.exports = {
 				storageValue = value ? 1 : 0;
 				break;
 		}
-		await sql.run(`INSERT OR REPLACE INTO Config (Channel, Player_ID, Key, Value) VALUES ($channel, $playerId, $key, $value)`,
+		let existingRow = await sql.get(`SELECT * FROM Config WHERE Player_ID = $playerId AND Key = $key`, { $playerId: playerId, $key: key});
+		if(existingRow) {
+			await sql.run(`DELETE FROM Config WHERE Player_ID = $playerId AND Key = $key`, { $playerId: playerId, $key: key});
+		}
+		await sql.run(`INSERT INTO Config (Channel, Player_ID, Key, Value) VALUES ($channel, $playerId, $key, $value)`,
 			{
 				$channel: channel,
 				$playerId: playerId,
