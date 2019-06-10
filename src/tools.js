@@ -1158,7 +1158,7 @@ module.exports = {
 					const mistake = this.roll() < 3;
 					loserBracketMatch.odds = this.getOdds(await sql.getFighterById(loserBracketMatch.id), 
 						await sql.getFighterById(foe.id), tournament.round, mistake);
-					loserBracketMatch.odds = this.getOdds(await sql.getFighterById(foe.id), 
+					foe.odds = this.getOdds(await sql.getFighterById(foe.id), 
 						await sql.getFighterById(loserBracketMatch.id), tournament.round, mistake);
 				}
 			} else if(winner.bracket == enums.Brackets.Losers && tournament.round > 2) {
@@ -1559,21 +1559,22 @@ module.exports = {
 		}
 	},
 	async testMethod(player, param) {
-		let output = '';
-		
-		let flawLibrary = [
-			{ cost: 2, levelUp: 1, speed: 1, id: 'slow', namePattern: '^slow$' },
-			{ cost: 3, levelUp: 2, speed: 0, id: 'weakPhysicalAttacker', namePattern: '^weak physical attack' },
-			{ cost: 3, levelUp: 2, speed: 0, id: 'weakEnergyAttacker', namePattern: '^weak energy attack' }
-		];
-		let techFlawList = ['slow', 'weak physical attack'];
-		for(const flawName in techFlawList) {
-			const flawData = flawLibrary.find(f => {
-				return flawName.match(f.namePattern);
-			});
-			if(flawData) techflaws.push(flawData);
+		let tournament = await sql.getTournament(player.channel);
+		let losers = tournament.fighters.filter(f => f.bracket == 1);
+		for(let loser of losers) {
+			if(loser.position % 2 == 1) {
+				// Set odds on new match
+				const foe = tournament.fighters.find(f => f && f.position == loserPosition - 1 && f.bracket == enums.Brackets.Losers);
+				
+				const mistake = this.roll() < 3;
+				loser.odds = this.getOdds(await sql.getFighterById(loser.id), 
+					await sql.getFighterById(foe.id), tournament.round, mistake);
+				foe.odds = this.getOdds(await sql.getFighterById(foe.id), 
+					await sql.getFighterById(loser.id), tournament.round, mistake);
+			}
 		}
-		return output;
+
+		await sql.setTournament(tournament);
 	},
 	roll() {
 		return Math.floor(Math.random() * 20) + 1;
