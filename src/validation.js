@@ -118,11 +118,6 @@ module.exports = {
 									if(target.id != leftFighter.id && target.id != rightFighter.id) {
 										errors.push(`That fighter isn't participating in the next battle.`);
 									}
-									if(player.sponsored) {
-										if(player.sponsored.id == leftFighter.id || player.sponsored.id == rightFighter.id) {
-											errors.push(`You can't bet on a sponsored match.`);
-										}
-									}
 									break;
 								}
 							}
