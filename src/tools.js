@@ -1564,7 +1564,7 @@ module.exports = {
 		for(let loser of losers) {
 			if(loser.position % 2 == 1) {
 				// Set odds on new match
-				const foe = tournament.fighters.find(f => f && f.position == loserPosition - 1 && f.bracket == enums.Brackets.Losers);
+				const foe = tournament.fighters.find(f => f && f.position == loser.position - 1 && f.bracket == enums.Brackets.Losers);
 				
 				const mistake = this.roll() < 3;
 				loser.odds = this.getOdds(await sql.getFighterById(loser.id), 
