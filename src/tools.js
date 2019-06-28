@@ -46,6 +46,7 @@ module.exports = {
 
 		let stats = '';
 		stats += `Gender: ${fighter.gender}`;
+		stats += `\nAge: ${fighter.age}`;
 		stats += `\nAttracted to: ${fighter.orientation}`;
 		stats += `\nMood: ${enums.Moods.Name[fighter.mood]}`;
 		stats += `\nStrength: ${fighter.strength}`;
@@ -54,6 +55,9 @@ module.exports = {
 		}
 
 		stats += `\nStyle: ${fighter.style.name}`;
+		if(fighter.techs.length > 0) {
+			stats += `\nTechniques: ${fighter.techs.map(t => t.name).join(', ')}`;
+		}
 
 		const history = await sql.getHistory(fighter.id);
 		const wins = history.filter(h => h.winner.id == fighter.id).length;
@@ -233,6 +237,9 @@ module.exports = {
 		let headers = [7, 3, 5, 4, 8];
 		let rows = [];
 		for(const i in tournament.fighters) {
+			if(tournament.fighters[i].status == enums.TournamentFighterStatuses.Lost) {
+				continue;
+			}
 			const fighter = await sql.getFighterById(tournament.fighters[i].id);
 			
 			let row = [];
@@ -349,6 +356,7 @@ module.exports = {
 	// Fight between two players.
     async fight(fighter1, fighter2) {
 		let channel = fighter1.channel;
+		let tournament = await sql.getTournament(channel);
 
 		let embed = new Discord.RichEmbed();
 		embed.setTitle(`${fighter1.name.toUpperCase()} VS ${fighter2.name.toUpperCase()}`)
@@ -426,9 +434,82 @@ module.exports = {
 		embed.addField('Get Ready...', prepText);
 		
 		// Final battle scores!
-		const score1 = Math.max(0, power1 + this.roll());
-		const score2 = Math.max(0, power2 + this.roll());
+		let score1 = Math.max(0, power1 + this.roll());
+		let score2 = Math.max(0, power2 + this.roll());
 		
+		let battleLog = '';
+		battleLog += `${fighter1.name} Battle Power: ${score1}\n${fighter2.name} Battle Power: ${score2}\n`
+
+		// Check for potential spark
+		if(fighter1.potential > 0 && fighter1.strength < fighter2.strength && this.roll() == 20) {
+			fighter1.strength += fighter1.potential;
+			score1 += fighter1.potential;
+			fighter1.potential = 0;
+			battleLog += `${fighter1}'s true potential awakened, raising ${this.their(fighter1.gender)} strength to ${fighter1.strength} `
+				+ `and ${this.their(fighter1.gender)} battle power to ${score1}!`;
+		}
+		if(fighter2.potential > 0 && fighter2.strength < fighter1.strength && this.roll() == 20) {
+			fighter2.strength += fighter2.potential;
+			score2 += fighter2.potential;
+			fighter2.potential = 0;
+			battleLog += `${fighter2}'s true potential awakened, raising ${this.their(fighter2.gender)} strength to ${fighter2.strength} `
+				+ `and ${this.their(fighter2.gender)} battle power to ${score2}!`;
+		}
+
+		// Check for techniques
+		let tournamentFighter1 = tournament.fighters.find(f => f.id == fighter1.id && f.status == enums.TournamentFighterStatuses.Pending);
+		let tournamentFighter2 = tournament.fighters.find(f => f.id == fighter2.id && f.status == enums.TournamentFighterStatuses.Pending);
+		let spark1 = fighter1.techs.length < 3 && Math.random() < 0.02;
+		let spark2 = fighter2.techs.length < 3 && Math.random() < 0.02;
+		if(fighter1.techs.length > 0 || spark1) {
+			let techOdds = 3;
+			if(tournamentFighter1.score == 2 && tournamentFighter2.score == 2) {
+				techOdds = 12;
+			} else if(tournamentFighter1.score < tournamentFighter2.score) {
+				techOdds = 8;
+			}
+			if(this.roll() <= techOdds) {
+				// Use tech!
+				if(spark1) {
+					// Sparking!
+					const style = await sql.getStyle(channel, fighter1.style.name);
+					tech = style.techs[fighter1.techs.length];
+					fighter1.techs.push(tech);
+					await sql.addTechnique(fighter1, tech);
+					score1 += (matchup2 && matchup2.effect == enums.MatchupTypes.Strong) ? Math.ceil(tech.power / 3) : tech.power;
+					battleLog += `**Sparking!** ${fighter1.name} finally mastered the ${tech.name} technique, raising ${this.their(fighter1.gender)} battle power to ${score1}!\n`;
+				} else {
+					const tech = fighter1.techs[Math.floor(Math.random() & fighter1.techs.length)];
+					score1 += (matchup2 && matchup2.effect == enums.MatchupTypes.Strong) ? Math.ceil(tech.power / 3) : tech.power;
+					battleLog += `${fighter1.name} uses the ${tech.name} technique, raising ${this.their(fighter1.gender)} battle power to ${score1}!\n`;
+				}
+			}
+		}
+		if(fighter2.techs.length > 0 || spark2) {
+			let techOdds = 3;
+			if(tournamentFighter1.score == 2 && tournamentFighter2.score == 2) {
+				techOdds = 12;
+			} else if(tournamentFighter2.score < tournamentFighter1.score) {
+				techOdds = 8;
+			}
+			if(this.roll() <= techOdds) {
+				// Use tech!
+				if(spark2) {
+					// Sparking!
+					const style = await sql.getStyle(channel, fighter2.style.name);
+					const tech = style.techs[fighter2.techs.length];
+					fighter2.techs.push(tech);
+					await sql.addTechnique(fighter2, tech);
+					score2 += (matchup1 && matchup1.effect == enums.MatchupTypes.Strong) ? Math.ceil(tech.power / 3) : tech.power;
+					battleLog += `**Sparking!** ${fighter2.name} finally mastered the ${tech.name} technique, raising ${this.their(fighter2.gender)} battle power to ${score2}!\n`;
+				} else {
+					const tech = fighter2.techs[Math.floor(Math.random() & fighter2.techs.length)];
+					score2 += (matchup1 && matchup1.effect == enums.MatchupTypes.Strong) ? Math.ceil(tech.power / 3) : tech.power;
+					battleLog += `${fighter2.name} uses the ${tech.name} technique, raising ${this.their(fighter2.gender)} battle power to ${score2}!\n`;
+				}
+			}
+		}
+
 		// Determine winner - fighters[0] defeats fighters[1]
 		let fighters = [];
 		if(score1 > score2) {
@@ -438,17 +519,13 @@ module.exports = {
 			fighters = [fighter2, fighter1];
 			scores = [score2, score1];
 		}
-
 		let difference = scores[0] - scores[1];
-		
-		let battleLog = '';
-		battleLog += `${fighter1.name} Battle Power: ${score1}\n${fighter2.name} Battle Power: ${score2}\n\n`
 		if(difference < 2) {
-			battleLog += `Neither fighter is able to gain ground...`;
+			battleLog += `\nNeither fighter is able to gain ground...`;
 		} else if(difference < 10) {
-			battleLog += `${fighters[0].name} lands a direct hit on ${fighters[1].name} for 1 point!`;
+			battleLog += `\n${fighters[0].name} lands a direct hit on ${fighters[1].name} for 1 point!`;
 		} else {
-			battleLog += `${fighters[0].name} inflicts a critical strike on ${fighters[1].name} for 2 points!`;
+			battleLog += `\n${fighters[0].name} inflicts a critical strike on ${fighters[1].name} for 2 points!`;
 		}
 
 		embed.addField('Ready? Fight!', battleLog);
@@ -652,7 +729,7 @@ module.exports = {
 			case 'Female':
 				return 'she';
 			default:
-				return 'their';
+				return 'they';
 		}
 	},
 	their(pronoun) {
@@ -747,15 +824,7 @@ module.exports = {
 					let winnerBracket = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Winners);
 					let loserBracket = tournament.fighters.filter(f => f && f.bracket == enums.Brackets.Losers);
 					
-					if(winnerBracket.length == 2 && loserBracket.length == 0) {
-						output += `CHAMPIONSHIP FINALS\n`;
-					} else if(winnerBracket.length == 2 && loserBracket.length == 2) {
-						output += `FINAL ROUND\n`;
-					} else if(tournament.fighters.length == 4) {
-						output += `SEMIFINAL ROUND\n`;
-					} else {
-						output += `ROUND ${tournament.round}\n`;
-					}
+					output += enums.Rounds.Name[tournament.round].toUpperCase() + '\n';
 					output += `Remaining Fighters: ${names.join(', ')}\n\n`;
 
 
@@ -889,6 +958,18 @@ module.exports = {
 		} else if(genderRoll < 17) {
 			gender = "Female";
 		}
+
+		let age = 0;
+		const ageRoll = this.roll();
+		if(ageRoll <= 3) {
+			age = 14 + Math.ceil(Math.random() * 6);
+		} else if(ageRoll <= 16) {
+			age = 20 + Math.ceil(Math.random() * 10);
+		} else if(ageRoll <= 19) {
+			age = 30 + Math.ceil(Math.random() * 15);
+		} else {
+			age = 45 + Math.ceil(Math.random() * 20);
+		}
 		
 		const orientationRoll = Math.random();
 		let orientation = "Nobody";
@@ -907,8 +988,15 @@ module.exports = {
 			},
 			gender: gender,
 			orientation: orientation,
+			potential: 0,
+			age: age,
 			relationships: [],
-			sponsorships: []
+			sponsorships: [],
+			techs: []
+		}
+
+		if(fighter.strength < 4 && this.roll() < 5) {
+			fighter.potential = Math.floor(Math.random() * 8) + 3;
 		}
 
 		const id = await sql.setFighter(fighter);
@@ -929,7 +1017,8 @@ module.exports = {
 		let style = {
 			channel: channel,
 			name: name,
-			matchups: []
+			matchups: [],
+			techs: []
 		}
 
 		const id = await sql.setStyle(style);
@@ -937,9 +1026,39 @@ module.exports = {
 
 		return style;
 	},
+	async newTech(style, power) {
+		let name;
+		let nameUnique = false;
+		while(!nameUnique) {
+			let nameParts = [];
+			nameParts.push(templates.TechniqueQualifiers[Math.floor(Math.random() * templates.TechniqueQualifiers.length)]);
+			if(power >= 8) {
+				nameParts.push(templates.TechniqueQualifiers[Math.floor(Math.random() * templates.TechniqueQualifiers.length)]);
+				while(nameParts[0] == nameParts[1]) {
+					nameParts[1] = templates.TechniqueQualifiers[Math.floor(Math.random() * templates.TechniqueQualifiers.length)];
+				}
+			}
+			nameParts.push(templates.TechniqueNouns[Math.floor(Math.random() * templates.TechniqueNouns.length)]);
+
+			name = nameParts.join(' ');
+			if(!(await sql.getTechniqueByName(style.channel, name))) {
+				nameUnique = true;
+			}
+		}
+
+		let tech = {
+			name: name,
+			styleId: style.id,
+			power: power,
+			channel: style.channel
+		};
+
+		return await sql.setTechnique(tech);
+	},
 	async startTournament(channel) {
 		const now = new Date().getTime();
 
+		let fighters = await sql.getFighters(channel);
 		let tournament = {
 			channel: channel
 		};
@@ -965,106 +1084,139 @@ module.exports = {
 				effect: enums.MatchupTypes.Weak
 			});
 		}
+
 		for(const style of styles) {
+			style.techs.push(await this.newTech(style, 3 + Math.floor(Math.random() * 3)));
+			style.techs.push(await this.newTech(style, 6 + Math.floor(Math.random() * 3)));
+			style.techs.push(await this.newTech(style, 9 + Math.floor(Math.random() * 3)));
 			await sql.setStyle(style);
 		}
 
 		// Generate fighters
-		for(let i = 0; i < 16; i++) {
+		for(let i = 0; i < fighters.length; i++) {
+			if(this.roll() < 9) {
+				// Add a returning fighter!
+				tournament.fighters.push(fighters[i]);
+				if(tournament.fighters.length > 8) {
+					break;
+				}
+			}
+		}
+
+		for(let i = tournament.fighters.length; i < 16; i++) {
 			tournament.fighters.push(await this.newFighter(channel));
+		}
+
+		// Set fighter techniques
+		for(const fighter of tournament.fighters) {
+			if(fighter.techs.length < 3 && this.roll() < 11) {
+				// Learn a new technique!
+				const fighterStyle = styles.find(s => s.id == fighter.style.id);
+				const newTech = fighterStyle.techs[fighter.techs.length]
+				fighter.techs.push(newTech);
+				await sql.addTechnique(fighter, newTech);
+			}
 		}
 
 		// Generate fighter relationships
 		for(const fighter of tournament.fighters) {
-			const numRelationships = Math.floor(Math.random() * 3) + 1;
-			for(let i = 0; i < numRelationships; i++) {
-				const relationshipRoll = this.roll();
-				let relationshipType = 0;
-				if(relationshipRoll < 6 && fighter.orientation != 'Nobody') {
-					relationshipType = enums.Relationships.Love;
-				} else if(relationshipRoll < 11) {
-					relationshipType = enums.Relationships.Friend;
-				} else if(relationshipRoll < 16) {
-					relationshipType = enums.Relationships.Rival;
-				} else {
-					relationshipType = enums.Relationships.Hate;
-				}
-
-				let validRelationship = false;
-				let tries = 0;
-				const mutual = this.roll() < 11 || relationshipType == enums.Relationships.Friend;
-				while(!validRelationship && tries < 100) {
-					tries++;
-					targetFighter = tournament.fighters[Math.floor(Math.random() * 16)];
-					if(fighter.id == targetFighter.id) {
-						validRelationship = false;
-						continue;
+			if(fighter.relationships.length == 0) {
+				const numRelationships = Math.floor(Math.random() * 3) + 1;
+				for(let i = 0; i < numRelationships; i++) {
+					const relationshipRoll = this.roll();
+					let relationshipType = 0;
+					if(relationshipRoll < 6 && fighter.orientation != 'Nobody') {
+						relationshipType = enums.Relationships.Love;
+					} else if(relationshipRoll < 11) {
+						relationshipType = enums.Relationships.Friend;
+					} else if(relationshipRoll < 16) {
+						relationshipType = enums.Relationships.Rival;
+					} else {
+						relationshipType = enums.Relationships.Hate;
 					}
 
-					validRelationship = true;
-					if(relationshipType == enums.Relationships.Love) {
-						switch(fighter.orientation) {
-							case 'Men':
-								if(targetFighter.gender == 'Female') validRelationship = false;
-								break;
-							case 'Women':
-								if(targetFighter.gender == 'Male') validRelationship = false;
-								break;
+					let validRelationship = false;
+					let tries = 0;
+					const mutual = this.roll() < 11 || relationshipType == enums.Relationships.Friend;
+					while(!validRelationship && tries < 100) {
+						tries++;
+						targetFighter = tournament.fighters[Math.floor(Math.random() * 16)];
+						if(fighter.id == targetFighter.id) {
+							validRelationship = false;
+							continue;
 						}
-						if(mutual) {
-							switch(targetFighter.orientation) {
+
+						validRelationship = true;
+						if(relationshipType == enums.Relationships.Love) {
+							switch(fighter.orientation) {
 								case 'Men':
-									if(fighter.gender == 'Female') validRelationship = false;
+									if(targetFighter.gender == 'Female') validRelationship = false;
 									break;
 								case 'Women':
-									if(fighter.gender == 'Male') validRelationship = false;
+									if(targetFighter.gender == 'Male') validRelationship = false;
 									break;
-								case 'Nobody':
-									validRelationship = false;
-									break;
+							}
+							if(mutual) {
+								switch(targetFighter.orientation) {
+									case 'Men':
+										if(fighter.gender == 'Female') validRelationship = false;
+										break;
+									case 'Women':
+										if(fighter.gender == 'Male') validRelationship = false;
+										break;
+									case 'Nobody':
+										validRelationship = false;
+										break;
+								}
+							}
+
+							// Don't allow major age differences in ships
+							let ageVariance = Math.max(Math.ceil(fighter.age * .15), 2);
+							if(fighter.age + ageVariance < targetFighter.age || 
+								fighter.age - ageVariance > targetFighter.age) {
+								validRelationship = false;
 							}
 						}
 					}
-				}
 
-				if(tries == 100) continue;
+					if(tries == 100) continue;
 
-				// Create the relationship
-				fighter.relationships.push({
-					id: targetFighter.id,
-					type: relationshipType
-				});
-				await sql.addRelationship(fighter, targetFighter.id, relationshipType);
-				if(mutual) {
-					targetFighter.relationships.push({
-						id: fighter.id,
+					// Create the relationship
+					fighter.relationships.push({
+						id: targetFighter.id,
 						type: relationshipType
 					});
-					await sql.addRelationship(targetFighter, fighter.id, relationshipType);
+					await sql.addRelationship(fighter, targetFighter.id, relationshipType);
+					if(mutual) {
+						targetFighter.relationships.push({
+							id: fighter.id,
+							type: relationshipType
+						});
+						await sql.addRelationship(targetFighter, fighter.id, relationshipType);
+					}
 				}
 			}
 		}
 
 		// Generate seed list
 		let seeds = this.getTournamentSeeds(tournament.fighters.length);
-		let fighters = tournament.fighters;
 
-		fighters = this.shuffle(fighters);
+		tournament.fighters = this.shuffle(tournament.fighters);
 
 		for(const i in seeds) {
-			if(seeds[i] <= fighters.length) {
-				fighters[seeds[i] - 1].position = i;
-				fighters[seeds[i] - 1].bracket = enums.Brackets.Winners;
-				fighters[seeds[i] - 1].status = enums.TournamentFighterStatuses.Pending;
-				fighters[seeds[i] - 1].score = 0;
+			if(seeds[i] <= tournament.fighters.length) {
+				tournament.fighters[seeds[i] - 1].position = i;
+				tournament.fighters[seeds[i] - 1].bracket = enums.Brackets.Winners;
+				tournament.fighters[seeds[i] - 1].status = enums.TournamentFighterStatuses.Pending;
+				tournament.fighters[seeds[i] - 1].score = 0;
 			}
 		}
 
 		// Generate odds
 		for(let i = 0; i < 16; i += 2) {
 			const mistake = this.roll() < 3;
-			const thisFighter = fighters.find(f => f.position == i);
-			const otherFighter = fighters.find(f => f.position == i + 1);
+			const thisFighter = tournament.fighters.find(f => f.position == i);
+			const otherFighter = tournament.fighters.find(f => f.position == i + 1);
 			const thisF = await sql.getFighterById(thisFighter.id);
 			const otherF = await sql.getFighterById(otherFighter.id);
 			thisFighter.odds = this.getOdds(thisF, otherF, 1, mistake);
@@ -1120,7 +1272,7 @@ module.exports = {
 		if(powerDifference > 9) {
 			winner.score += 2;
 		
-			if(Math.random() < 0.01) {
+			if(Math.random() < 0.02) {
 				// Permanent injury
 				output += `${loser.name} suffered a serious injury, and ${this.their(loser.gender)} strength has been permanently reduced.\n`;
 				loser.strength = Math.max(0, loser.strength - 1);
@@ -1200,7 +1352,7 @@ module.exports = {
 			loser.status = enums.TournamentFighterStatuses.Lost;
 
 			if(tournament.fighters.length == 2) {
-				await sql.eliminateFighter(loser.id);
+				await sql.eliminateFighter(loser);
 				tournament.fighters = [winner];
 				winner.position = 0
 				output += `The tournament is over! ${winner.name} is the world's strongest warrior!`;
@@ -1425,7 +1577,7 @@ module.exports = {
 
 		for(const f of oldFighters) {
 			if(f) {
-				await sql.eliminateFighter(f.id);
+				await sql.eliminateFighter(f);
 			}
 		}
 
@@ -1450,7 +1602,7 @@ module.exports = {
 			newFighters[1].status = enums.TournamentFighterStatuses.Pending;
 		} else {
 			let nextPosition = 0;
-			for(const f of newFighters) {
+			for(let f of newFighters) {
 				if(f) {
 					if(f.bracket == enums.Brackets.Losers) {
 						if(tournament.round == 1) {
@@ -1559,22 +1711,14 @@ module.exports = {
 		}
 	},
 	async testMethod(player, param) {
-		let tournament = await sql.getTournament(player.channel);
-		let losers = tournament.fighters.filter(f => f.bracket == 1);
-		for(let loser of losers) {
-			if(loser.position % 2 == 1) {
-				// Set odds on new match
-				const foe = tournament.fighters.find(f => f && f.position == loser.position - 1 && f.bracket == enums.Brackets.Losers);
-				
-				const mistake = this.roll() < 3;
-				loser.odds = this.getOdds(await sql.getFighterById(loser.id), 
-					await sql.getFighterById(foe.id), tournament.round, mistake);
-				foe.odds = this.getOdds(await sql.getFighterById(foe.id), 
-					await sql.getFighterById(loser.id), tournament.round, mistake);
-			}
+		let styles = await sql.getStyles(player.channel);
+		
+		for(const style of styles) {
+			style.techs.push(await this.newTech(style, 3 + Math.floor(Math.random() * 3)));
+			style.techs.push(await this.newTech(style, 6 + Math.floor(Math.random() * 3)));
+			style.techs.push(await this.newTech(style, 9 + Math.floor(Math.random() * 3)));
+			await sql.setStyle(style);
 		}
-
-		await sql.setTournament(tournament);
 	},
 	roll() {
 		return Math.floor(Math.random() * 20) + 1;

@@ -1,3 +1,5 @@
 module.exports = {
-    MatchMinutes: 60 * 12
+    MatchMinutes: 1,
+    EventTimerMinMinutes: 3,
+    EventTimerMaxMinutes: 6
 }

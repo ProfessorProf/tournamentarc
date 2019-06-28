@@ -48,6 +48,20 @@ module.exports = {
             6: 'Determined'
         }
     },
+    Rounds: {
+        Round1: 1,
+        Round2: 2,
+        Semifinals: 3,
+        Finals: 4,
+        ChampionshipFinals: 5,
+        Name: {
+            1: 'Round 1',
+            2: 'Round 2',
+            3: 'Semifinals',
+            4: 'Finals',
+            5: 'Championship Finals'
+        }
+    },
     Relationships: {
         Love: 0,
         Hate: 1,
