@@ -1783,10 +1783,11 @@ module.exports = {
 					output += `\n$0's mood improves!`;
 				}
 			}
+			await sql.setFighter(fighter);
 		} else {
 			// Relationship event!
 			const relationship = outgoingRelationships[Math.floor(Math.random() * outgoingRelationships.length)];
-			let targetFighter = await sql.getFighterById(targetId.toId);
+			let targetFighter = await sql.getFighterById(relationship.toId);
 			if(targetFighter) {
 				switch(relationship.type) {
 					case enums.Relationships.Friend:
