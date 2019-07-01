@@ -68,28 +68,48 @@ module.exports = {
 			stats += `\n${fighter.sponsorships.length == 1 ? 'Sponsor' : 'Sponsors'}: ${fighter.sponsorships.map(s => s.name)}`;
 		}
 
-		stats += '\n';
+		embed.setDescription(stats);
 
-		for(const r of fighter.relationships) {
-			stats += '\n'
+		let relationships = [];
+
+		for(const r of fighter.relationships.filter(r => r.fromId == fighter.id)) {
+			let relationship = '';
 			switch(r.type) {
 				case enums.Relationships.Love: 
-					stats += 'Loves ';
+					relationship += 'Loves ';
 					break;
 				case enums.Relationships.Friend: 
-					stats += 'Friends with ';
+					relationship += 'Friends with ';
 					break;
 				case enums.Relationships.Rival: 
-					stats += 'Rival of ';
+					relationship += 'Rival of ';
 					break;
 				case enums.Relationships.Hate: 
-					stats += 'Hates ';
+					relationship += 'Hates ';
 					break;
 			}
-			stats += r.name;
+			relationship += r.toName;
+			relationships.push(relationship);
 		}
 
-		embed.setDescription(stats);
+		for(const r of fighter.relationships.filter(r => r.toId == fighter.id)) {
+			let relationship = '';
+			switch(r.type) {
+				case enums.Relationships.Love: 
+					relationship += 'Loved by ';
+					break;
+				case enums.Relationships.Hate: 
+					relationship += 'Hated by ';
+					break;
+			}
+			if(relationship.length > 0) {
+				relationship += r.fromName;
+				relationships.push(relationship);
+			}
+		}
+
+		relationships.sort();
+		embed.addField('Relationships',  relationships.join('\n'));
 
 		return embed;
 	},
@@ -394,8 +414,8 @@ module.exports = {
 		}
 
 		// Get relationship modifiers
-		const relationship1 = fighter1.relationships.find(r => r.id == fighter2.id);
-		const relationship2 = fighter2.relationships.find(r => r.id == fighter1.id);
+		const relationship1 = fighter1.relationships.find(r => r.toId == fighter2.id);
+		const relationship2 = fighter2.relationships.find(r => r.toId == fighter1.id);
 
 		if(relationship1) {
 			switch(relationship1.type) {
@@ -445,14 +465,14 @@ module.exports = {
 			fighter1.strength += fighter1.potential;
 			score1 += fighter1.potential;
 			fighter1.potential = 0;
-			battleLog += `${fighter1}'s true potential awakened, raising ${this.their(fighter1.gender)} strength to ${fighter1.strength} `
+			battleLog += `**Burst!** ${fighter1.name}'s true potential awakened, raising ${this.their(fighter1.gender)} strength to ${fighter1.strength} `
 				+ `and ${this.their(fighter1.gender)} battle power to ${score1}!`;
 		}
 		if(fighter2.potential > 0 && fighter2.strength < fighter1.strength && this.roll() == 20) {
 			fighter2.strength += fighter2.potential;
 			score2 += fighter2.potential;
 			fighter2.potential = 0;
-			battleLog += `${fighter2}'s true potential awakened, raising ${this.their(fighter2.gender)} strength to ${fighter2.strength} `
+			battleLog += `**Burst!** ${fighter2.name}'s true potential awakened, raising ${this.their(fighter2.gender)} strength to ${fighter2.strength} `
 				+ `and ${this.their(fighter2.gender)} battle power to ${score2}!`;
 		}
 
@@ -639,6 +659,10 @@ module.exports = {
 					}
 				}
 			}
+		} else if(tournament && now > tournament.nextEvent) {
+			tournament.nextEvent = now + (settings.EventTimerMinMinutes + Math.random() * (settings.EventTimerMaxMinutes - settings.EventTimerMinMinutes)) * 60 * 1000;
+			await sql.setTournament(tournament);
+			return await this.event(tournament);
 		}
 	},
 	// Process updating passive changes in the world - offers and statuses expiring, garden updating, etc.
@@ -1067,29 +1091,33 @@ module.exports = {
 		tournament.fighters = [];
 
 		// Generate styles
-		let styles = [];
-		for(let i = 0; i < 5; i++) {
-			styles.push(await this.newStyle(channel));
-		}
-		// Generate style matchups
-		for(let i = 0; i < 5; i++) {
-			const strongAgainst = (i + 1) % 5;
-			const weakAgainst = i < 0 ? i + 5 : i
-			styles[i].matchups.push({
-				id: styles[strongAgainst].id,
-				effect: enums.MatchupTypes.Strong
-			});
-			styles[i].matchups.push({
-				id: styles[weakAgainst].id,
-				effect: enums.MatchupTypes.Weak
-			});
-		}
-
-		for(const style of styles) {
-			style.techs.push(await this.newTech(style, 3 + Math.floor(Math.random() * 3)));
-			style.techs.push(await this.newTech(style, 6 + Math.floor(Math.random() * 3)));
-			style.techs.push(await this.newTech(style, 9 + Math.floor(Math.random() * 3)));
-			await sql.setStyle(style);
+		let styles = await sql.getStyles(channel);
+		if(styles.length == 0) {
+			for(let i = 0; i < 5; i++) {
+				styles.push(await this.newStyle(channel));
+			}
+			
+			// Generate style matchups
+			for(let i = 0; i < 5; i++) {
+				const strongAgainst = (i + 1) % 5;
+				const weakAgainst = i < 0 ? i + 5 : i
+				styles[i].matchups.push({
+					id: styles[strongAgainst].id,
+					effect: enums.MatchupTypes.Strong
+				});
+				styles[i].matchups.push({
+					id: styles[weakAgainst].id,
+					effect: enums.MatchupTypes.Weak
+				});
+			}
+	
+			for(const style of styles) {
+				style.techs.push(await this.newTech(style, 3 + Math.floor(Math.random() * 3)));
+				style.techs.push(await this.newTech(style, 6 + Math.floor(Math.random() * 3)));
+				style.techs.push(await this.newTech(style, 9 + Math.floor(Math.random() * 3)));
+				await sql.setStyle(style);
+			}
+	
 		}
 
 		// Generate fighters
@@ -1183,13 +1211,15 @@ module.exports = {
 
 					// Create the relationship
 					fighter.relationships.push({
-						id: targetFighter.id,
+						fromId: fighter.id,
+						toId: targetFighter.id,
 						type: relationshipType
 					});
 					await sql.addRelationship(fighter, targetFighter.id, relationshipType);
 					if(mutual) {
 						targetFighter.relationships.push({
-							id: fighter.id,
+							fromId: targetFighter.id,
+							toId: fighter.id,
 							type: relationshipType
 						});
 						await sql.addRelationship(targetFighter, fighter.id, relationshipType);
@@ -1232,8 +1262,9 @@ module.exports = {
 
 		tournament.status = enums.TournamentStatuses.Active;
 		tournament.round = 1;
-		tournament.nextMatch = now + settings.MatchMinutes * 1000 * 60;
+		tournament.nextMatch = (now - (now % (hour * 24))) + settings.StartTime + 24 * hour;
 		tournament.nextAttack = tournament.nextMatch;
+		tournament.nextEvent = now + (settings.EventTimerMinMinutes + Math.random() * (settings.EventTimerMaxMinutes - settings.EventTimerMinMinutes)) * 60 * 1000;
 		await sql.setTournament(tournament);
 
 		return this.displayTournament(await sql.getTournament(tournament.channel));
@@ -1269,6 +1300,8 @@ module.exports = {
 		let winner = tournament.fighters.find(f => f && f.id == winnerFighter.id && f.status == enums.TournamentFighterStatuses.Pending);
 		let loser = tournament.fighters.find(f => f && f.id == loserFighter.id && f.status == enums.TournamentFighterStatuses.Pending);
 
+		let output = '';
+
 		if(powerDifference > 9) {
 			winner.score += 2;
 		
@@ -1281,7 +1314,7 @@ module.exports = {
 			winner.score += 1;
 		}
 
-		let output = `Score: ${winnerFighter.name} ${winner.score}, ${loserFighter.name} ${loser.score}\n`;
+		output += `Score: ${winnerFighter.name} ${winner.score}, ${loserFighter.name} ${loser.score}\n`;
 
 		if(winner.score >= 3) {
 			// Battle over!
@@ -1565,28 +1598,31 @@ module.exports = {
 		for(let i = 0; i < tournament.fighters.length; i += 2) {
 			const leftFighter = tournament.fighters[i];
 			const rightFighter = tournament.fighters[i+1];
-			if((leftFighter && leftFighter.status == enums.TournamentFighterStatuses.Won) ||
-				(!rightFighter)) {
-				newFighters.push(leftFighter);
+			let outdated = false;
+			if(tournament.fighters.find(f => f.id == leftFighter.id && f.bracket == leftFighter.bracket && f.position > leftFighter.position)) {
+				outdated = true;
+			}
+			if(tournament.fighters.find(f => f.id == rightFighter.id && f.bracket == rightFighter.bracket && f.position > rightFighter.position)) {
+				outdated = true;
+			}
+			if(outdated) {
+				oldFighters.push(leftFighter);
 				oldFighters.push(rightFighter);
 			} else {
-				newFighters.push(rightFighter);
-				oldFighters.push(leftFighter);
+				if((leftFighter && leftFighter.status == enums.TournamentFighterStatuses.Won) ||
+					(!rightFighter)) {
+					newFighters.push(leftFighter);
+					oldFighters.push(rightFighter);
+				} else {
+					newFighters.push(rightFighter);
+					oldFighters.push(leftFighter);
+				}
 			}
 		}
 
 		for(const f of oldFighters) {
 			if(f) {
 				await sql.eliminateFighter(f);
-			}
-		}
-
-		newFighters.sort((a,b) => a.bracket * 1000 + a.position - (b.bracket * 1000 + b.position));
-		for(let i = 0; i < newFighters.length; i++) {
-			const fighter = newFighters[i];
-			if(newFighters.find(f => f.id == fighter.id && f.bracket == fighter.bracket && f.position > fighter.position)) {
-				newFighters.splice(i, 1);
-				i--;
 			}
 		}
 
@@ -1708,6 +1744,183 @@ module.exports = {
 			await sql.setPlayer(player);
 			await sql.setPlayer(target);
 			return `${player.name} donates ${amount} ${amount == 1 ? 'coin' : 'coins'} to ${target.name}!`;
+		}
+	},
+	async event(tournament) {
+		let embed = new Discord.RichEmbed();
+		embed.setTitle('MEANWHILE...')
+			.setColor(0x00AE86);
+
+		// Select a fighter to act
+		let tournamentFighter = tournament.fighters[Math.floor(Math.random() * tournament.fighters.length)];
+		let fighter = await sql.getFighterById(tournamentFighter.id);
+
+		let output = '';
+		let outgoingRelationships = fighter.relationships.filter(r => r.fromId == fighter.id && tournament.fighters.find(f => f.id == r.toId));
+		const eventRoll = this.roll();
+		if(this.roll() < 7 || outgoingRelationships.length == 0) {
+			// Solo event!
+			if(eventRoll < 11) {
+				// Training event
+				output = templates.TrainingScenes[Math.floor(Math.random() * templates.TrainingScenes.length)];
+				if(this.roll() < 3) {
+					// Strength up
+					fighter.strength++;
+					output += `\n$0's Strength increases to ${fighter.strength}!`;
+				} else if (this.roll() < 3 && fighter.techs.length < 3) {
+					// New technique
+					const style = await sql.getStyle(channel, fighter1.style.name);
+					tech = style.techs[fighter.techs.length];
+					fighter.techs.push(tech);
+					await sql.addTechnique(fighter, tech);
+					output += `\n$0 masters the ${tech.name} technique!`;
+				}
+			} else {
+				// Mood event
+				output = templates.MoodScenes[Math.floor(Math.random() * templates.MoodScenes.length)];
+				if(this.roll() < 11 && fighter.mood < enums.Moods.Determined) {
+					fighter.mood++;
+					output += `\n$0's mood improves!`;
+				}
+			}
+		} else {
+			// Relationship event!
+			const relationship = outgoingRelationships[Math.floor(Math.random() * outgoingRelationships.length)];
+			let targetFighter = await sql.getFighterById(targetId.toId);
+			if(targetFighter) {
+				switch(relationship.type) {
+					case enums.Relationships.Friend:
+						output = templates.FriendshipScenes[Math.floor(Math.random() * templates.FriendshipScenes.length)];
+						if(this.roll() < 11 && fighter.mood < enums.Moods.Determined) {
+							fighter.mood++;
+							output += `\n$0's mood improves!`;
+						}
+						if(this.roll() < 11 && targetFighter.mood < enums.Moods.Determined) {
+							targetFighter.mood++;
+							output += `\n$1's mood improves!`;
+						}
+						break;
+					case enums.Relationships.Hate:
+						output = templates.HateScenes[Math.floor(Math.random() * templates.HateScenes.length)];
+						if(this.roll() < 11 && fighter.mood > enums.Moods.Depressed) {
+							fighter.mood--;
+							output += `\n$0's mood worsens.`;
+						}
+						break;
+					case enums.Relationships.Rival:
+						if(this.roll() < 7) {
+							// Fight
+							output = templates.FightScenes[Math.floor(Math.random() * templates.FightScenes.length)];
+							let score1 = fighter.strength + this.roll();
+							let score2 = targetFighter.strength + this.roll();
+							// Determine winner - fighters[0] defeats fighters[1]
+							let fighters = [];
+							let scores = [];
+							if(score1 > score2) {
+								fighters = [fighter, targetFighter];
+								scores = [score1, score2];
+							} else {
+								fighters = [targetFighter, fighter];
+								scores = [score2, score1];
+							}
+							let difference = scores[0] - scores[1];
+							if(difference < 2) {
+								output += `\nThe fight ends without a clear winner...`;
+							} else {
+								battleLog += `\n${fighters[0].name} wins the fight!`;
+								if(this.roll() < 16 && fighters[0].mood < enums.Moods.Determined) {
+									fighters[0].mood++;
+									output += `\n${fighters[0].name}'s mood improves!`;
+								}
+								if(this.roll() < 16 && fighters[1].mood > enums.Moods.Depressed) {
+									fighters[0].mood++;
+									output += `\n${fighters[1].name}'s mood worsens.`;
+								}
+							}
+						} else {
+							// No change
+							output = templates.RivalScenes[Math.floor(Math.random() * templates.RivalScenes.length)];
+						}
+						break;
+					case enums.Relationships.Love:
+						let mutual = fighter.relationships.find(r => r.toId == fighter.id && r.fromId == targetFighter.id && r.type == enums.Relationships.Love);
+						if(mutual) {
+							output = templates.LoveScenes[Math.floor(Math.random() * templates.LoveScenes.length)];
+							if(this.roll() < 16 && fighter.mood < enums.Moods.Determined) {
+								fighter.mood++;
+								output += `\n$0's mood improves!`;
+							}
+							if(this.roll() < 16 && targetFighter.mood < enums.Moods.Determined) {
+								targetFighter.mood++;
+								output += `\n$1's mood improves!`;
+							}
+						} else {
+							if(this.roll() < 6) {
+								// Confession!
+								output = `$0 confessed ${this.their(fighter.gender)} feelings for ${targetFighter.name}!`;
+
+								let loveOdds = 16;
+								loveOdds += loserFighter.mood - 3; // Odds are affected by the confessee's mood
+
+								let returnRelationship = fighter.relationships.find(r => r.toId == fighter.id && r.fromId == targetFighter.id);
+
+								switch(targetFighter.orientation) {
+									case 'Men':
+										if(fighter.gender == 'Female') {
+											loveOdds = 0;
+										}
+										break;
+									case 'Women':
+										if(fighter.gender == 'Male') {
+											loveOdds = 0;
+										}
+										break;
+									case 'Nobody':
+										loveOdds = 0;
+										break;
+								}
+
+								if(returnRelationship && returnRelationship.type == enums.Relationships.Hate) {
+									loveOdds -= 12;
+								}
+
+								if(this.roll() < loveOdds) {
+									output += `\n${targetFighter.name} accepted ${fighter.name}'s feelings!`;
+									await sql.addRelationship(targetFighter, fighter.id, enums.Relationships.Love);
+									if(this.roll() < 16 && fighter.mood < enums.Moods.Determined) {
+										fighter.mood++;
+										output += `\n$0's mood improves!`;
+									}
+								} else {
+									output += `\n${targetFighter.name} didn't accept ${fighter.name}'s feelings...`
+									if(this.roll() < 16 && fighter.mood > enums.Moods.Depressed) {
+										fighter.mood--;
+										output += `\n$0's mood worsens.`;
+									}
+								}
+							} else {
+								// No change
+								output = templates.CrushScenes[Math.floor(Math.random() * templates.CrushScenes.length)];
+							}
+						}
+						break;
+				}
+
+				await sql.setFighter(fighter);
+				await sql.setFighter(targetFighter);
+			}
+		}
+
+		output.replace(/\$0they/g, this.they(fighter.gender));
+		output.replace(/\$0their/g, this.their(fighter.gender));
+		output.replace(/\$0/g, fighter.name);
+		output.replace(/\$1/g, targetFighter.name);
+
+		if(output.length == 0) {
+			return null;
+		} else {
+			embed.setDescription(output);
+			return embed;
 		}
 	},
 	async testMethod(player, param) {

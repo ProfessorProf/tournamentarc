@@ -38,9 +38,9 @@ module.exports = {
         "$0 and $1 discuss what they'll do if they win the tournament."
     ],
     RivalScenes: [
-        "$0 and $1 declare they won't lose to anyone but each other.",
+        "$0 declares that $0they won't lose to anyone but $1.",
         "$0 provokes $1, but they don't get into a fight.",
-        "$0 and $1 are looking forward to facing each other in the tournament."
+        "$0 is looking forward to facing $1 in the tournament."
     ],
     FightScenes: [
         "$0 and $1 get into a fight outside the tournament!",
@@ -50,7 +50,8 @@ module.exports = {
     LoveScenes: [
         "$0 and $1 talk about their future after the tournament.",
         "$0 and $1 go out for drinks between battles.",
-        "$0 and $1 are thinking about each other."
+        "$0 and $1 are thinking about each other.",
+        "$0 and $1 spend some quiet time together."
     ],
     CrushScenes: [
         "$0 is thinking about $1.",
@@ -62,10 +63,17 @@ module.exports = {
         "$0 swears to get revenge on $1.",
         "$0 is avoiding talking to $1."
     ],
-    NeutralScenes: [
+    MoodScenes: [
         "$0 thinks about what $0theyre fighting for.",
         "$0 is taking a nap to conserve strength.",
         "$0 sends a letter back to $0their family.",
+        "$0 spends the evening at the hot springs.",
         "$0 is getting fired up thinking of the next match."
+    ],
+    TrainingScenes: [
+        "$0 works hard on perfecting a new technique.",
+        "$0 meditates under a waterfall for hours.",
+        "$0 trains in ten times Earth's gravity.",
+        "$0 contemplates new battle strategies."
     ]
 }
