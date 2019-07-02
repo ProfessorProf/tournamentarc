@@ -17,7 +17,6 @@ client.on('ready', () => {
 	console.log(`Logged in as ${client.user.username}!`);
 
 	sql.getChannels().then(async channels => {;
-		const now = new Date().getTime();
 		if(channels.length > 0) {
 			for(const i in channels) {
 				const c = channels[i];
@@ -28,12 +27,6 @@ client.on('ready', () => {
 					} else {
 						let world = await sql.getWorld(c);
 						channel.send(`Bot online! Greetings, Universe ${world.id}.`);
-						const downtime = now - world.lastUpdate
-						console.log(`(${c}) Downtime ${tools.getTimeString(downtime)}`);
-						if(world && world.lastUpdate && downtime > 5 * 1000 * 60) {
-							// await sql.fastForward(c, downtime);
-							channel.send(`Bot was offline for about ${tools.getTimeString(downtime)}.`);
-						}
 					}
 				}
 			}
@@ -280,6 +273,9 @@ async function handleMessage(message) {
 			break;
 		case 'test':
 			output.messages = await tools.testMethod(player, args[0]);
+			break;
+		case 'import':
+			await sql.import(channel, args[0]);
 			break;
 		case 'update':
 			await sql.update();

@@ -13,6 +13,8 @@ module.exports = {
                 .addField('!help info', 'Help with informational commands: !check, !fighter, !fighters, !players, !next, !tournament.')
                 .addField('!help actions', 'Help with other commands: !sponsor, !bet, !give.')
                 .addField('!help battle', 'Help with the mechanics of combat.')
+                .addField('!help techs', 'Help with battle techniques.')
+                .addField('!help events', 'Help with random events.')
                 .addField('Private commands', 'For info commands, you can start the command with `!!` instead of `!` ' +
                     'and it will send the information in a DM.')
         } else {
@@ -70,6 +72,20 @@ module.exports = {
                             "**Rival:** The fighter will fight hard to surpass their rival, and their power will be slightly higher.\n" +
                             "**Friend:** No effect on combat, but whenever their friend wins a fight, this fighter's mood will improve slightly.");
                     break;
+                case 'event':
+                    output.setTitle('Help: Events')
+                        .setDescription('Between battles, various minor events will occur. These can involve one or two characters, and can have various effects ' +
+                            'based on their relationships. Moods can change, relationships can change, characters may get in fights with their rivals, and ' +
+                            'they can even become stronger or learn new techniques. Keep an eye out when considering who to bet on!');
+                        break;
+                case 'techs':
+                    output.setTitle('Help: Techniques')
+                        .setDescription('Some fighters will learn powerful fighting techniques that can turn the tide of battle. These techniques activate randomly, ' +
+                            'although fighters who are on the defensive are more likely to use them. Activated techniques increase the battle power of their attack, ' +
+                            'giving them an edge that may change the outcome of a battle!\n' +
+                            "Each Style has three Techniques. Each Technique adds a different amount to the user's battle power. New Techniques can be learned " +
+                            'between matches, or sometimes in the heat of battle.');
+                        break;
                 default:
                     if(this.addHelpField(output, topic)) {
                         return output;

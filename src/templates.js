@@ -38,7 +38,7 @@ module.exports = {
         "$0 and $1 discuss what they'll do if they win the tournament."
     ],
     RivalScenes: [
-        "$0 declares that $0they won't lose to anyone but $1.",
+        "$0 swears that $0they won't lose to anyone but $1.",
         "$0 provokes $1, but they don't get into a fight.",
         "$0 is looking forward to facing $1 in the tournament."
     ],

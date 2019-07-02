@@ -643,19 +643,21 @@ module.exports = {
 	async updateTournament(channel) {
 		const now = new Date().getTime();
 		let tournament = await sql.getTournament(channel);
-		if(tournament && now > tournament.nextAttack) {
-			if(tournament.status == enums.TournamentStatuses.Complete) {
-				// Start the new tournament
-				return this.startTournament(channel);
-			} else {
-				// Find the next match
-				for(let i = 0; i < tournament.fighters.length; i += 2) {
-					const leftFighter = tournament.fighters[i];
-					const rightFighter = tournament.fighters[i + 1];
+		if(tournament && now > tournament.nextMatch) {
+			if(tournament.nextAttack) {
+				if(tournament.status == enums.TournamentStatuses.Complete) {
+					// Start the new tournament
+					//return this.startTournament(channel);
+				} else {
+					// Find the next match
+					for(let i = 0; i < tournament.fighters.length; i += 2) {
+						const leftFighter = tournament.fighters[i];
+						const rightFighter = tournament.fighters[i + 1];
 
-					if(leftFighter && rightFighter && leftFighter.status == enums.TournamentFighterStatuses.Pending) {
-						// Fight!
-						return await this.fight(await sql.getFighterById(leftFighter.id), await sql.getFighterById(rightFighter.id));
+						if(leftFighter && rightFighter && leftFighter.status == enums.TournamentFighterStatuses.Pending) {
+							// Fight!
+							return await this.fight(await sql.getFighterById(leftFighter.id), await sql.getFighterById(rightFighter.id));
+						}
 					}
 				}
 			}
@@ -754,6 +756,18 @@ module.exports = {
 				return 'she';
 			default:
 				return 'they';
+		}
+	},
+	theyre(pronoun) {
+		switch(pronoun) {
+			case 'he':
+			case 'Male':
+				return "he's";
+			case 'she':
+			case 'Female':
+				return "she's";
+			default:
+				return "they're";
 		}
 	},
 	their(pronoun) {
@@ -1007,9 +1021,7 @@ module.exports = {
 			strength: Math.floor(Math.random() * 10) + 1,
 			preferredMood: preferredMood,
 			mood: Math.max(0, Math.min(6, preferredMood + Math.floor(Math.random() * 5) - 2)),
-			style: {
-				id: Math.floor(Math.random() * 5) + 1,
-			},
+			style: {},
 			gender: gender,
 			orientation: orientation,
 			potential: 0,
@@ -1019,7 +1031,11 @@ module.exports = {
 			techs: []
 		}
 
-		if(fighter.strength < 4 && this.roll() < 5) {
+		const styles = await sql.getStyles(channel);
+		const style = styles[Math.floor(Math.random() * styles.length)];
+		fighter.style.id = style.id;
+
+		if(fighter.strength < 4 && this.roll() < 6) {
 			fighter.potential = Math.floor(Math.random() * 8) + 3;
 		}
 
@@ -1260,6 +1276,8 @@ module.exports = {
 			await sql.setPlayer(player);
 		}
 
+		await sql.clearSponsors(channel);
+
 		tournament.status = enums.TournamentStatuses.Active;
 		tournament.round = 1;
 		tournament.nextMatch = (now - (now % (hour * 24))) + settings.StartTime + 24 * hour;
@@ -1409,12 +1427,22 @@ module.exports = {
 				}
 			}
 
-			const sponsorReward = tournament.round * 20;
 			for(const sponsor of winnerFighter.sponsorships) {
 				let player = await sql.getPlayerById(sponsor.id);
+				const sponsorReward = Math.max(tournament.round * 20, Math.floor(player.coins / 4));
 				output += `\nSponsor ${player.name} earns ${sponsorReward} coins!`;
 				player.coins += sponsorReward;
 				await sql.setPlayer(player);
+			}
+
+			// Give money to broke players who didn't bet
+			let players = (await sql.getPlayers(tournament.channel))
+				.filter(p => !bets.find(b => b.playerId == p.id));
+			for(const player of players) {
+				if(player.coins < tournament.round * 10) {
+					player.coins = tournament.round * 10;
+					await sql.setPlayer(player);
+				}
 			}
 
 			await sql.deleteBets(tournament.channel);
@@ -1674,15 +1702,6 @@ module.exports = {
 			}
 		}
 
-		// Give money to broke players
-		let players = await sql.getPlayers(tournament.channel);
-		for(const player of players) {
-			if(player.coins < tournament.round * 10) {
-				player.coins = tournament.round * 10;
-				await sql.setPlayer(player);
-			}
-		}
-
 		if(tournament.fighters.length == 2) {
 			return `\nIt's time for the tournament finals!`;
 		} else {
@@ -1751,12 +1770,14 @@ module.exports = {
 		embed.setTitle('MEANWHILE...')
 			.setColor(0x00AE86);
 
+		let fighters = (await sql.getFighters(tournament.channel))
+			.filter(f => tournament.fighters.find(f2 => f2.id == f.id && f2.status != enums.TournamentFighterStatuses.Lost));
 		// Select a fighter to act
-		let tournamentFighter = tournament.fighters[Math.floor(Math.random() * tournament.fighters.length)];
-		let fighter = await sql.getFighterById(tournamentFighter.id);
+		let fighter = fighters[Math.floor(Math.random() * fighters.length)];
 
 		let output = '';
-		let outgoingRelationships = fighter.relationships.filter(r => r.fromId == fighter.id && tournament.fighters.find(f => f.id == r.toId));
+		let outgoingRelationships = fighter.relationships.filter(r => r.fromId == fighter.id && 
+			tournament.fighters.find(f => f.id == r.toId && f.status != enums.TournamentFighterStatuses.Lost));
 		const eventRoll = this.roll();
 		if(this.roll() < 7 || outgoingRelationships.length == 0) {
 			// Solo event!
@@ -1769,7 +1790,7 @@ module.exports = {
 					output += `\n$0's Strength increases to ${fighter.strength}!`;
 				} else if (this.roll() < 3 && fighter.techs.length < 3) {
 					// New technique
-					const style = await sql.getStyle(channel, fighter1.style.name);
+					const style = await sql.getStyle(tournament.channel, fighter1.style.name);
 					tech = style.techs[fighter.techs.length];
 					fighter.techs.push(tech);
 					await sql.addTechnique(fighter, tech);
@@ -1909,13 +1930,15 @@ module.exports = {
 
 				await sql.setFighter(fighter);
 				await sql.setFighter(targetFighter);
+
+				output = output.replace(/\$1/g, targetFighter.name);
 			}
 		}
 
-		output.replace(/\$0they/g, this.they(fighter.gender));
-		output.replace(/\$0their/g, this.their(fighter.gender));
-		output.replace(/\$0/g, fighter.name);
-		output.replace(/\$1/g, targetFighter.name);
+		output = output.replace(/\$0theyre/g, this.theyre(fighter.gender));
+		output = output.replace(/\$0they/g, this.they(fighter.gender));
+		output = output.replace(/\$0their/g, this.their(fighter.gender));
+		output = output.replace(/\$0/g, fighter.name);
 
 		if(output.length == 0) {
 			return null;
@@ -1932,6 +1955,29 @@ module.exports = {
 			style.techs.push(await this.newTech(style, 6 + Math.floor(Math.random() * 3)));
 			style.techs.push(await this.newTech(style, 9 + Math.floor(Math.random() * 3)));
 			await sql.setStyle(style);
+		}
+
+		let fighters = await sql.getFighters(player.channel);
+		for(const fighter of fighters) {
+			let age = 0;
+			const ageRoll = this.roll();
+			if(ageRoll <= 3) {
+				age = 14 + Math.ceil(Math.random() * 6);
+			} else if(ageRoll <= 16) {
+				age = 20 + Math.ceil(Math.random() * 10);
+			} else if(ageRoll <= 19) {
+				age = 30 + Math.ceil(Math.random() * 15);
+			} else {
+				age = 45 + Math.ceil(Math.random() * 20);
+			}
+
+			fighter.age = age;
+			
+			if(fighter.strength < 4 && this.roll() < 6) {
+				fighter.potential = Math.floor(Math.random() * 8) + 3;
+			}
+
+			await(sql.setFighter(fighter));
 		}
 	},
 	roll() {

@@ -766,6 +766,9 @@ module.exports = {
 		await sql.run(`INSERT INTO Sponsorships (Player_ID, Fighter_ID) VALUES ($playerId, $fighterId)`,
 			{ $playerId: playerId, $fighterId: fighterId });
 	},
+	async clearSponsors(channel) {
+		await sql.run(`DELETE FROM Sponsorships WHERE Channel = $channel`, { $channel: channel });
+	},
 	async getBets(channel) {
 		const betRows = await sql.all(`SELECT * FROM Bets WHERE Channel = $channel`, { $channel: channel });
 		return betRows.map(row => {
@@ -787,5 +790,28 @@ module.exports = {
 			return world;
 		}
 		return false;
+	},
+	async import(channel, fromChannel) {
+		await sql.run(`DELETE FROM Worlds WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Tournaments WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Players WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Config WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Fighters WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Styles WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM TournamentFighters WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Bets WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Sponsorships WHERE Channel = $channel`, { $channel: channel});
+		await sql.run(`DELETE FROM Techniques WHERE Channel = $channel`, { $channel: channel});
+
+		await sql.run(`UPDATE Worlds SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Tournaments SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Players SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Config SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Fighters SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Styles SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE TournamentFighters SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Bets SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Sponsorships SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
+		await sql.run(`UPDATE Techniques SET Channel = $channel2 WHERE Channel = $channel1`, { $channel1: fromChannel, $channel2: channel});
 	}
 }
